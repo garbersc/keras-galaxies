@@ -13,7 +13,8 @@ from pylearn2.sandbox.cuda_convnet.filter_acts import FilterActs
 from pylearn2.sandbox.cuda_convnet.pool import MaxPool
 from pylearn2.sandbox.cuda_convnet.stochastic_pool import StochasticMaxPool, WeightedMaxPool
 from pylearn2.sandbox.cuda_convnet.response_norm import CrossMapNorm
-from theano.sandbox.cuda import host_from_gpu
+#from theano.sandbox.cuda import host_from_gpu
+from theano.sandbox.cuda.basic_ops import host_from_gpu
 
 
 class CudaConvnetInput2DLayer(layers.Input2DLayer):
@@ -49,6 +50,8 @@ class CudaConvnetConv2DLayer(object):
         self.input_shape = self.input_layer.get_output_shape()
 
         self.filter_shape = (self.input_shape[0], filter_size, filter_size, n_filters)
+
+	print self.filter_shape
 
         self.W = layers.shared_single(4) # theano.shared(np.random.randn(*self.filter_shape).astype(np.float32) * self.weights_std)
 

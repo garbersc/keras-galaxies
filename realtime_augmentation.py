@@ -9,9 +9,13 @@ import time
 
 import load_data
 
+myLoadFrom_RAM=False
+
 
 NUM_PROCESSES = 6
-CHUNK_SIZE = 25000
+#CHUNK_SIZE = 25000
+
+CHUNK_SIZE = 25000 #10000 #i think its only used as default value
 
 
 IMAGE_WIDTH = 424
@@ -48,7 +52,10 @@ def fast_warp(img, tf, output_shape=(53,53), mode='reflect'):
     """
     This wrapper function is about five times faster than skimage.transform.warp, for our use case.
     """
-    m = tf._matrix
+#    m = tf._matrix
+    #print("DEBUG:")
+   # print type(tf)
+    m = tf.params
     img_wf = np.empty((output_shape[0], output_shape[1], 3), dtype='float32')
     for k in xrange(3):
         img_wf[..., k] = skimage.transform._warps_cy._warp_fast(img[..., k], m, output_shape=output_shape, mode=mode)
@@ -185,7 +192,7 @@ ds_transforms = ds_transforms_default # CHANGE THIS LINE to select downsampling 
 def load_and_process_image(img_index, ds_transforms, augmentation_params, target_sizes=None):
     # start_time = time.time()
     img_id = load_data.train_ids[img_index]
-    img = load_data.load_image(img_id, from_ram=True)
+    img = load_data.load_image(img_id, from_ram=myLoadFrom_RAM)
     # load_time = (time.time() - start_time) * 1000
     # start_time = time.time()
     img_a = perturb_and_dscrop(img, ds_transforms, augmentation_params, target_sizes)
@@ -238,6 +245,7 @@ def realtime_augmented_data_gen(num_chunks=None, chunk_size=CHUNK_SIZE, augmenta
             break
 
         # start_time = time.time()
+
         selected_indices = select_indices(num_train, chunk_size)
         labels = y_train[selected_indices]
 
@@ -291,7 +299,7 @@ def load_and_process_image_fixed(img_index, subset, ds_transforms, augmentation_
     elif subset == 'test':
         img_id = load_data.test_ids[img_index]
 
-    img = load_data.load_image(img_id, from_ram=True, subset=subset)
+    img = load_data.load_image(img_id, from_ram=myLoadFrom_RAM, subset=subset)
     img_a = augment_fixed_and_dscrop(img, ds_transforms, augmentation_transforms, target_sizes)
     return img_a
 
@@ -317,7 +325,12 @@ def realtime_fixed_augmented_data_gen(selected_indices, subset, ds_transforms=ds
     """
     by default, only the identity transform is in the augmentation list, so no augmentation occurs (only ds_transforms are applied).
     """
+
+    print('Debug from ra.realtime_fixed_augmented_data_gen y_valid.shape %s , valid_ids.shape %s ' % (y_valid.shape,valid_ids.shape))
+    print('len(augmentation_transforms) %s ' % len(augmentation_transforms))
+    print('chunk_size %s ' % chunk_size)
     num_ids_per_chunk = (chunk_size // len(augmentation_transforms)) # number of datapoints per chunk - each datapoint is multiple entries!
+    print('num_ids_per_chunk %s ' % num_ids_per_chunk)
     num_chunks = int(np.ceil(len(selected_indices) / float(num_ids_per_chunk)))
 
     if target_sizes is None: # default to (53,53) for backwards compatibility
@@ -543,7 +556,7 @@ def perturb_and_dscrop_with_prepro(img, ds_transforms, augmentation_params, targ
 def load_and_process_image_pysex_centering(img_index, ds_transforms, augmentation_params, target_sizes=None):
     # start_time = time.time()
     img_id = load_data.train_ids[img_index]
-    img = load_data.load_image(img_id, from_ram=True)
+    img = load_data.load_image(img_id, from_ram=myLoadFrom_RAM)
     # load_time = (time.time() - start_time) * 1000
     # start_time = time.time()
     tf_center = build_pysex_center_transform(img_index)
@@ -567,7 +580,7 @@ class LoadAndProcessPysexCentering(object):
 def load_and_process_image_pysex_centering_rescaling(img_index, ds_transforms, augmentation_params, target_sizes=None):
     # start_time = time.time()
     img_id = load_data.train_ids[img_index]
-    img = load_data.load_image(img_id, from_ram=True)
+    img = load_data.load_image(img_id, from_ram=myLoadFrom_RAM)
     # load_time = (time.time() - start_time) * 1000
     # start_time = time.time()
     tf_center_rescale = build_pysex_center_rescale_transform(img_index)
@@ -591,7 +604,7 @@ class LoadAndProcessPysexCenteringRescaling(object):
 def load_and_process_image_pysexgen1_centering_rescaling(img_index, ds_transforms, augmentation_params, target_sizes=None):
     # start_time = time.time()
     img_id = load_data.train_ids[img_index]
-    img = load_data.load_image(img_id, from_ram=True)
+    img = load_data.load_image(img_id, from_ram=myLoadFrom_RAM)
     # load_time = (time.time() - start_time) * 1000
     # start_time = time.time()
     tf_center_rescale = build_pysexgen1_center_rescale_transform(img_index)
@@ -637,7 +650,7 @@ def load_and_process_image_fixed_pysex_centering(img_index, subset, ds_transform
 
     tf_center = build_pysex_center_transform(img_index, subset)
     
-    img = load_data.load_image(img_id, from_ram=True, subset=subset)
+    img = load_data.load_image(img_id, from_ram=myLoadFrom_RAM, subset=subset)
     img_a = augment_fixed_and_dscrop_with_prepro(img, ds_transforms, augmentation_transforms, target_sizes, prepro_transform=tf_center)
     return img_a
 
@@ -665,7 +678,7 @@ def load_and_process_image_fixed_pysex_centering_rescaling(img_index, subset, ds
 
     tf_center_rescale = build_pysex_center_rescale_transform(img_index, subset)
     
-    img = load_data.load_image(img_id, from_ram=True, subset=subset)
+    img = load_data.load_image(img_id, from_ram=myLoadFrom_RAM, subset=subset)
     img_a = augment_fixed_and_dscrop_with_prepro(img, ds_transforms, augmentation_transforms, target_sizes, prepro_transform=tf_center_rescale)
     return img_a
 
@@ -693,7 +706,7 @@ def load_and_process_image_fixed_pysexgen1_centering_rescaling(img_index, subset
 
     tf_center_rescale = build_pysexgen1_center_rescale_transform(img_index, subset)
     
-    img = load_data.load_image(img_id, from_ram=True, subset=subset)
+    img = load_data.load_image(img_id, from_ram=myLoadFrom_RAM, subset=subset)
     img_a = augment_fixed_and_dscrop_with_prepro(img, ds_transforms, augmentation_transforms, target_sizes, prepro_transform=tf_center_rescale)
     return img_a
 
@@ -720,7 +733,7 @@ class LoadAndProcessFixedPysexGen1CenteringRescaling(object):
 
 def load_and_process_image_brightness_norm(img_index, ds_transforms, augmentation_params, target_sizes=None):
     img_id = load_data.train_ids[img_index]
-    img = load_data.load_image(img_id, from_ram=True)
+    img = load_data.load_image(img_id, from_ram=myLoadFrom_RAM)
     img = img / img.max() # normalise
     img_a = perturb_and_dscrop(img, ds_transforms, augmentation_params, target_sizes)
     return img_a
@@ -742,7 +755,7 @@ def load_and_process_image_fixed_brightness_norm(img_index, subset, ds_transform
     elif subset == 'test':
         img_id = load_data.test_ids[img_index]
 
-    img = load_data.load_image(img_id, from_ram=True, subset=subset)
+    img = load_data.load_image(img_id, from_ram=myLoadFrom_RAM, subset=subset)
     img = img / img.max() # normalise
     img_a = augment_fixed_and_dscrop(img, ds_transforms, augmentation_transforms, target_sizes)
     return img_a

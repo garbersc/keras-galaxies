@@ -11,6 +11,8 @@ import numpy as np
 d = pd.read_csv(TRAIN_LABELS_PATH)
 targets = d.as_matrix()[:, 1:].astype('float32')
 
+print targets.shape
+
 
 print "Saving %s" % TARGET_PATH
 np.save(TARGET_PATH, targets)

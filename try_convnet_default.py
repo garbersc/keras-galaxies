@@ -1,3 +1,4 @@
+import theano.sandbox.cuda.basic_ops as sbcuda
 import numpy as np
 # import pandas as pd
 import theano
@@ -17,26 +18,128 @@ from datetime import datetime, timedelta
 # plt.ion()
 # import utils
 
+debug = True
+predict = False
+
+continueAnalysis = False
+saveAtEveryLearningRate = True
+
+y_train = np.load("data/solutions_train.npy")
+#y_train = np.load("data/solutions_train_categorised.npy")
+ra.y_train=y_train
+
+# split training data into training + a small validation set
+ra.num_train = y_train.shape[0]
+
+ra.num_valid = ra.num_train // 20 # integer division, is defining validation size
+ra.num_train -= ra.num_valid
+
+ra.y_valid = ra.y_train[ra.num_train:]
+ra.y_train = ra.y_train[:ra.num_train]
+
+load_data.num_train=y_train.shape[0]
+load_data.train_ids = np.load("data/train_ids.npy")
+
+ra.load_data.num_train = load_data.num_train
+ra.load_data.train_ids = load_data.train_ids
+
+ra.valid_ids = load_data.train_ids[ra.num_train:]
+ra.train_ids = load_data.train_ids[:ra.num_train]
+
+
+train_ids = load_data.train_ids
+test_ids = load_data.test_ids
+
+num_train = ra.num_train
+num_test = len(test_ids)
+
+num_valid = ra.num_valid
+
+y_valid = ra.y_valid
+y_train = ra.y_train
+
+valid_ids = ra.valid_ids
+train_ids = ra.train_ids
+
+train_indices = np.arange(num_train)
+valid_indices = np.arange(num_train, num_train + num_valid)
+test_indices = np.arange(num_test)
+
+
 BATCH_SIZE = 16
 NUM_INPUT_FEATURES = 3
 
-LEARNING_RATE_SCHEDULE = {
-    0: 0.04,
+LEARNING_RATE_SCHEDULE = {  #if adam is used the learning rate doesnt follow the schedule
+    0: 0.02,
+    #1000: 0.04,
+    1000: 0.04,
+    #0: 0.01,
     1800: 0.004,
     2300: 0.0004,
+   # 0: 0.08,
+   # 50: 0.04,
+   # 2000: 0.008,
+   # 3200: 0.0008,
+   # 4600: 0.0004,
 }
+if continueAnalysis:
+    LEARNING_RATE_SCHEDULE = {
+        0: 0.002,	
+        500: 0.002,
+        #800: 0.0004,
+        3200: 0.0002,
+        4600: 0.0001,
+    }
+
+
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-CHUNK_SIZE = 100 #10000 # 30000 # this should be a multiple of the batch size, ideally.
-NUM_CHUNKS = 20 #2500 # 3000 # 1500 # 600 # 600 # 600 # 500 
-VALIDATE_EVERY = 2 #20 # 12 # 6 # 6 # 6 # 5 # validate only every 5 chunks. MUST BE A DIVISOR OF NUM_CHUNKS!!!
+CHUNK_SIZE = 1008#1008#10000 # 30000 # this should be a multiple of the batch size, ideally.
+NUM_CHUNKS = 1000#1000#7000 #2500 # 3000 # 1500 # 600 # 600 # 600 # 500   
+VALIDATE_EVERY = 5 #20 # 12 # 6 # 6 # 6 # 5 # validate only every 5 chunks. MUST BE A DIVISOR OF NUM_CHUNKS!!!
 # else computing the analysis data does not work correctly, since it assumes that the validation set is still loaded.
-
-NUM_CHUNKS_NONORM = 1 # train without normalisation for this many chunks, to get the weights in the right 'zone'.
+print("The training is running for %s chunks, each with %s images. That are about %s epochs. The validation sample contains %s images. \n" % (NUM_CHUNKS,CHUNK_SIZE,CHUNK_SIZE*NUM_CHUNKS / (ra.num_train-CHUNK_SIZE) ,  ra.num_valid ))
+NUM_CHUNKS_NONORM = 1  # train without normalisation for this many chunks, to get the weights in the right 'zone'.
 # this should be only a few, just 1 hopefully suffices.
+
+USE_ADAM = False
+
+USE_LLERROR=False
+
+USE_WEIGHTS=False
+
+if USE_LLERROR and USE_WEIGHTS: print 'combination of weighted classes and log loss fuction not implemented yet'
+
+WEIGHTS=np.ones((37))
+#WEIGHTS[2]=1  #star or artifact
+WEIGHTS[3]=1.5  #edge on yes
+WEIGHTS[4]=1.5  #edge on no
+#WEIGHTS[5]=1  #bar feature yes
+#WEIGHTS[7]=1  #spiral arms yes
+#WEIGHTS[14]=1  #anything odd? no
+#WEIGHTS[18]=1  #ring
+#WEIGHTS[19]=1  #lence
+#WEIGHTS[20]=1  #disturbed
+#WEIGHTS[21]=1  #irregular
+#WEIGHTS[22]=1  #other
+#WEIGHTS[23]=1  #merger
+#WEIGHTS[24]=1  #dust lane
+WEIGHTS=WEIGHTS/WEIGHTS[WEIGHTS.argmax()]
 
 GEN_BUFFER_SIZE = 1
 
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_default_test.txt" #TODO wrong, is LL error and SGD, change txt name afterwards
+
+TARGET_PATH = "predictions/final/try_convnet.csv"
+ANALYSIS_PATH = "analysis/final/try_convent_default_test.pkl"
+
+with open(TRAIN_LOSS_SF_PATH, 'a')as f:
+	if continueAnalysis: 
+		f.write('#continuing from ')
+		f.write(ANALYSIS_PATH)
+	f.write("#wRandFlip \n")
+	f.write("#The training is running for %s chunks, each with %s images. That are about %s epochs. The validation sample contains %s images. \n" % (NUM_CHUNKS,CHUNK_SIZE,CHUNK_SIZE*NUM_CHUNKS / (ra.num_train-CHUNK_SIZE) ,  ra.num_valid ))
+	f.write("#round  ,time, mean_train_loss , mean_valid_loss \n")
 
 # # need to load the full training data anyway to extract the validation set from it. 
 # # alternatively we could create separate validation set files.
@@ -47,9 +150,11 @@ GEN_BUFFER_SIZE = 1
 # DATA_TEST_PATH = "data/images_test_color_cropped33_singletf.npy.gz"
 # DATA2_TEST_PATH = "data/images_test_color_8x_singletf.npy.gz"
 
-TARGET_PATH = "predictions/final/try_convnet_cc_multirotflip_3x69r45_maxout2048_extradense.csv"
-ANALYSIS_PATH = "analysis/final/try_convnet_cc_multirotflip_3x69r45_maxout2048_extradense.pkl"
 # FEATURES_PATTERN = "features/try_convnet_chunked_ra_b3sched.%s.npy"
+
+if continueAnalysis:
+    print "Loading model data"
+    analysis = np.load(ANALYSIS_PATH)
 
 print "Set up data loading"
 # TODO: adapt this so it loads the validation data from JPEGs and does the processing realtime
@@ -80,26 +185,7 @@ post_augmented_data_gen = ra.post_augment_brightness_gen(augmented_data_gen, std
 train_gen = load_data.buffered_gen_mp(post_augmented_data_gen, buffer_size=GEN_BUFFER_SIZE)
 
 
-y_train = np.load("data/solutions_train.npy")
-train_ids = load_data.train_ids
-test_ids = load_data.test_ids
 
-# split training data into training + a small validation set
-num_train = len(train_ids)
-num_test = len(test_ids)
-
-num_valid = num_train // 10 # integer division
-num_train -= num_valid
-
-y_valid = y_train[num_train:]
-y_train = y_train[:num_train]
-
-valid_ids = train_ids[num_train:]
-train_ids = train_ids[:num_train]
-
-train_indices = np.arange(num_train)
-valid_indices = np.arange(num_train, num_train + num_valid)
-test_indices = np.arange(num_test)
 
 
 
@@ -141,10 +227,11 @@ print "  took %.2f seconds" % (time.time() - start_time)
 
 
 print "Build model"
+if debug : print("input size: %s x %s x %s x %s" % (input_sizes[0][0],input_sizes[0][1],NUM_INPUT_FEATURES,BATCH_SIZE))
 l0 = layers.Input2DLayer(BATCH_SIZE, NUM_INPUT_FEATURES, input_sizes[0][0], input_sizes[0][1])
 l0_45 = layers.Input2DLayer(BATCH_SIZE, NUM_INPUT_FEATURES, input_sizes[1][0], input_sizes[1][1])
 
-l0r = layers.MultiRotSliceLayer([l0, l0_45], part_size=45, include_flip=True)
+l0r = layers.MultiRotSliceLayer([l0, l0_45], part_size=45, random_flip=True)
 
 l0s = cc_layers.ShuffleBC01ToC01BLayer(l0r) 
 
@@ -160,27 +247,50 @@ l3 = cc_layers.CudaConvnetPooling2DLayer(l3b, pool_size=2)
 
 l3s = cc_layers.ShuffleC01BToBC01Layer(l3)
 
-j3 = layers.MultiRotMergeLayer(l3s, num_views=4) # 2) # merge convolutional parts
+j3 = layers.MultiRotMergeLayer(l3s, num_views=2) # 4) # merge convolutional parts
 
 
 l4a = layers.DenseLayer(j3, n_outputs=4096, weights_std=0.001, init_bias_value=0.01, dropout=0.5, nonlinearity=layers.identity)
+#l4a = layers.DenseLayer(j3, n_outputs=4096, weights_std=0.001, init_bias_value=0.01)
+
 l4b = layers.FeatureMaxPoolingLayer(l4a, pool_size=2, feature_dim=1, implementation='reshape')
+#l4bc = layers.FeatureMaxPoolingLayer(l4a, pool_size=2, feature_dim=1, implementation='reshape')
 l4c = layers.DenseLayer(l4b, n_outputs=4096, weights_std=0.001, init_bias_value=0.01, dropout=0.5, nonlinearity=layers.identity)
 l4 = layers.FeatureMaxPoolingLayer(l4c, pool_size=2, feature_dim=1, implementation='reshape')
 
-# l5 = layers.DenseLayer(l4, n_outputs=37, weights_std=0.01, init_bias_value=0.0, dropout=0.5, nonlinearity=custom.clip_01) #  nonlinearity=layers.identity)
+## l5 = layers.DenseLayer(l4, n_outputs=37, weights_std=0.01, init_bias_value=0.0, dropout=0.5, nonlinearity=custom.clip_01) #  nonlinearity=layers.identity)
 l5 = layers.DenseLayer(l4, n_outputs=37, weights_std=0.01, init_bias_value=0.1, dropout=0.5, nonlinearity=layers.identity)
+#l5 = layers.DenseLayer(l4bc, n_outputs=37, weights_std=0.01, init_bias_value=0.1, nonlinearity=layers.identity)
 
-# l6 = layers.OutputLayer(l5, error_measure='mse')
-l6 = custom.OptimisedDivGalaxyOutputLayer(l5) # this incorporates the constraints on the output (probabilities sum to one, weighting, etc.)
+## l6 = layers.OutputLayer(l5, error_measure='mse')
+l6 = custom.OptimisedDivGalaxyOutputLayer(l5,categorised=True) # this incorporates the constraints on the output (probabilities sum to one, weighting, etc.)
 
-train_loss_nonorm = l6.error(normalisation=False)
-train_loss = l6.error() # but compute and print this!
-valid_loss = l6.error(dropout_active=False)
+if debug : print("output shapes: l0 %s , l0r %s ,l0s %s, l1a %s , l1 %s , l2a %s , l3 %s , j3 %s , l4 %s , l5 %s" % ( l0.get_output_shape(), l0r.get_output_shape(), l0s.get_output_shape(), l1a.get_output_shape(), l1.get_output_shape(), l2a.get_output_shape(), l3.get_output_shape(), j3.get_output_shape(), l4.get_output_shape(), l5.get_output_shape()))
+
+#train_loss_nonorm = l6.error(normalisation=False)
+#train_loss = l6.error() # but compute and print this!
+#valid_loss = l6.error(dropout_active=False)
+
+if USE_WEIGHTS:
+    train_loss_nonorm = l6.error_weighted(WEIGHTS,normalisation=False)
+    train_loss = l6.error_weighted(WEIGHTS)
+    valid_loss_weighted =l6.error_weighted(WEIGHTS,dropout_active=False)
+else:
+    train_loss_nonorm = l6.error(normalisation=False)
+    train_loss = l6.error() # but compute and print this!
+valid_loss = l6.error(dropout_active=False)#,normalisation=False) #change this back as soon as possible
+
+if USE_LLERROR:
+    train_loss_nonorm = l6.ll_error(normalisation=False)
+    train_loss = l6.ll_error() # but compute and print this!
+    #valid_loss = l6.ll_error(dropout_active=False)
+
+valid_loss_ll = l6.ll_error(dropout_active=False)#,normalisation=False) #change this back as soon as possible
+
 all_parameters = layers.all_parameters(l6)
 all_bias_parameters = layers.all_bias_parameters(l6)
 
-xs_shared = [theano.shared(np.zeros((1,1,1,1), dtype=theano.config.floatX)) for _ in xrange(num_input_representations)]
+xs_shared = [theano.shared(np.zeros((1,1,1,1), dtype=theano.config.floatX)) for _ in xrange(num_input_representations)] 
 y_shared = theano.shared(np.zeros((1,1), dtype=theano.config.floatX))
 
 learning_rate = theano.shared(np.array(LEARNING_RATE_SCHEDULE[0], dtype=theano.config.floatX))
@@ -197,13 +307,30 @@ givens = {
 updates_nonorm = layers.gen_updates_nesterov_momentum_no_bias_decay(train_loss_nonorm, all_parameters, all_bias_parameters, learning_rate=learning_rate, momentum=MOMENTUM, weight_decay=WEIGHT_DECAY)
 updates = layers.gen_updates_nesterov_momentum_no_bias_decay(train_loss, all_parameters, all_bias_parameters, learning_rate=learning_rate, momentum=MOMENTUM, weight_decay=WEIGHT_DECAY)
 
+if USE_ADAM: 
+    updates_nonorm = layers.adam(train_loss_nonorm, all_parameters,learning_rate=learning_rate)
+    updates = layers.adam(train_loss, all_parameters,learning_rate=learning_rate)
+else:
+    updates_nonorm = layers.gen_updates_nesterov_momentum_no_bias_decay(train_loss_nonorm, all_parameters, all_bias_parameters, learning_rate=learning_rate, momentum=MOMENTUM, weight_decay=WEIGHT_DECAY)
+    updates = layers.gen_updates_nesterov_momentum_no_bias_decay(train_loss, all_parameters, all_bias_parameters, learning_rate=learning_rate, momentum=MOMENTUM, weight_decay=WEIGHT_DECAY)
+
 train_nonorm = theano.function([idx], train_loss_nonorm, givens=givens, updates=updates_nonorm)
-print("got beyond the first compilation!")
 train_norm = theano.function([idx], train_loss, givens=givens, updates=updates)
 compute_loss = theano.function([idx], valid_loss, givens=givens) # dropout_active=False
+
+#train_nonorm_ll = theano.function([idx], train_loss_nonorm_ll, givens=givens)
+#train_norm_ll = theano.function([idx], train_loss_ll, givens=givens)
+compute_loss_ll = theano.function([idx], valid_loss_ll, givens=givens) # dropout_active=False
+
+if USE_WEIGHTS: 
+	compute_loss_weighted = theano.function([idx], valid_loss_weighted, givens=givens)
 compute_output = theano.function([idx], l6.predictions(dropout_active=False), givens=givens, on_unused_input='ignore') # not using the labels, so theano complains
 compute_features = theano.function([idx], l4.output(dropout_active=False), givens=givens, on_unused_input='ignore')
+#compute_features = theano.function([idx], l4bc.output(dropout_active=False), givens=givens, on_unused_input='ignore')
 
+if continueAnalysis:
+    print "Load model parameters"
+    layers.set_param_values(l6, analysis['param_values'])
 
 print "Train model"
 start_time = time.time()
@@ -215,8 +342,14 @@ losses_valid = []
 
 param_stds = []
 
+current_lr=LEARNING_RATE_SCHEDULE[0]
+
+with open(TRAIN_LOSS_SF_PATH, 'a')as f:
+ f.write("#  starting learning rate to %.6f \n" % current_lr )
+
 for e in xrange(NUM_CHUNKS):
     print "Chunk %d/%d" % (e + 1, NUM_CHUNKS)
+    if e==0: print("Free GPU Mem before training step %s MiB " % (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0]/1024./1024.))
     chunk_data, chunk_length = train_gen.next()
     y_chunk = chunk_data.pop() # last element is labels.
     xs_chunk = chunk_data
@@ -224,13 +357,8 @@ for e in xrange(NUM_CHUNKS):
     # need to transpose the chunks to move the 'channels' dimension up
     xs_chunk = [x_chunk.transpose(0, 3, 1, 2) for x_chunk in xs_chunk]
 
-    if e in LEARNING_RATE_SCHEDULE:
-        current_lr = LEARNING_RATE_SCHEDULE[e]
-        learning_rate.set_value(LEARNING_RATE_SCHEDULE[e])
-        print "  setting learning rate to %.6f" % current_lr
-
     # train without normalisation for the first # chunks.
-    if e >= NUM_CHUNKS_NONORM:
+    if e >= NUM_CHUNKS_NONORM or continueAnalysis:
         train = train_norm
     else:
         train = train_nonorm
@@ -245,20 +373,30 @@ for e in xrange(NUM_CHUNKS):
 
     print "  batch SGD"
     losses = []
+    #losses_ll = []
+    losses_weighted = []
     for b in xrange(num_batches_chunk):
-        # if b % 1000 == 0:
-        #     print "  batch %d/%d" % (b + 1, num_batches_chunk)
+        #if b % 1000 == 0:
+            #print "  batch %d/%d" % (b + 1, num_batches_chunk)
 
         loss = train(b)
         losses.append(loss)
-        # print "  loss: %.6f" % loss
+        #print "  loss: %s" % loss
+        #loss_ll = train_ll(b)
+        #losses_ll.append(loss_ll)
 
-    mean_train_loss = np.sqrt(np.mean(losses))
-    print "  mean training loss (RMSE):\t\t%.6f" % mean_train_loss
+    if e==0: print("Free GPU Mem after training step %s MiB " % (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0]/1024./1024.))
+    
+    if USE_LLERROR: mean_train_loss = np.mean(losses)
+    else: mean_train_loss = np.sqrt(np.mean(losses))
+	  #mean_train_loss_ll = np.mean(losses_ll)
+    if USE_LLERROR:  print "  crossentropy loss (LL):\t\t%.6f" % mean_train_loss
+    else:  print "  mean training loss (RMSE):\t\t%.6f" % mean_train_loss
+    #print "  mean training loss (LL):\t\t%.6f" % mean_train_loss_ll
     losses_train.append(mean_train_loss)
 
     # store param stds during training
-    param_stds.append([p.std() for p in layers.get_param_values(l6)])
+    param_stds.append([p.std() for p in layers.get_param_values(l6)])  
 
     if ((e + 1) % VALIDATE_EVERY) == 0:
         print
@@ -270,15 +408,35 @@ for e in xrange(NUM_CHUNKS):
 
         print "  compute losses"
         losses = []
+	losses_ll = []
+	losses_weighted = []
         for b in xrange(num_batches_valid):
             # if b % 1000 == 0:
             #     print "  batch %d/%d" % (b + 1, num_batches_valid)
             loss = compute_loss(b)
+	    #print "  loss: %s" % loss
+	    if USE_WEIGHTS:  loss_weighted=compute_loss_weighted(b)
             losses.append(loss)
+	    if USE_WEIGHTS:  losses_weighted.append(loss_weighted)
+            loss_ll = compute_loss_ll(b)
+	    #print "  loss_ll: %s" % loss_ll
+            losses_ll.append(loss_ll)
 
-        mean_valid_loss = np.sqrt(np.mean(losses))
+    	#if USE_LLERROR: mean_valid_loss = np.mean(losses)
+        #else: 
+	mean_valid_loss = np.sqrt(np.mean(losses))
+    	mean_valid_loss_ll = np.mean(losses_ll)
+
+        if USE_WEIGHTS:  mean_valid_loss_weighted = np.sqrt(np.mean(losses_weighted))
+
         print "  mean validation loss (RMSE):\t\t%.6f" % mean_valid_loss
+        print "  mean validation loss (LL):\t\t%.6f" % mean_valid_loss_ll
+        if USE_WEIGHTS:  print "  mean weighted validation loss :\t\t%.6f" % mean_valid_loss_weighted
         losses_valid.append(mean_valid_loss)
+        if (e+1)==VALIDATE_EVERY: 
+		print("Free GPU Mem after validation step %s MiB " % (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0]/1024./1024.))
+		with open(TRAIN_LOSS_SF_PATH, 'a')as f:
+			f.write("#Free GPU Mem after validation step %s MiB \n" % (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0]/1024./1024.))
 
     now = time.time()
     time_since_start = now - start_time
@@ -290,7 +448,38 @@ for e in xrange(NUM_CHUNKS):
     print "  %s since start (%.2f s)" % (load_data.hms(time_since_start), time_since_prev)
     print "  estimated %s to go (ETA: %s)" % (load_data.hms(est_time_left), eta_str)
     print
+    if (e > VALIDATE_EVERY):  #lets try do save all losses
+	with open(TRAIN_LOSS_SF_PATH, 'a')as f:
+	   if USE_WEIGHTS:  f.write(" %s , %s , %s , %s, %s \n" % (e+1,time_since_start, mean_train_loss,mean_valid_loss,mean_valid_loss_weighted) )
+	   else:  f.write(" %s , %s , %s , %s, %s \n" % (e+1,time_since_start, mean_train_loss,mean_valid_loss,mean_valid_loss_ll) )
+    else:
+    	with open(TRAIN_LOSS_SF_PATH, 'a')as f:
+	   if USE_WEIGHTS:  f.write(" %s , %s , %s , 0.0, 0.0 \n" % (e+1,time_since_start, mean_train_loss) )
+	   else: f.write(" %s , %s , %s , 0.0, 0.0 \n" % (e+1,time_since_start, mean_train_loss) )
 
+    if (not USE_ADAM) and ( (e+1) in LEARNING_RATE_SCHEDULE ):
+	if saveAtEveryLearningRate:
+  		print("saving parameters after learning rate %s " % (current_lr))
+		LR_PATH = ((ANALYSIS_PATH.split('.',1)[0]+'toLearningRate%s.'+ANALYSIS_PATH.split('.',1)[1])%current_lr)
+		with open(LR_PATH, 'w') as f:
+    			pickle.dump({
+        			'ids': valid_ids[:num_batches_valid * BATCH_SIZE], # note that we need to truncate the ids to a multiple of the batch size.
+      			 	#'predictions': all_predictions,
+       				'targets': y_valid,
+        			'mean_train_loss': mean_train_loss,
+        			'mean_valid_loss': mean_valid_loss,
+        			'time_since_start': time_since_start,
+        			'losses_train': losses_train,
+        			'losses_valid': losses_valid,
+        			'param_values': layers.get_param_values(l6),
+        			'param_stds': param_stds,
+    				}, f, pickle.HIGHEST_PROTOCOL)
+
+        current_lr = LEARNING_RATE_SCHEDULE[(e+1)]
+        learning_rate.set_value(LEARNING_RATE_SCHEDULE[(e+1)])
+        print "  setting learning rate to %.6f" % current_lr
+	with open(TRAIN_LOSS_SF_PATH, 'a')as f:
+	   f.write("#  setting learning rate to %.6f \n" % current_lr )
 
 del chunk_data, xs_chunk, x_chunk, y_chunk, xs_valid, x_valid # memory cleanup
 
@@ -310,6 +499,7 @@ all_predictions = np.vstack(predictions_list)
 all_predictions[all_predictions > 1] = 1.0
 all_predictions[all_predictions < 0] = 0.0
 
+if continueAnalysis : ANALYSIS_PATH=ANALYSIS_PATH.split('.',1)[0]+'_next.'+ANALYSIS_PATH.split('.',1)[1]
 print "Write validation set predictions to %s" % ANALYSIS_PATH
 with open(ANALYSIS_PATH, 'w') as f:
     pickle.dump({
@@ -338,6 +528,9 @@ del predictions_list, all_predictions # memory cleanup
 # x2_test = x2_test.transpose(0, 3, 1, 2)
 # create_test_gen = lambda: load_data.array_chunker_gen([x_test, x2_test], chunk_size=CHUNK_SIZE, loop=False, truncate=False, shuffle=False)
 
+
+if not predict:
+	exit()
 
 print "Computing predictions on test data"
 predictions_list = []

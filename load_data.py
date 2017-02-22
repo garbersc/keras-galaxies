@@ -6,7 +6,7 @@ import threading
 import time
 import skimage.transform
 import skimage.io
-import skimage.filter
+import skimage.filters
 import gzip
 import os
 import Queue
@@ -359,7 +359,7 @@ def chunk_lcn(chunk, sigma_mean, sigma_std, std_bias=0.0, rescale=1.0):
     """
     means = np.zeros(chunk.shape, dtype=chunk.dtype)
     for k in xrange(len(chunk)):
-        means[k] = skimage.filter.gaussian_filter(chunk[k], sigma_mean, multichannel=True)
+        means[k] = skimage.filters.gaussian_filter(chunk[k], sigma_mean, multichannel=True)
 
     chunk = chunk - means # centering
     del means # keep memory usage in check
@@ -367,7 +367,7 @@ def chunk_lcn(chunk, sigma_mean, sigma_std, std_bias=0.0, rescale=1.0):
     variances = np.zeros(chunk.shape, dtype=chunk.dtype)
     chunk_squared = chunk**2
     for k in xrange(len(chunk)):
-        variances[k] = skimage.filter.gaussian_filter(chunk_squared[k], sigma_std, multichannel=True)
+        variances[k] = skimage.filters.gaussian_filter(chunk_squared[k], sigma_std, multichannel=True)
 
     chunk = chunk / np.sqrt(variances + std_bias)
 
@@ -555,9 +555,16 @@ def buffered_gen_mp(source_gen, buffer_size=2, sleep_time=1):
             # we block here when the buffer is full. There's no point in generating more data
             # when the buffer is full, it only causes extra memory usage and effectively
             # increases the buffer size by one.
+	    #fullBuffer=False
             while buffer.full():
+		#if not fullBuffer: 
+		#	time1=time.time()
+		#	fullBuffer=True
                 # print "DEBUG: buffer is full, waiting to generate more data."
                 time.sleep(sleep_time)
+
+	    #if fullBuffer:
+		#print "sleeped for %.2f" % (time.time()-time1)
 
             try:
                 data = source_gen.next()

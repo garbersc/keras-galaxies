@@ -17,26 +17,61 @@ from datetime import datetime, timedelta
 # plt.ion()
 # import utils
 
+debug = True
+predict = False
+
+
+y_train = np.load("data/solutions_train.npy")
+ra.y_train=y_train
+
+# split training data into training + a small validation set
+ra.num_train = y_train.shape[0]
+
+ra.num_valid = ra.num_train // 10 # integer division
+ra.num_train -= ra.num_valid
+
+ra.y_valid = ra.y_train[ra.num_train:]
+ra.y_train = ra.y_train[:ra.num_train]
+
+load_data.num_train=y_train.shape[0]
+load_data.train_ids = np.load("data/train_ids.npy")
+
+ra.load_data.num_train = load_data.num_train
+ra.load_data.train_ids = load_data.train_ids
+
+ra.valid_ids = load_data.train_ids[ra.num_train:]
+ra.train_ids = load_data.train_ids[:ra.num_train]
+
+
 BATCH_SIZE = 16
 NUM_INPUT_FEATURES = 3
 
 LEARNING_RATE_SCHEDULE = {
-    0: 0.04,
-    1800: 0.004,
-    2300: 0.0004,
+    #0: 0.04,
+    #1800: 0.004,
+    #2300: 0.0004,
+    0: 0.08,
+    2000: 0.008,
+    3200: 0.0008,
+    4600: 0.0004,
 }
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-CHUNK_SIZE = 100 #10000 # 30000 # this should be a multiple of the batch size, ideally.
-NUM_CHUNKS = 20 #2500 # 3000 # 1500 # 600 # 600 # 600 # 500 
-VALIDATE_EVERY = 2 #20 # 12 # 6 # 6 # 6 # 5 # validate only every 5 chunks. MUST BE A DIVISOR OF NUM_CHUNKS!!!
+CHUNK_SIZE = 1600#10000 # 30000 # this should be a multiple of the batch size, ideally.
+NUM_CHUNKS = 40 #2500 # 3000 # 1500 # 600 # 600 # 600 # 500   
+VALIDATE_EVERY = 10 #20 # 12 # 6 # 6 # 6 # 5 # validate only every 5 chunks. MUST BE A DIVISOR OF NUM_CHUNKS!!!
 # else computing the analysis data does not work correctly, since it assumes that the validation set is still loaded.
-
+print("The training is running for %s chunks, each with %s images. That are about %s epochs." % (NUM_CHUNKS,CHUNK_SIZE,CHUNK_SIZE*NUM_CHUNKS / (ra.num_train-CHUNK_SIZE) ))
 NUM_CHUNKS_NONORM = 1 # train without normalisation for this many chunks, to get the weights in the right 'zone'.
 # this should be only a few, just 1 hopefully suffices.
 
 GEN_BUFFER_SIZE = 1
 
+
+with open("trainingNmbrs.txt", 'a')as f:
+	f.write("#noFlip, default \n")
+	f.write("#The training is running for %s chunks, each with %s images. That are about %s epochs. \n" % (NUM_CHUNKS,CHUNK_SIZE,CHUNK_SIZE*NUM_CHUNKS / (ra.num_train-CHUNK_SIZE) ))
+	f.write("#round  ,time, mean_train_loss , mean_valid_loss \n")
 
 # # need to load the full training data anyway to extract the validation set from it. 
 # # alternatively we could create separate validation set files.
@@ -47,8 +82,8 @@ GEN_BUFFER_SIZE = 1
 # DATA_TEST_PATH = "data/images_test_color_cropped33_singletf.npy.gz"
 # DATA2_TEST_PATH = "data/images_test_color_8x_singletf.npy.gz"
 
-TARGET_PATH = "predictions/final/try_convnet_cc_multirotflip_3x69r45_maxout2048_extradense.csv"
-ANALYSIS_PATH = "analysis/final/try_convnet_cc_multirotflip_3x69r45_maxout2048_extradense.pkl"
+TARGET_PATH = "predictions/final/try_convnet_simpler2.csv"
+ANALYSIS_PATH = "analysis/final/try_convnet_simpler2.pkl"
 # FEATURES_PATTERN = "features/try_convnet_chunked_ra_b3sched.%s.npy"
 
 print "Set up data loading"
@@ -141,15 +176,22 @@ print "  took %.2f seconds" % (time.time() - start_time)
 
 
 print "Build model"
+if debug : print("input size: %s x %s x %s x %s" % (input_sizes[0][0],input_sizes[0][1],NUM_INPUT_FEATURES,BATCH_SIZE))
 l0 = layers.Input2DLayer(BATCH_SIZE, NUM_INPUT_FEATURES, input_sizes[0][0], input_sizes[0][1])
 l0_45 = layers.Input2DLayer(BATCH_SIZE, NUM_INPUT_FEATURES, input_sizes[1][0], input_sizes[1][1])
 
-l0r = layers.MultiRotSliceLayer([l0, l0_45], part_size=45, include_flip=True)
+#l0r = layers.MultiRotSliceLayer([l0, l0_45], part_size=45, include_flip=True)
+
+l0r = layers.MultiRotSliceLayer([l0, l0_45], part_size=45, include_flip=False)
 
 l0s = cc_layers.ShuffleBC01ToC01BLayer(l0r) 
 
 l1a = cc_layers.CudaConvnetConv2DLayer(l0s, n_filters=32, filter_size=6, weights_std=0.01, init_bias_value=0.1, dropout=0.0, partial_sum=1, untie_biases=True)
 l1 = cc_layers.CudaConvnetPooling2DLayer(l1a, pool_size=2)
+#l12 = cc_layers.CudaConvnetPooling2DLayer(l1a, pool_size=4)
+
+#l3a = cc_layers.CudaConvnetConv2DLayer(l12, n_filters=64, filter_size=7, pad=0, weights_std=0.1, init_bias_value=0.1, dropout=0.0, partial_sum=1, untie_biases=True)
+#l3 = cc_layers.CudaConvnetPooling2DLayer(l3a, pool_size=2)
 
 l2a = cc_layers.CudaConvnetConv2DLayer(l1, n_filters=64, filter_size=5, weights_std=0.01, init_bias_value=0.1, dropout=0.0, partial_sum=1, untie_biases=True)
 l2 = cc_layers.CudaConvnetPooling2DLayer(l2a, pool_size=2)
@@ -158,29 +200,41 @@ l3a = cc_layers.CudaConvnetConv2DLayer(l2, n_filters=128, filter_size=3, weights
 l3b = cc_layers.CudaConvnetConv2DLayer(l3a, n_filters=128, filter_size=3, pad=0, weights_std=0.1, init_bias_value=0.1, dropout=0.0, partial_sum=1, untie_biases=True)
 l3 = cc_layers.CudaConvnetPooling2DLayer(l3b, pool_size=2)
 
+#l3s = cc_layers.ShuffleC01BToBC01Layer(l3)
 l3s = cc_layers.ShuffleC01BToBC01Layer(l3)
 
-j3 = layers.MultiRotMergeLayer(l3s, num_views=4) # 2) # merge convolutional parts
+j3 = layers.MultiRotMergeLayer(l3s, num_views=2) #4) # 2) # merge convolutional parts
 
 
 l4a = layers.DenseLayer(j3, n_outputs=4096, weights_std=0.001, init_bias_value=0.01, dropout=0.5, nonlinearity=layers.identity)
+#l4a = layers.DenseLayer(j3, n_outputs=4096, weights_std=0.001, init_bias_value=0.01)
+
 l4b = layers.FeatureMaxPoolingLayer(l4a, pool_size=2, feature_dim=1, implementation='reshape')
+#l4bc = layers.FeatureMaxPoolingLayer(l4a, pool_size=2, feature_dim=1, implementation='reshape')
 l4c = layers.DenseLayer(l4b, n_outputs=4096, weights_std=0.001, init_bias_value=0.01, dropout=0.5, nonlinearity=layers.identity)
 l4 = layers.FeatureMaxPoolingLayer(l4c, pool_size=2, feature_dim=1, implementation='reshape')
 
-# l5 = layers.DenseLayer(l4, n_outputs=37, weights_std=0.01, init_bias_value=0.0, dropout=0.5, nonlinearity=custom.clip_01) #  nonlinearity=layers.identity)
+## l5 = layers.DenseLayer(l4, n_outputs=37, weights_std=0.01, init_bias_value=0.0, dropout=0.5, nonlinearity=custom.clip_01) #  nonlinearity=layers.identity)
 l5 = layers.DenseLayer(l4, n_outputs=37, weights_std=0.01, init_bias_value=0.1, dropout=0.5, nonlinearity=layers.identity)
+#l5 = layers.DenseLayer(l4bc, n_outputs=37, weights_std=0.01, init_bias_value=0.1, nonlinearity=layers.identity)
 
-# l6 = layers.OutputLayer(l5, error_measure='mse')
+## l6 = layers.OutputLayer(l5, error_measure='mse')
 l6 = custom.OptimisedDivGalaxyOutputLayer(l5) # this incorporates the constraints on the output (probabilities sum to one, weighting, etc.)
+
+if debug : print("output shapes: l0 %s , l0r %s , l1 %s , l3 %s , j3 %s , l4 %s , l5 %s  " % ( l0.get_output_shape(), l0r.get_output_shape(), l1.get_output_shape(), l3.get_output_shape(), j3.get_output_shape(), l4.get_output_shape(), l5.get_output_shape()))
+
+#train_loss_nonorm = l6.error(normalisation=False)
+#train_loss = l6.error() # but compute and print this!
+#valid_loss = l6.error(dropout_active=False)
 
 train_loss_nonorm = l6.error(normalisation=False)
 train_loss = l6.error() # but compute and print this!
 valid_loss = l6.error(dropout_active=False)
+
 all_parameters = layers.all_parameters(l6)
 all_bias_parameters = layers.all_bias_parameters(l6)
 
-xs_shared = [theano.shared(np.zeros((1,1,1,1), dtype=theano.config.floatX)) for _ in xrange(num_input_representations)]
+xs_shared = [theano.shared(np.zeros((1,1,1,1), dtype=theano.config.floatX)) for _ in xrange(num_input_representations)] 
 y_shared = theano.shared(np.zeros((1,1), dtype=theano.config.floatX))
 
 learning_rate = theano.shared(np.array(LEARNING_RATE_SCHEDULE[0], dtype=theano.config.floatX))
@@ -198,12 +252,11 @@ updates_nonorm = layers.gen_updates_nesterov_momentum_no_bias_decay(train_loss_n
 updates = layers.gen_updates_nesterov_momentum_no_bias_decay(train_loss, all_parameters, all_bias_parameters, learning_rate=learning_rate, momentum=MOMENTUM, weight_decay=WEIGHT_DECAY)
 
 train_nonorm = theano.function([idx], train_loss_nonorm, givens=givens, updates=updates_nonorm)
-print("got beyond the first compilation!")
 train_norm = theano.function([idx], train_loss, givens=givens, updates=updates)
 compute_loss = theano.function([idx], valid_loss, givens=givens) # dropout_active=False
 compute_output = theano.function([idx], l6.predictions(dropout_active=False), givens=givens, on_unused_input='ignore') # not using the labels, so theano complains
 compute_features = theano.function([idx], l4.output(dropout_active=False), givens=givens, on_unused_input='ignore')
-
+#compute_features = theano.function([idx], l4bc.output(dropout_active=False), givens=givens, on_unused_input='ignore')
 
 print "Train model"
 start_time = time.time()
@@ -246,8 +299,8 @@ for e in xrange(NUM_CHUNKS):
     print "  batch SGD"
     losses = []
     for b in xrange(num_batches_chunk):
-        # if b % 1000 == 0:
-        #     print "  batch %d/%d" % (b + 1, num_batches_chunk)
+        #if b % 1000 == 0:
+            #print "  batch %d/%d" % (b + 1, num_batches_chunk)
 
         loss = train(b)
         losses.append(loss)
@@ -290,7 +343,9 @@ for e in xrange(NUM_CHUNKS):
     print "  %s since start (%.2f s)" % (load_data.hms(time_since_start), time_since_prev)
     print "  estimated %s to go (ETA: %s)" % (load_data.hms(est_time_left), eta_str)
     print
-
+    if ((e + 1) % VALIDATE_EVERY) == 0:
+	with open("trainingNmbrs.txt", 'a')as f:
+	   f.write(" %s , %s , %s , %s \n" % (e+1,time_since_start, mean_train_loss,mean_valid_loss) )
 
 del chunk_data, xs_chunk, x_chunk, y_chunk, xs_valid, x_valid # memory cleanup
 
@@ -338,6 +393,9 @@ del predictions_list, all_predictions # memory cleanup
 # x2_test = x2_test.transpose(0, 3, 1, 2)
 # create_test_gen = lambda: load_data.array_chunker_gen([x_test, x2_test], chunk_size=CHUNK_SIZE, loop=False, truncate=False, shuffle=False)
 
+
+if not predict:
+	exit()
 
 print "Computing predictions on test data"
 predictions_list = []

@@ -2,7 +2,8 @@ import numpy as np
 import theano.tensor as T
 import theano
 from theano.tensor.signal.conv import conv2d as sconv2d
-from theano.tensor.signal.downsample import max_pool_2d
+#from theano.tensor.signal.downsample import max_pool_2d
+from theano.tensor.signal.pool import pool_2d
 from theano.tensor.nnet.conv import conv2d
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 import sys
@@ -30,6 +31,42 @@ def compress(x, C=10000.0):
 
 def compress_abs(x, C=10000.0):
     return T.log(1 + C * abs(x))
+
+#copied from https://gist.github.com/skaae/ae7225263ca8806868cb
+def adam(loss, all_params, learning_rate=0.001, b1=0.9, b2=0.999, e=1e-7,
+         gamma=1-1e-7):
+    """
+    ADAM update rules
+    Default values are taken from [Kingma2014]
+    References:
+    [Kingma2014] Kingma, Diederik, and Jimmy Ba.
+    "Adam: A Method for Stochastic Optimization."
+    arXiv preprint arXiv:1412.6980 (2014).
+    http://arxiv.org/pdf/1412.6980v4.pdf
+    """
+    updates = []
+    all_grads = theano.grad(loss, all_params)
+    alpha = learning_rate
+    t = theano.shared(np.float32(1))
+    b1_t = b1*gamma**(t-1)   #(Decay the first moment running average coefficient)
+
+    for theta_previous, g in zip(all_params, all_grads):
+        m_previous = theano.shared(np.zeros(theta_previous.get_value().shape,
+                                            dtype=theano.config.floatX))
+        v_previous = theano.shared(np.zeros(theta_previous.get_value().shape,
+                                            dtype=theano.config.floatX))
+
+        m = b1_t*m_previous + (1 - b1_t)*g                             # (Update biased first moment estimate)
+        v = b2*v_previous + (1 - b2)*g**2                              # (Update biased second raw moment estimate)
+        m_hat = m / (1-b1**t)                                          # (Compute bias-corrected first moment estimate)
+        v_hat = v / (1-b2**t)                                          # (Compute bias-corrected second raw moment estimate)
+        theta = theta_previous - (alpha * m_hat) / (T.sqrt(v_hat) + e) #(Update parameters)
+
+        updates.append((m_previous, m))
+        updates.append((v_previous, v))
+        updates.append((theta_previous, theta) )
+    updates.append((t, t + 1.))
+    return updates
 
 
 def all_layers(layer):
@@ -311,8 +348,8 @@ class PoolingLayer(object):
 
     def output(self, *args, **kwargs):
         input = self.input_layer.output(*args, **kwargs)
-        return max_pool_2d(input, (1, self.ds_factor), self.ignore_border)
-
+#        return max_pool_2d(input, (1, self.ds_factor), self.ignore_border)
+        return pool_2d(input, (1, self.ds_factor), self.ignore_border)
 
 
 class Pooling2DLayer(object):
@@ -336,8 +373,8 @@ class Pooling2DLayer(object):
 
     def output(self, *args, **kwargs):
         input = self.input_layer.output(*args, **kwargs)
-        return max_pool_2d(input, self.pool_size, self.ignore_border)
-
+#        return max_pool_2d(input, self.pool_size, self.ignore_border)
+        return pool_2d(input, self.pool_size, self.ignore_border)
 
 
 class GlobalPooling2DLayer(object):
@@ -368,7 +405,7 @@ class GlobalPooling2DLayer(object):
 
 
 class DenseLayer(object):
-    def __init__(self, input_layer, n_outputs, weights_std, init_bias_value, nonlinearity=rectify, dropout=0.):
+    def __init__(self, input_layer, n_outputs, weights_std, init_bias_value, nonlinearity=rectify, dropout=0. ):
         self.n_outputs = n_outputs
         self.input_layer = input_layer
         self.weights_std = np.float32(weights_std)
@@ -405,7 +442,8 @@ class DenseLayer(object):
             input = input / retain_prob * srng.binomial(input.shape, p=retain_prob, dtype='int32').astype('float32')
             # apply the input mask and rescale the input accordingly. By doing this it's no longer necessary to rescale the weights at test time.
 
-        return self.nonlinearity(T.dot(input, self.W) + self.b.dimshuffle('x', 0))
+	retval=self.nonlinearity(T.dot(input, self.W) + self.b.dimshuffle('x', 0))
+        return retval
 
     def rescaled_weights(self, c): # c is the maximal norm of the weight vector going into a single filter.
         norms = T.sqrt(T.sqr(self.W).mean(0, keepdims=True))
@@ -1234,10 +1272,11 @@ class MultiRotSliceLayer(ConcatenateLayer):
 
     enabling include_flip also includes flipped versions of all the parts. This doubles the number of views.
     """
-    def __init__(self, input_layers, part_size, include_flip=False):
+    def __init__(self, input_layers, part_size, include_flip=False, random_flip=False):
         self.input_layers = input_layers
         self.part_size = part_size
         self.include_flip = include_flip
+        self.random_flip = random_flip
         self.params = []
         self.bias_params = []
         self.mb_size = self.input_layers[0].mb_size * 4 * len(self.input_layers)
@@ -1259,6 +1298,8 @@ class MultiRotSliceLayer(ConcatenateLayer):
 
             if self.include_flip:
                 input_representations = [input, input[:, :, :, ::-1]] # regular and flipped
+	    elif self.random_flip:
+		input_representations = [input] if np.random.binomial(1,0.5) else [input[:, :, :, ::-1]]
             else:
                 input_representations = [input] # just regular
 
@@ -1397,7 +1438,7 @@ class FeatureMaxPoolingLayer(object):
         For c01b, this has to be set to 0.
 
         implementation:
-            - 'max_pool': uses theano's max_pool_2d - doesn't work for input dimension > 1024!
+            - 'max_pool': uses theano's max_pool_2d - doesn't work for input dimension > 1024! now using pool_2d which is a max pool
             - 'reshape': reshapes the tensor to create a 'pool' dimension and then uses T.max.
         """
         self.pool_size = pool_size
@@ -1440,7 +1481,6 @@ class FeatureMaxPoolingLayer(object):
             output = T.max(input_reshaped, axis=self.feature_dim + 1)
         else:
             raise "Uknown implementation string '%s'" % self.implementation
-
         return output
 
 
