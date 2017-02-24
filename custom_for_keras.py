@@ -1,11 +1,13 @@
 import numpy as np
 import keras.backend as T
-from keras.metrics import categorical_accuracy
+from keras.metrics import categorical_accuracy, mean_squared_error
 
 
 def kaggle_MultiRotMergeLayer_output(x , num_views=2, mb_size=16 ):
+	#TODO: stop using mb_size argument! needed for events mod batch_size!=0! build check?
         input_shape = T.shape(x)
         input_ = x
+	mb_size = input_shape[0]/4/num_views
         input_r = input_.reshape((4 * num_views, mb_size, T.prod(input_shape[1:]))) # split out the 4* dimension
 	output_shape = lambda lx : (lx[0]//4//num_views, (lx[1]*lx[2]*lx[3]*4* num_views) )
 	return input_r.transpose(1, 0, 2).reshape( output_shape(input_shape) )
@@ -52,7 +54,8 @@ def kaggle_sliced_accuracy(y_true, y_pred):
 	accuracy_slices = T.cast(accuracy_slices,'float32')
 	return {'sliced_accuracy_mean' : T.mean(accuracy_slices), 'sliced_accuracy_std' :  T.std(accuracy_slices)}
 		
-		
+def rmse(y_true, y_pred):
+	return T.sqrt(mean_squared_error(y_true, y_pred))		
 	
 def dense_weight_init_values( n_inputs , n_outputs , w_std = 0.001 , b_init_val = 0.01 ):
 	if type(n_inputs)!=tuple and type(n_inputs)==int: n_inputs = (n_inputs,)
@@ -86,7 +89,7 @@ def OptimisedDivGalaxyOutput(x,mb_size ,normalised=True, categorised=False): #TO
             (slice(28, 37), 7), # VI: rescale Q10, Q11 by A4.1
         ]
 
-	if normalised: return predictions(input_layer,normalisation_mask,categorised,mb_size,scaling_sequence)
+	if normalised: return predictions (input_layer,normalisation_mask,categorised,mb_size,scaling_sequence)
 	else: return predictions_no_normalisation(input_layer)
 
 def predictions(input_layer,normalisation_mask,categorised,mb_size,scaling_sequence, *args, **kwargs):
@@ -118,16 +121,6 @@ def error(self, normalisation=True, *args, **kwargs):
         error = T.mean((predictions - self.target_var) ** 2)
         return error
 '''
-    # def generate_scaling_mask(self):
-    #     """
-    #     This mask needs to be applied to the LOGARITHM of the probabilities. The appropriate log probs are then summed,
-    #     which corresponds to multiplying the raw probabilities, which is what we want to achieve.
-    #     """
-    #     mask = np.zeros((37, 37), dtype='float32')
-    #     for s, factor_indices in zip(self.question_slices, self.scaling_factor_indices):
-    #         if factor_indices is not None:
-    #             mask[factor_indices, s] = 1.0
-    #     return mask
 
 def weighted_answer_probabilities(input_layer,normalisation_mask,categorised,mb_size,scaling_sequence, *args, **kwargs):
         probs = answer_probabilities(input_layer,normalisation_mask,categorised,mb_size,*args, **kwargs)
@@ -150,8 +143,8 @@ def answer_probabilities(x,normalisation_mask,categorised,mb_size, *args, **kwar
         """
         normalise the answer groups for each question.
         """
-        input_ = T.reshape(x,(mb_size,37))
-        input_clipped = T.maximum(input_, 0) # T.clip(input, 0, 1) # T.maximum(input, 0)	
+        input_ = T.reshape(x,(mb_size,37)) #not needed but keep as saveguard
+        input_clipped = T.maximum(input_, 0) 	
 
         normalisation_denoms = T.dot(input_clipped, normalisation_mask) + 1e-7 # small constant to prevent division by 0
         input_normalised = input_clipped / normalisation_denoms

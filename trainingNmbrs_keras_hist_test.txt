@@ -1,0 +1,20 @@
+#wRandFlip 
+#The training is running for 1 chunks, each with 2016 images. That are about 0 epochs. The validation sample contains 3078 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 1 chunks, each with 2016 images. That are about 0 epochs. The validation sample contains 3078 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 1 chunks, each with 2016 images. That are about 0 epochs. The validation sample contains 3078 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 1 chunks, each with 192 images. That are about 0 epochs. The validation sample contains 3078 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 1 chunks, each with 192 images. That are about 0 epochs. The validation sample contains 3078 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+{'loss': [0.035928324175377689, 0.03133548516780138, 0.030430822012325127, 0.030328760854899883, 0.030185318862398464], 'val_loss': [0.029242391387621563, 0.028525540294746559, 0.028461267861227196, 0.028239247699578602, 0.02816657939304908]}
+#wRandFlip 
+#The training is running for 1 chunks, each with 192 images. That are about 0 epochs. The validation sample contains 3078 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+{"loss": [0.033585838663081326, 0.028294605513413746, 0.027987121293942135, 0.027677465230226517, 0.027779167518019676], "val_loss": [0.032121335156261921, 0.031551437452435493, 0.030963410002489884, 0.030681392488380272, 0.030754828204711277]}

@@ -1,0 +1,4 @@
+#wRandFlip 
+#The training is running for 1 chunks, each with 192 images. That are about 0 epochs. The validation sample contains 3078 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+{"loss": [0.03632913281520208, 0.032509522512555122, 0.03171448533733686, 0.031650695018470287, 0.031610802747309208], "val_loss": [0.031920697850485645, 0.031370267892877259, 0.031021517391006153, 0.030928811058402061, 0.031044392225642998]}
