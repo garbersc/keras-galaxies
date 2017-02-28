@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 
 #data=np.loadtxt(fname="trainingNmbrs_christmas.txt",delimiter=",")
-data=np.loadtxt(fname="trainingNmbrs_keras_maxout_start_w_winsolWeights.txt",delimiter=",")
+data=np.loadtxt(fname="trainingNmbrs_keras_maxout_start_w_winsolWeights_noDropout.txt",delimiter=",")
 data=data.transpose()
 
 print("adjusting rounds...")
