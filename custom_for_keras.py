@@ -3,7 +3,7 @@ import keras.backend as T
 from keras.metrics import categorical_accuracy, mean_squared_error
 
 
-def kaggle_MultiRotMergeLayer_output(x , num_views=2, mb_size=16 ):
+def kaggle_MultiRotMergeLayer_output(x , num_views=2):
 	#TODO: stop using mb_size argument! needed for events mod batch_size!=0! build check?
         input_shape = T.shape(x)
         input_ = x
@@ -45,28 +45,31 @@ def kaggle_input(x, part_size = 45, n_input_var = 2, include_flip=False, random_
 	return T.concatenate(parts, axis=0)
 
 
-def kaggle_sliced_accuracy(y_true, y_pred):
+def kaggle_sliced_accuracy(y_true, y_pred, slice_weights = [1.]*11):
 	question_slices = [slice(0, 3), slice(3, 5), slice(5, 7), slice(7, 9), slice(9, 13), slice(13, 15),
                                 slice(15, 18), slice(18, 25), slice(25, 28), slice(28, 31), slice(31, 37)]
-	accuracy_slices = []
-	for q_slice in question_slices:
-		accuracy_slices.append( categorical_accuracy( y_true[:,q_slice] , y_pred[:,q_slice] ) )
+
+	accuracy_slices = [ categorical_accuracy( y_true[:,question_slices[i]] , y_pred[:,question_slices[i]] )*slice_weights[i] for i in range(len(question_slices)) ]
 	accuracy_slices = T.cast(accuracy_slices,'float32')
 	return {'sliced_accuracy_mean' : T.mean(accuracy_slices), 'sliced_accuracy_std' :  T.std(accuracy_slices)}
 		
 def rmse(y_true, y_pred):
 	return T.sqrt(mean_squared_error(y_true, y_pred))		
 	
-def dense_weight_init_values( n_inputs , n_outputs , w_std = 0.001 , b_init_val = 0.01 ):
+def dense_weight_init_values( n_inputs , n_outputs, nb_feature = None , w_std = 0.001 , b_init_val = 0.01 ):
 	if type(n_inputs)!=tuple and type(n_inputs)==int: n_inputs = (n_inputs,)
 	if type(n_outputs)!=tuple and type(n_outputs)==int: n_outputs = (n_outputs,)
 	W_shape = n_inputs + n_outputs
-	return ( np.random.randn(*W_shape).astype(np.float32)*w_std , np.ones(*n_outputs).astype(np.float32)*b_init_val )
+	if nb_feature:
+		W_shape = (nb_feature,) + W_shape
+		n_outputs = (nb_feature,) + n_outputs
+	return ( np.random.randn(*W_shape).astype(np.float32)*w_std , np.ones(n_outputs).astype(np.float32)*b_init_val )
 
 
 
-def OptimisedDivGalaxyOutput(x,mb_size ,normalised=True, categorised=False): #TODO categorised and LL loss not updated
+def OptimisedDivGalaxyOutput(x,mb_size=None ,normalised=True, categorised=False): #TODO categorised and LL loss not updated
         input_layer = x
+	if not mb_size: mb_size = input_layer.shape[0]
         params = []
         bias_params = []
         

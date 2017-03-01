@@ -72,3 +72,24 @@
 #wRandFlip 
 #The training is running for 1 chunks, each with 192 images. That are about 0 epochs. The validation sample contains 3078 images. 
 #round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 1 chunks, each with 192 images. That are about 0 epochs. The validation sample contains 3078 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#eval losses and metrics:
+{"loss": [0.042885636600355305, 0.031410300172865391], "sliced_accuracy_std": [0.26157212878266972, 0.27529126902421314], "categorical_accuracy": [0.052083333333333336, 0.609375], "sliced_accuracy_mean": [0.32623106986284256, 0.54971593618392944], "rmse": [0.20667656883597374, 0.1769096851348877]}
+#fit losses:
+{"loss": [0.037395412102341652], "val_loss": [0.030821569574375946]}
+#wRandFlip 
+#The training is running for 1 chunks, each with 192 images. That are about 0 epochs. The validation sample contains 3078 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#eval losses and metrics:
+{"loss": [0.041898656015594803, 0.03329892704884211], "sliced_accuracy_std": [0.32523339490095776, 0.31408120691776276], "categorical_accuracy": [0.052083333333333336, 0.56770833333333337], "sliced_accuracy_mean": [0.3385416716337204, 0.47348485887050629], "rmse": [0.20449136445919672, 0.18222076197465262]}
+#fit losses:
+{"loss": [0.040976730485757194], "val_loss": [0.031896313031514488]}
+#wRandFlip 
+#The training is running for 1 chunks, each with 3968 images. That are about 0 epochs. The validation sample contains 3078 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#eval losses and metrics:
+{"loss": [0.040544733074643922, 0.030337213193096461], "sliced_accuracy_std": [0.30095068870052216, 0.23692559234557614], "categorical_accuracy": [0.59879032258064513, 0.59879032258064513], "sliced_accuracy_mean": [0.41637648065243998, 0.60266222540409331], "rmse": [0.20115223430818127, 0.17385170608758926]}
+#fit losses:
+{"loss": [0.030759052163170229], "val_loss": [0.030527466787926612]}
