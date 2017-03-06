@@ -199,10 +199,11 @@ REDUCTION = 3000
 
 print 'load translation matrixes'
 
-rot_m = np.load('u_formPcaTest_middled_55420_3.npy')
-mid_m = np.load('mean_cropped_train_set.npy')
+rot_m = np.load('../../../MNIST-tut/u_formPcaTest_middled_55420_3.npy')
+mid_m = np.load('../../../MNIST-tut/mean_cropped_train_set.npy')
 
-ev_translation = lambda x: ev.rotate( middle( flat_galax_imgs( x ) , mid_m ) , rot_m , REDUCTION )
+ev_translation = lambda x: ev.rotate( ev.middle( ev.flat_galax_imgs( x ) , mid_m ) , rot_m , REDUCTION )
+#ev_translation = lambda x:  ev.middle( ev.flat_galax_imgs( x ) , mid_m ) 
 
 print "Build model"
 
@@ -228,7 +229,7 @@ model.add(Merge([model1, model2], mode=kaggle_input , output_shape=lambda x: ((m
 
 if debug : print model.output_shape
 
-model.add(Lambda( ev_translation , output_shape = ( model.output_shape[0] , REDUCTION ) ))
+model.add(Lambda( ev_translation , output_shape = ( REDUCTION, ) ))
 
 
 #needed for the pylearn moduls used by kerasCudaConvnetConv2DLayer and kerasCudaConvnetPooling2DLayer
