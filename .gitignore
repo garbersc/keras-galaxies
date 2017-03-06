@@ -61,3 +61,5 @@ predictions/
 *.jpeg
 *.jpg
 *.gz
+*.npy
+
