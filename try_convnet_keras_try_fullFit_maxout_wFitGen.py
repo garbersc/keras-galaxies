@@ -29,7 +29,7 @@ from custom_for_keras import kaggle_MultiRotMergeLayer_output, OptimisedDivGalax
 debug = True
 predict = False
 
-continueAnalysis = True
+continueAnalysis = False
 saveAtEveryValidation = True
 
 getWinSolWeights = False
@@ -94,7 +94,7 @@ valid_indices = np.arange(num_train, num_train + num_valid)
 test_indices = np.arange(num_test)
 
 
-BATCH_SIZE = 512 #keep in mind
+BATCH_SIZE = 16 #keep in mind
 
 NUM_INPUT_FEATURES = 3
 
@@ -408,27 +408,15 @@ for i in range(len(model_norm_metrics.metrics_names)):
 
 if debug: print("Free GPU Mem after validation check %s MiB " % (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0]/1024./1024.))
 print ''
-print "load and augment data, ETA %.f s" % (t_val*N_TRAIN/num_valid*2)
-start_time = time.time()
-chunk_data, chunk_length = train_gen.next()
-y_chunk = chunk_data.pop() # last element is labels.
-xs_chunk = chunk_data
-
-    # need to transpose the chunks to move the 'channels' dimension up
-xs_chunk = [x_chunk.transpose(0, 3, 1, 2) for x_chunk in xs_chunk]
 
 
-l0_input_var = xs_chunk[0]
-l0_45_input_var = xs_chunk[1]
-l6_target_var = y_chunk
-
-print "  took %.2f seconds" % (time.time() - start_time)
-
-print ''
 print "Train %s epoch without norm" % NUM_EPOCHS_NONORM
 
-no_norm_events = int(NUM_EPOCHS_NONORM*N_TRAIN)
-hist = model_noNorm.fit( x=[l0_input_var[:no_norm_events],l0_45_input_var[:no_norm_events]] , y=l6_target_var[:no_norm_events],validation_data=([xs_valid[0],xs_valid[1]],y_valid),batch_size=BATCH_SIZE, nb_epoch=1, verbose=1, callbacks=[lr_callback] ) #loss is squared!!!
+no_norm_events = int(NUM_EPOCHS_NONORM*N_TRAIN)  #how do i do this with a input_gen?
+no_norm_events = N_TRAIN
+hist = model_noNorm.fit_generator(input_gen ,validation_data=([xs_valid[0],xs_valid[1]],y_valid),samples_per_epoch=N_TRAIN, nb_epoch=1, verbose=1, callbacks=[lr_callback] ) #loss is squared!!!
+
+#hist = model_noNorm.fit( x=[l0_input_var[:no_norm_events],l0_45_input_var[:no_norm_events]] , y=l6_target_var[:no_norm_events],validation_data=([xs_valid[0],xs_valid[1]],y_valid),batch_size=BATCH_SIZE, nb_epoch=1, verbose=1, callbacks=[lr_callback] ) #loss is squared!!!
 
 hists=hist.history
 
@@ -440,7 +428,7 @@ for i in range(EPOCHS/VALIDATE_EVERY if not EPOCHS%VALIDATE_EVERY else EPOCHS/VA
 	print ''
 	print "epochs run: %s - epochs to go: %s " % (epochs_run,epoch_togo)
 
-	hist = model_norm.fit( x=[l0_input_var,l0_45_input_var] , y=l6_target_var, validation_data=([xs_valid[0],xs_valid[1]],y_valid) ,batch_size=BATCH_SIZE, nb_epoch=np.min([epoch_togo,VALIDATE_EVERY])+epochs_run, initial_epoch=epochs_run, verbose=1, callbacks=[lr_callback] )
+	hist = model_norm.fit_generator( input_gen, validation_data=([xs_valid[0],xs_valid[1]],y_valid),samples_per_epoch=N_TRAIN ,_epoch=np.min([epoch_togo,VALIDATE_EVERY])+epochs_run, initial_epoch=epochs_run, verbose=1, callbacks=[lr_callback] )
 
 	for k in hists:
 		hists[k]+=hist.history[k]

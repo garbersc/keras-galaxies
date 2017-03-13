@@ -231,3 +231,17 @@ def ll_error(self, normalisation=True, *args, **kwargs):
         error =   logloss(self.target_var,predictions)
         return error
 '''
+def input_generator(train_gen):
+    for chunk in train_gen:   
+        chunk_data, chunk_length = chunk
+        y_chunk = chunk_data.pop() # last element is labels.
+        xs_chunk = chunk_data
+        
+            # need to transpose the chunks to move the 'channels' dimension up
+        xs_chunk = [x_chunk.transpose(0, 3, 1, 2) for x_chunk in xs_chunk]
+        
+        l0_input_var = xs_chunk[0]
+        l0_45_input_var = xs_chunk[1]
+        l6_target_var = y_chunk
+
+        yield ([l0_input_var,l0_45_input_var] , l6_target_var)
