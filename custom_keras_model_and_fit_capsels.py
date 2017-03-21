@@ -15,7 +15,7 @@ from custom_for_keras import kaggle_MultiRotMergeLayer_output, OptimisedDivGalax
 import Object
 
 
-class kaggle_winsol(Object):
+class kaggle_winsol:
     def __init__(self, BATCH_SIZE, NUM_INPUT_FEATURES, PART_SIZE, input_sizes,
                  LEARNING_RATE_SCHEDULE, MOMENTUM, LOSS_PATH, WEIGHTS_PATH,
                  **kwargs):

@@ -96,7 +96,7 @@ valid_indices = np.arange(num_train, num_train + num_valid)
 test_indices = np.arange(num_test)
 
 
-BATCH_SIZE = 16  # keep in mind
+BATCH_SIZE = 512  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
@@ -178,7 +178,7 @@ WEIGHTS[4] = 1.5  # edge on no
 # WEIGHTS[24]=1  #dust lane
 WEIGHTS = WEIGHTS / WEIGHTS[WEIGHTS.argmax()]
 
-GEN_BUFFER_SIZE = 1
+GEN_BUFFER_SIZE = 2
 
 TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_hist_new.txt"
 
@@ -392,7 +392,7 @@ augmentation_params = {
     'do_flip': True,
 }
 
-augmented_data_gen = ra.realtime_augmented_data_gen(num_chunks=N_TRAIN / BATCH_SIZE, chunk_size=BATCH_SIZE,
+augmented_data_gen = ra.realtime_augmented_data_gen(num_chunks=N_TRAIN / BATCH_SIZE * (EPOCHS + 1), chunk_size=BATCH_SIZE,
                                                     augmentation_params=augmentation_params, ds_transforms=ds_transforms,
                                                     target_sizes=input_sizes)
 
@@ -479,8 +479,9 @@ print "Train %s epoch without norm" % NUM_EPOCHS_NONORM
 # how do i do this with a input_gen?
 no_norm_events = int(NUM_EPOCHS_NONORM * N_TRAIN)
 no_norm_events = N_TRAIN
+# print 'nb_worker=4 test is on'
 hist = model_noNorm.fit_generator(input_gen, validation_data=(
-    [xs_valid[0], xs_valid[1]], y_valid), samples_per_epoch=N_TRAIN, nb_epoch=1, verbose=1, callbacks=[lr_callback])  # loss is squared!!!
+    [xs_valid[0], xs_valid[1]], y_valid), samples_per_epoch=N_TRAIN, nb_epoch=1, verbose=1, callbacks=[lr_callback], nb_worker=1)  # loss is squared!!! TODO nb_worker=4 test, does not work with this generator
 
 # hist = model_noNorm.fit(
 # x=[l0_input_var[:no_norm_events],l0_45_input_var[:no_norm_events]] ,
@@ -499,7 +500,7 @@ for i in range(EPOCHS / VALIDATE_EVERY if not EPOCHS % VALIDATE_EVERY else EPOCH
     print ''
     print "epochs run: %s - epochs to go: %s " % (epochs_run, epoch_togo)
 
-    hist = model_norm.fit_generator(input_gen, validation_data=([xs_valid[0], xs_valid[1]], y_valid), samples_per_epoch=N_TRAIN, _epoch=np.min([
+    hist = model_norm.fit_generator(input_gen, validation_data=([xs_valid[0], xs_valid[1]], y_valid), samples_per_epoch=N_TRAIN, nb_epoch=np.min([
                                     epoch_togo, VALIDATE_EVERY]) + epochs_run, initial_epoch=epochs_run, verbose=1, callbacks=[lr_callback])
 
     for k in hists:
