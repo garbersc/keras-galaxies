@@ -15,11 +15,18 @@ starting_time = time.time()
 # plt.ion()
 # import utils
 
+copy_to_ram_beforehand = False
+
 debug = True
 predict = False  # not implemented
 
 continueAnalysis = False
 saveAtEveryValidation = True
+
+
+if copy_to_ram_beforehand:
+    ra.myLoadFrom_RAM = True
+    import copy_data_to_shm
 
 y_train = np.load("data/solutions_train.npy")
 ra.y_train = y_train

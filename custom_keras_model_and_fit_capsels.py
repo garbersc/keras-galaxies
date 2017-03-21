@@ -1,6 +1,9 @@
 import numpy as np
 import json
-
+import time
+from datetime import datetime, timedelta
+import functools
+from copy import copy
 
 from keras.models import Sequential, Model
 from keras.layers import Dense, Dropout, Input,  MaxoutDense
@@ -10,15 +13,12 @@ from keras.engine.topology import Merge
 from keras.callbacks import LearningRateScheduler
 
 from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute, kerasCudaConvnetConv2DLayer
-from custom_for_keras import kaggle_MultiRotMergeLayer_output, OptimisedDivGalaxyOutput, kaggle_input, kaggle_sliced_accuracy, dense_weight_init_values, rmse
-
-import Object
+from custom_for_keras import kaggle_MultiRotMergeLayer_output, OptimisedDivGalaxyOutput, kaggle_input, kaggle_sliced_accuracy, dense_weight_init_values, rmse, lr_function
 
 
 class kaggle_winsol:
     def __init__(self, BATCH_SIZE, NUM_INPUT_FEATURES, PART_SIZE, input_sizes,
-                 LEARNING_RATE_SCHEDULE, MOMENTUM, LOSS_PATH, WEIGHTS_PATH,
-                 **kwargs):
+                 LEARNING_RATE_SCHEDULE, MOMENTUM, LOSS_PATH, WEIGHTS_PATH):
         self.BATCH_SIZE = BATCH_SIZE
         self.NUM_INPUT_FEATURES = NUM_INPUT_FEATURES
         self.input_sizes = input_sizes
@@ -35,10 +35,13 @@ class kaggle_winsol:
     def init_hist_dics(self, model_in):
         for n in model_in:
             self.hists[n] = {}
-            for o in model_in[n].metrics_names:
-                self.hists[n][o] = []
+            try:
+                for o in model_in[n].metrics_names:
+                    self.hists[n][o] = []
+            except AttributeError:
+                pass
 
-        return self.eval_hists
+        return self.hists
 
     def init_models(self):
         print "init model"
@@ -155,8 +158,6 @@ class kaggle_winsol:
                        'model_norm_metrics': model_norm_metrics,
                        'model_noNorm': model_noNorm}
 
-        self.init_hist_dics(self.models)
-
         return self.models
 
     def compile_models(self):
@@ -180,6 +181,8 @@ class kaggle_winsol:
                                                            'categorical_accuracy',
                                                            kaggle_sliced_accuracy])
 
+        self.init_hist_dics(self.models)
+
         return True
 
     def print_summary(self, modelname='model_norm'):
@@ -193,47 +196,54 @@ class kaggle_winsol:
                     ' into  model ' + modelname + '\n')
         return True
 
-    def sevaluate(self, x, y_valid, batch_size=0,
-                  modelname='model_norm_metrics'):
+    def print_last_hist(self, modelname='model_norm_metrics'):
+        for n in self.hists['model_norm_metrics']:
+            print "   %s : %.3f" % (
+                n, self.hists['model_norm_metrics'][n][-1])
+        return True
+
+    def evaluate(self, x, y_valid, batch_size=0,
+                 modelname='model_norm_metrics', verbose=1):
         if not batch_size:
             batch_size = self.BATCH_SIZE
         evalHist = self.models[modelname].evaluate(
             x=x, y=y_valid, batch_size=batch_size,
-            verbose=1)
+            verbose=verbose)
 
         for i in range(len(self.models[modelname].metrics_names)):
             self.hists[modelname][self.models[modelname].metrics_names[i]].append(
                 evalHist[i])
 
+        if verbose:
+            self.print_last_hist()
+
         return evalHist
 
-    def lr_function(self, e):
-        if e in self.LEARNING_RATE_SCHEDULE:
-            _current_lr = self.LEARNING_RATE_SCHEDULE[e]
-            self.current_lr = _current_lr
-        else:
-            _current_lr = self.current_lr
-        return _current_lr
-
-    lr_callback = LearningRateScheduler(lr_function)
+    def make_lrs_fct(self):
+        return functools.partial(lr_function,
+                                 lrs=self.LEARNING_RATE_SCHEDULE)
 
     def save_hist(self, history, modelname='model_norm'):
         if not self.hists:
             self.init_hist_dics(self.models)
         for k in self.hists[modelname]:
-            self.hists[k] += history[k]
+            self.hists[modelname][k] += history[k]
 
         return True
 
     def fit_gen(self, modelname, data_generator, validation, samples_per_epoch,
-                callbacks=[lr_callback], nb_epoch=1):
+                callbacks='default', nb_epoch=1):  # think about making nb_worker>1 work, problem: generator needs multiple instances
+        if callbacks == 'default':
+            _callbacks = [LearningRateScheduler(self.make_lrs_fct())]
+        else:
+            _callbacks = callbacks
 
         hist = self.models[modelname].fit_generator(data_generator,
                                                     validation_data=validation,
                                                     samples_per_epoch=samples_per_epoch,
                                                     nb_epoch=nb_epoch,
                                                     verbose=1,
-                                                    callbacks=callbacks)
+                                                    callbacks=_callbacks)
 
         self.save_hist(hist.history, modelname=modelname)
 
@@ -270,37 +280,50 @@ class kaggle_winsol:
         self.save_loss(modelname='model_norm')
         return True
 
-    def full_fit(self, input_gen, validation, samples_per_epoch,
+    def full_fit(self, data_gen, validation, samples_per_epoch,
                  validate_every,
-                 nb_epochs):
+                 nb_epochs, verbose=1, save_at_every_validation=True):
+        if verbose:
+            timedeltas = []
         epochs_run = 0
         epoch_togo = nb_epochs
         for i in range(nb_epochs / validate_every if not nb_epochs
                        % validate_every else nb_epochs / validate_every + 1):
-            print ''
-            print "epochs run: %s - epochs to go: %s " % (
-                epochs_run, epoch_togo)
+            if verbose:
+                time1 = time.time()
+                print ''
+                print "epochs run: %s - epochs to go: %s " % (
+                    epochs_run, epoch_togo)
 
             # main fit
             hist = self.models['model_norm'].fit_generator(
-                input_gen, validation_data=validation,
+                data_gen, validation_data=validation,
                 samples_per_epoch=samples_per_epoch,
                 nb_epoch=np.min([
                     epoch_togo, validate_every]) + epochs_run,
                 initial_epoch=epochs_run, verbose=1,
-                callbacks=[self.lr_callback])
+                callbacks=[LearningRateScheduler(self.make_lrs_fct())])
 
             self.save_hist(hist.history)
 
             epoch_togo -= np.min([epoch_togo, validate_every])
             epochs_run += np.min([epoch_togo, validate_every])
 
-            print ''
-            print 'validate:'
-            self.evaluate(validation[0], y=validation[1])
+            if verbose:
+                print ''
+                print 'validate:'
+            self.evaluate(
+                validation[0], y_valid=validation[1], verbose=verbose)
 
-            for n in self.hists['model_norm_metrics']:
-                print "   %s : %.3f" % (
-                    n, self.hists['model_norm_metrics'][n][-1])
+            if verbose:
+                timedeltas.append(time.time() - time1)
+                if len(timedeltas) > 10:
+                    timedeltas = timedeltas[-10:]
+                print '\nestimated finish: %s \n' % (
+                    datetime.now() + timedelta(
+                        seconds=(
+                            np.mean(timedeltas)
+                            * epoch_togo / validate_every)))
 
-            self.save()
+            if save_at_every_validation:
+                self.save()
