@@ -75,7 +75,7 @@ valid_indices = np.arange(num_train, num_train + num_valid)
 test_indices = np.arange(num_test)
 
 
-BATCH_SIZE = 512  # keep in mind
+BATCH_SIZE = 1024  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
@@ -112,8 +112,8 @@ MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
 N_TRAIN = num_train
 N_VALID = num_valid
-EPOCHS = 20
-VALIDATE_EVERY = 10  # 20 # 12 # 6 # 6 # 6 # 5 #
+EPOCHS = 6
+VALIDATE_EVERY = 2  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 print("The training sample contains %s , the validation sample contains %s images. \n" %
       (ra.num_train,  ra.num_valid))
