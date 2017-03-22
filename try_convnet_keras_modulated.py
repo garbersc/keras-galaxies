@@ -4,6 +4,7 @@ import load_data
 import realtime_augmentation as ra
 import time
 import sys
+import json
 from custom_for_keras import input_generator
 from datetime import datetime, timedelta
 
@@ -75,15 +76,16 @@ valid_indices = np.arange(num_train, num_train + num_valid)
 test_indices = np.arange(num_test)
 
 
-BATCH_SIZE = 1024  # keep in mind
+BATCH_SIZE = 512  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
 LEARNING_RATE_SCHEDULE = {
-    0: 0.1,
-    20: 0.05,
+    0: 0.04,
+    # 20: 0.05,
     40: 0.01,
-    80: 0.005
+    80: 0.005,
+    120: 0.0005
     # 500: 0.04,
     # 0: 0.01,
     # 1800: 0.004,
@@ -112,22 +114,22 @@ MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
 N_TRAIN = num_train
 N_VALID = num_valid
-EPOCHS = 6
-VALIDATE_EVERY = 2  # 20 # 12 # 6 # 6 # 6 # 5 #
+EPOCHS = 150
+VALIDATE_EVERY = 20  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 print("The training sample contains %s , the validation sample contains %s images. \n" %
       (ra.num_train,  ra.num_valid))
 # train without normalisation for this fraction of the traininng sample, to get the weights in
 # the right 'zone'.
-NUM_EPOCHS_NONORM = 0.1
+NUM_EPOCHS_NONORM = 1.
 # this should be only a few, just .1 hopefully suffices.
 
 GEN_BUFFER_SIZE = 2
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_longRun_longer_noNorm_lowerStarting_learningrate.txt"
 
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_convent_keras_modular.h5"
+WEIGHTS_PATH = "analysis/final/try_convent_keras_modular_longRun_longer_noNorm_lowerStarting_learningrate.h5"
 
 # maybe put into class
 with open(TRAIN_LOSS_SF_PATH, 'a')as f:
@@ -137,7 +139,9 @@ with open(TRAIN_LOSS_SF_PATH, 'a')as f:
     f.write("#wRandFlip \n")
     f.write("#The training is running for %s epochs, each with %s images. The validation sample contains %s images. \n" % (
         EPOCHS, N_TRAIN, ra.num_valid))
-    f.write("#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy \n")
+    f.write("#validation is done every %s epochs" % VALIDATE_EVERY)
+    f.write("the learning rate schedule is")
+    json.dump(LEARNING_RATE_SCHEDULE, f)
 
 
 input_sizes = [(69, 69), (69, 69)]
@@ -287,7 +291,7 @@ try:
 except KeyboardInterrupt:
     print "\ngot keyboard interuption"
     print "\nsaving..."
-    winsol.save()
+    winsol.save('interrupt')
     print ' run for %s' % timedelta(seconds=(time.time() - start_time))
     exit()
     sys.exit(0)

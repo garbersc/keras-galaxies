@@ -48,7 +48,7 @@ class kaggle_winsol:
         self.WEIGHTS_PATH = WEIGHTS_PATH
         self.LOSS_PATH = LOSS_PATH
         self.hists = {}
-        self.first_loss_save = False
+        self.first_loss_save = True
         self.models = {}
         self.reinit_counter = 0
 
@@ -362,19 +362,45 @@ class kaggle_winsol:
     def save_loss(self, path='', modelname=''):
         if not path:
             path = self.LOSS_PATH
-        with open(path, 'a')as f:
-            if not self.first_loss_save:
-                f.write("#eval losses and metrics:\n")
-                self.first_loss_save = True
-            if modelname:
-                f.write("#history of model: " + modelname + '\n')
-                json.dump(self.hists[modelname], f)
+            if self.first_loss_save:
+                with open(path, 'a')as f:
+                    f.write("#eval losses and metrics:\n")
+                    self.first_loss_save = False
+                    if modelname:
+                        f.write("#history of model: " + modelname + '\n')
+                        json.dump(self.hists[modelname], f)
+                    else:
+                        f.write("#histories of all models:\n")
+                        for k in self.models:
+                            f.write("#history of model: " + k + '\n')
+                            json.dump(self.hists[k], f)
+                    f.write("\n")
             else:
-                f.write("#histories of all models:\n")
-                for k in self.models:
-                    f.write("#history of model: " + k + '\n')
-                    json.dump(self.hists[k], f)
-            f.write("\n")
+                if modelname:
+                    with open(path, "r+") as f:
+                        d = f.readlines()
+                        f.seek(0)
+                        rewrite_next_json = False
+                        model_found = True
+                        for i in d:
+                            if i != "#history of model: " + modelname:
+                                if rewrite_next_json and i.find("{", 0, 1):
+                                    json.dump(self.hists[modelname], f)
+                                    rewrite_next_json = False
+                                else:
+                                    f.write(i)
+                            else:
+                                f.write(i)
+                                model_found = True
+                                rewrite_next_json = True
+                                f.truncate()
+                        if not model_found:
+                            f.write("#history of model: " + modelname + '\n')
+                            json.dump(self.hists[modelname], f)
+
+                else:
+                    for k in self.models:
+                        self.save_loss(path=path, modelname=k)
 
         return True
 
@@ -382,10 +408,20 @@ class kaggle_winsol:
     performs all saving task
     '''
 
-    def save(self):
-        self.save_weights()
-        self.save_loss(modelname='model_norm_metrics')
-        self.save_loss(modelname='model_norm')
+    def save(self, option_string=None):
+        if not option_string:
+            self.save_weights()
+            self.save_loss(modelname='model_norm_metrics')
+            self.save_loss(modelname='model_norm')
+        elif option_string == 'interrupt':
+            self.save_weights(path=self.WEIGHTS_PATH + '_interrupted.h5')
+            self.save_loss(path=self.LOSS_PATH + '_interrupted.txt',
+                           modelname='model_norm_metrics')
+            self.save_loss(path=self.LOSS_PATH + '_interrupted.txt',
+                           modelname='model_norm_metrics')
+        else:
+            print 'WARNING: unknown saving opotion *' + option_string + '*'
+            self.save()
         return True
 
     '''
@@ -463,5 +499,7 @@ class kaggle_winsol:
         else:
             self.LOSS_PATH = ((self.LOSS_PATH.split(
                 '.', 1)[0] + '_' + str(self.reinit_counter) + '.h5'))
+
+        self.first_loss_save = True
 
         self.init_models()
