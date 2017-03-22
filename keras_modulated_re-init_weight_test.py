@@ -20,8 +20,8 @@ copy_to_ram_beforehand = False
 debug = True
 predict = False  # not implemented
 
-continueAnalysis = False
-saveAtEveryValidation = True
+continueAnalysis = True
+saveAtEveryValidation = False
 
 
 if copy_to_ram_beforehand:
@@ -74,8 +74,7 @@ train_indices = np.arange(num_train)
 valid_indices = np.arange(num_train, num_train + num_valid)
 test_indices = np.arange(num_test)
 
-
-BATCH_SIZE = 512  # keep in mind
+BATCH_SIZE = 16  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
@@ -127,7 +126,7 @@ GEN_BUFFER_SIZE = 2
 TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular.txt"
 
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_convent_keras_modular.h5"
+WEIGHTS_PATH = "analysis/final/goodWeightS_test.h5"
 
 # maybe put into class
 with open(TRAIN_LOSS_SF_PATH, 'a')as f:
@@ -263,10 +262,18 @@ try:
 
     no_norm_events = int(NUM_EPOCHS_NONORM * N_TRAIN)
 
-    hist = winsol.fit_gen(modelname='model_noNorm',
-                          data_generator=input_gen,
-                          validation=validation_data,
-                          samples_per_epoch=no_norm_events)
+    # hist = winsol.fit_gen(modelname='model_norm',
+    #                       data_generator=input_gen,
+    #                       validation=validation_data,
+    #                       samples_per_epoch=N_TRAIN)
+
+    # evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
+
+    print 'does this reset the weights?'
+
+    winsol.init_models()
+
+    evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
 
     if debug:
         print("\nFree GPU Mem before train loop %s MiB " %
@@ -278,24 +285,21 @@ try:
     print 'rough ETA %s sec. -> finishes at %s' % (
         int(eta), datetime.now() + timedelta(seconds=eta))
 
-    winsol.full_fit(data_gen=input_gen,
-                    validation=validation_data,
-                    samples_per_epoch=N_TRAIN,
-                    validate_every=VALIDATE_EVERY,
-                    nb_epochs=EPOCHS)
+    # winsol.full_fit(data_gen=input_gen,
+    #                 validation=validation_data,
+    #                 samples_per_epoch=N_TRAIN,
+    #                 validate_every=VALIDATE_EVERY,
+    #                 nb_epochs=EPOCHS)
 
 except KeyboardInterrupt:
     print "\ngot keyboard interuption"
-    print "\nsaving..."
-    winsol.save()
     print ' run for %s' % timedelta(seconds=(time.time() - start_time))
     exit()
     sys.exit(0)
 
 
-print "\nsaving..."
-winsol.save()
 print "Done!"
-print ' run for %s' % timedelta(seconds=(time.time() - start_time))
+td = time.time() - start_time
+print ' run for %sh %sm %ss ' % (int(td // 3600), int(td // 60) % 60, int(td) % 60)
 exit()
 sys.exit(0)

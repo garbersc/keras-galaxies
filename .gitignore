@@ -62,3 +62,9 @@ predictions/
 *.jpeg
 *.jpg
 *.gz
+trainingNmbrs*.txt
+
+# emacs autosave files and hidden files
+\#*
+.*
+
