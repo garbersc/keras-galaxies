@@ -360,47 +360,50 @@ class kaggle_winsol:
     '''
 
     def save_loss(self, path='', modelname=''):
+        print 'first loss save %s' % self.first_loss_save  # debug
         if not path:
             path = self.LOSS_PATH
-            if self.first_loss_save:
-                with open(path, 'a')as f:
-                    f.write("#eval losses and metrics:\n")
-                    self.first_loss_save = False
-                    if modelname:
-                        f.write("#history of model: " + modelname + '\n')
-                        json.dump(self.hists[modelname], f)
-                    else:
-                        f.write("#histories of all models:\n")
-                        for k in self.models:
-                            f.write("#history of model: " + k + '\n')
-                            json.dump(self.hists[k], f)
-                    f.write("\n")
-            else:
+        if self.first_loss_save:
+            with open(path, 'a')as f:
+                f.write("#eval losses and metrics:\n")
                 if modelname:
-                    with open(path, "r+") as f:
-                        d = f.readlines()
-                        f.seek(0)
-                        rewrite_next_json = False
-                        model_found = True
-                        for i in d:
-                            if i != "#history of model: " + modelname:
-                                if rewrite_next_json and i.find("{", 0, 1):
-                                    json.dump(self.hists[modelname], f)
-                                    rewrite_next_json = False
-                                else:
-                                    f.write(i)
+                    f.write("#history of model: " + modelname + '\n')
+                    json.dump(self.hists[modelname], f)
+                else:
+                    f.write("#histories of all models:\n")
+                    for k in self.models:
+                        f.write("#history of model: " + k + '\n')
+                        json.dump(self.hists[k], f)
+                f.write("\n")
+            self.first_loss_save = False
+        else:
+            if modelname:
+                with open(path, "r+") as f:
+                    d = f.readlines()
+                    f.seek(0)
+                    rewrite_next_json = False
+                    model_found = False
+                    for i in d:
+                        print 'nxt line'
+                        print i  # debug
+                        if i != "#history of model: " + modelname + '\n':
+                            if rewrite_next_json and i.find("{", 0, 1) != -1:
+                                json.dump(self.hists[modelname], f)
+                                rewrite_next_json = False
                             else:
                                 f.write(i)
-                                model_found = True
-                                rewrite_next_json = True
-                                f.truncate()
-                        if not model_found:
-                            f.write("#history of model: " + modelname + '\n')
-                            json.dump(self.hists[modelname], f)
-
-                else:
-                    for k in self.models:
-                        self.save_loss(path=path, modelname=k)
+                        else:
+                            print 'found the model'  # debug
+                            f.write(i)
+                            model_found = True
+                            rewrite_next_json = True
+                    if not model_found:
+                        f.write("#history of model: " + modelname + '\n')
+                        json.dump(self.hists[modelname], f)
+                    f.write('\n')
+            else:
+                for k in self.models:
+                    self.save_loss(path=path, modelname=k)
 
         return True
 
