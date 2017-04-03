@@ -1,5 +1,6 @@
 import numpy as np
 import json
+import warnings
 import time
 from datetime import datetime, timedelta
 import functools
@@ -152,6 +153,9 @@ class kaggle_winsol:
         model = Sequential()
 
         N_INPUT_VARIATION = 2  # depends on the kaggle input settings
+        include_flip = True
+
+        num_views = N_INPUT_VARIATION * (2 if include_flip else 1)
 
         model.add(Merge([model1, model2], mode=kaggle_input,
                         output_shape=lambda x: ((model1.output_shape[0]
@@ -162,8 +166,8 @@ class kaggle_winsol:
                                                 self.PART_SIZE),
                         arguments={'part_size': self.PART_SIZE,
                                    'n_input_var': N_INPUT_VARIATION,
-                                   'include_flip': False,
-                                   'random_flip': True}))
+                                   'include_flip': True,
+                                   'random_flip': False}))
 
         # needed for the pylearn moduls used by kerasCudaConvnetConv2DLayer and
         # kerasCudaConvnetPooling2DLayer
@@ -191,8 +195,8 @@ class kaggle_winsol:
                          output_shape=lambda x: (
                              x[0] // 4 // N_INPUT_VARIATION, (x[1] * x[2]
                                                               * x[3] * 4
-                                                              * N_INPUT_VARIATION)),
-                         arguments={'num_views': N_INPUT_VARIATION}))
+                                                              * num_views)),
+                         arguments={'num_views': num_views}))
 
         model.add(Dropout(0.5))
         model.add(MaxoutDense(output_dim=2048, nb_feature=2,
@@ -205,8 +209,10 @@ class kaggle_winsol:
                                   model.output_shape[-1], 2048, nb_feature=2)))
 
         model.add(Dropout(0.5))
-        model.add(Dense(output_dim=37, weights=dense_weight_init_values(
-            model.output_shape[-1], 37, w_std=0.01, b_init_val=0.1)))
+        model.add(Dense(output_dim=37, activation='relu',
+                        weights=dense_weight_init_values(
+                            model.output_shape[-1], 37, w_std=0.01,
+                            b_init_val=0.1)))
 
         model_seq = model([input_tensor, input_tensor_45])
 
@@ -259,6 +265,43 @@ class kaggle_winsol:
             f.write('#loaded weights from ' + path +
                     ' into  model ' + modelname + '\n')
         return True
+
+    ''''
+    MEHTOD NOT FINISHED
+    load weights from the winning solution
+    '''
+
+    def getWinSolWeights(self,
+                         modelname='model_norm',
+                         path="analysis/final/try_convent_gpu1_win_sol_net_on_0p0775_validation.pkl",
+                         debug=False):
+        analysis = np.load(path)
+        l_weights = analysis['param_values']
+        # w_pairs=[]
+        # for i in range(len(l_weights)/2):
+        #	w_pairs.append([l_weights[2*i],l_weights[2*i+1]])
+        w_kSorted = []
+        for i in range(len(l_weights) / 2):
+            w_kSorted.append(l_weights[-2 - 2 * i])
+            w_kSorted.append(l_weights[-1 - 2 * i])
+        w_load_worked = False
+        for l in self.models[modelname].layers:
+            if debug:
+                print '---'
+                if debug:
+                    print len(l.get_weights())
+                    l_weights = l.get_weights()
+                    if len(l_weights) == len(w_kSorted):
+                        if debug:
+                            for i in range(len(l_weights)):
+                                print type(l_weights[i])
+                                print np.shape(l_weights[i])
+                                if not np.shape(l_weights[i]) == np.shape(w_kSorted[i]):
+                                    "somethings wrong with the loaded weight shapes"
+                        l.set_weights(w_kSorted)
+                        w_load_worked = True
+        if not w_load_worked:
+            print "no matching weight length were found"
 
     '''
     prints the loss and metric information of a model
@@ -360,7 +403,6 @@ class kaggle_winsol:
     '''
 
     def save_loss(self, path='', modelname=''):
-        print 'first loss save %s' % self.first_loss_save  # debug
         if not path:
             path = self.LOSS_PATH
         if self.first_loss_save:
@@ -384,16 +426,19 @@ class kaggle_winsol:
                     rewrite_next_json = False
                     model_found = False
                     for i in d:
-                        print 'nxt line'
-                        print i  # debug
                         if i != "#history of model: " + modelname + '\n':
-                            if rewrite_next_json and i.find("{", 0, 1) != -1:
-                                json.dump(self.hists[modelname], f)
-                                rewrite_next_json = False
+                            if rewrite_next_json:
+                                if i.find("{", 0, 1) != -1:
+                                    json.dump(self.hists[modelname], f)
+                                    rewrite_next_json = False
+                                else:
+                                    print 'WARNING: loss history save file is not in the expected stats'
+                                    json.dump(self.hists[modelname], f)
+                                    rewrite_next_json = False
+                                    f.write(i)
                             else:
                                 f.write(i)
                         else:
-                            print 'found the model'  # debug
                             f.write(i)
                             model_found = True
                             rewrite_next_json = True
@@ -421,7 +466,7 @@ class kaggle_winsol:
             self.save_loss(path=self.LOSS_PATH + '_interrupted.txt',
                            modelname='model_norm_metrics')
             self.save_loss(path=self.LOSS_PATH + '_interrupted.txt',
-                           modelname='model_norm_metrics')
+                           modelname='model_norm')
         else:
             print 'WARNING: unknown saving opotion *' + option_string + '*'
             self.save()
@@ -442,7 +487,8 @@ class kaggle_winsol:
 
     def full_fit(self, data_gen, validation, samples_per_epoch,
                  validate_every,
-                 nb_epochs, verbose=1, save_at_every_validation=True):
+                 nb_epochs, verbose=1, save_at_every_validation=True,
+                 data_gen_creator=None):
         if verbose:
             timedeltas = []
         epochs_run = 0
@@ -456,15 +502,35 @@ class kaggle_winsol:
                     epochs_run, epoch_togo)
 
             # main fit
-            hist = self.models['model_norm'].fit_generator(
-                data_gen, validation_data=validation,
-                samples_per_epoch=samples_per_epoch,
-                nb_epoch=np.min([
-                    epoch_togo, validate_every]) + epochs_run,
-                initial_epoch=epochs_run, verbose=1,
-                callbacks=[LearningRateScheduler(self._make_lrs_fct())])
+            def _main_fit(
+                    self,
+                    data_gen, validation_data=validation,
+                    samples_per_epoch=samples_per_epoch,
+                    nb_epoch=np.min([
+                        epoch_togo, validate_every]) + epochs_run,
+                    initial_epoch=epochs_run, verbose=1,
+                    callbacks=[LearningRateScheduler(self._make_lrs_fct())],
+                    data_gen_creator=data_gen_creator):
+                try:
+                    hist = self.models['model_norm'].fit_generator(
+                        data_gen, validation_data=validation_data,
+                        samples_per_epoch=samples_per_epoch,
+                        nb_epoch=nb_epoch,
+                        initial_epoch=initial_epoch, verbose=verbose,
+                        callbacks=callbacks)
+                    self._save_hist(hist.history)
+                except ValueError:
+                    warnings.warn(
+                        'Value Error in the main fit. Generator will be reinitialised.')
+                    print 'saving'
+                    self.save()
+                    if data_gen_creator:
+                        _main_fit(self, data_gen=data_gen_creator())
+                    else:
+                        raise ValueError(
+                            'no reinitilizer of the data generator defined')
 
-            self._save_hist(hist.history)
+            _main_fit(self, data_gen)
 
             epoch_togo -= np.min([epoch_togo, validate_every])
             epochs_run += np.min([epoch_togo, validate_every])

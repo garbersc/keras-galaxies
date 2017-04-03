@@ -12,18 +12,66 @@ from custom_keras_model_and_fit_capsels import kaggle_winsol
 
 starting_time = time.time()
 
-# import matplotlib.pyplot as plt
-# plt.ion()
-# import utils
-
 copy_to_ram_beforehand = False
 
 debug = True
 predict = False  # not implemented
-
 continueAnalysis = False
 saveAtEveryValidation = True
 
+BATCH_SIZE = 256  # keep in mind
+
+NUM_INPUT_FEATURES = 3
+
+MOMENTUM = 0.9
+WEIGHT_DECAY = 0.0
+EPOCHS = 150
+VALIDATE_EVERY = 20  # 20 # 12 # 6 # 6 # 6 # 5 #
+NUM_EPOCHS_NONORM = 0.1
+# this should be only a few, just .1 hopefully suffices.
+
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
+# TARGET_PATH = "predictions/final/try_convnet.csv"
+WEIGHTS_PATH = "analysis/final/try_convent_keras_modular_includeFlip_and_37relu.h5"
+
+LEARNING_RATE_SCHEDULE = {
+    0: 0.4,
+    2: 0.1,
+    10: 0.05,
+    40: 0.01,
+    80: 0.005,
+    120: 0.0005
+    # 500: 0.04,
+    # 0: 0.01,
+    # 1800: 0.004,
+    # 2300: 0.0004,
+    # 0: 0.08,
+    # 50: 0.04,
+    # 2000: 0.008,
+    # 3200: 0.0008,
+    # 4600: 0.0004,
+}
+if continueAnalysis:
+    LEARNING_RATE_SCHEDULE = {
+        0: 0.1,
+        20: 0.05,
+        40: 0.01,
+        80: 0.005
+        # 0: 0.0001,
+        # 500: 0.002,
+        # 800: 0.0004,
+        # 3200: 0.0002,
+        # 4600: 0.0001,
+    }
+
+
+input_sizes = [(69, 69), (69, 69)]
+PART_SIZE = 45
+
+N_INPUT_VARIATION = 2
+
+
+GEN_BUFFER_SIZE = 2
 
 if copy_to_ram_beforehand:
     ra.myLoadFrom_RAM = True
@@ -75,79 +123,27 @@ train_indices = np.arange(num_train)
 valid_indices = np.arange(num_train, num_train + num_valid)
 test_indices = np.arange(num_test)
 
-
-BATCH_SIZE = 512  # keep in mind
-
-NUM_INPUT_FEATURES = 3
-
-LEARNING_RATE_SCHEDULE = {
-    0: 0.04,
-    # 20: 0.05,
-    40: 0.01,
-    80: 0.005,
-    120: 0.0005
-    # 500: 0.04,
-    # 0: 0.01,
-    # 1800: 0.004,
-    # 2300: 0.0004,
-    # 0: 0.08,
-    # 50: 0.04,
-    # 2000: 0.008,
-    # 3200: 0.0008,
-    # 4600: 0.0004,
-}
-if continueAnalysis:
-    LEARNING_RATE_SCHEDULE = {
-        0: 0.1,
-        20: 0.05,
-        40: 0.01,
-        80: 0.005
-        # 0: 0.0001,
-        # 500: 0.002,
-        # 800: 0.0004,
-        # 3200: 0.0002,
-        # 4600: 0.0001,
-    }
-
-
-MOMENTUM = 0.9
-WEIGHT_DECAY = 0.0
 N_TRAIN = num_train
 N_VALID = num_valid
-EPOCHS = 150
-VALIDATE_EVERY = 20  # 20 # 12 # 6 # 6 # 6 # 5 #
+
 
 print("The training sample contains %s , the validation sample contains %s images. \n" %
       (ra.num_train,  ra.num_valid))
 # train without normalisation for this fraction of the traininng sample, to get the weights in
 # the right 'zone'.
-NUM_EPOCHS_NONORM = 1.
-# this should be only a few, just .1 hopefully suffices.
-
-GEN_BUFFER_SIZE = 2
-
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_longRun_longer_noNorm_lowerStarting_learningrate.txt"
-
-# TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_convent_keras_modular_longRun_longer_noNorm_lowerStarting_learningrate.h5"
 
 # maybe put into class
 with open(TRAIN_LOSS_SF_PATH, 'a')as f:
     if continueAnalysis:
         f.write('#continuing from ')
         f.write(WEIGHTS_PATH)
-    f.write("#wRandFlip \n")
+    # f.write("#wRandFlip \n")
     f.write("#The training is running for %s epochs, each with %s images. The validation sample contains %s images. \n" % (
         EPOCHS, N_TRAIN, ra.num_valid))
-    f.write("#validation is done every %s epochs" % VALIDATE_EVERY)
-    f.write("the learning rate schedule is")
+    f.write("#validation is done every %s epochs\n" % VALIDATE_EVERY)
+    f.write("the learning rate schedule is ")
     json.dump(LEARNING_RATE_SCHEDULE, f)
-
-
-input_sizes = [(69, 69), (69, 69)]
-PART_SIZE = 45
-
-N_INPUT_VARIATION = 2
+    f.write('\n')
 
 print 'initiate winsol class'
 winsol = kaggle_winsol(BATCH_SIZE=BATCH_SIZE,
@@ -198,20 +194,29 @@ augmentation_params = {
     'do_flip': True,
 }
 
-augmented_data_gen = ra.realtime_augmented_data_gen(
-    num_chunks=N_TRAIN / BATCH_SIZE * (EPOCHS + 1),
-    chunk_size=BATCH_SIZE,
-    augmentation_params=augmentation_params,
-    ds_transforms=ds_transforms,
-    target_sizes=input_sizes)
 
-post_augmented_data_gen = ra.post_augment_brightness_gen(
-    augmented_data_gen, std=0.5)
+def create_data_gen():
+    augmented_data_gen = ra.realtime_augmented_data_gen(
+        num_chunks=N_TRAIN / BATCH_SIZE * (EPOCHS + 1),
+        chunk_size=BATCH_SIZE,
+        augmentation_params=augmentation_params,
+        ds_transforms=ds_transforms,
+        target_sizes=input_sizes)
 
-train_gen = load_data.buffered_gen_mp(
-    post_augmented_data_gen, buffer_size=GEN_BUFFER_SIZE)
+    post_augmented_data_gen = ra.post_augment_brightness_gen(
+        augmented_data_gen, std=0.5)
 
-input_gen = input_generator(train_gen)
+    train_gen = load_data.buffered_gen_mp(
+        post_augmented_data_gen, buffer_size=GEN_BUFFER_SIZE)
+
+    input_gen = input_generator(train_gen)
+
+    return input_gen
+
+
+#  # may need doubling the generator,can be done with
+# itertools.tee(iterable, n=2)
+input_gen = create_data_gen()
 
 
 def create_valid_gen():
@@ -267,10 +272,11 @@ try:
 
     no_norm_events = int(NUM_EPOCHS_NONORM * N_TRAIN)
 
-    hist = winsol.fit_gen(modelname='model_noNorm',
-                          data_generator=input_gen,
-                          validation=validation_data,
-                          samples_per_epoch=no_norm_events)
+    if no_norm_events:
+        hist = winsol.fit_gen(modelname='model_noNorm',
+                              data_generator=input_gen,
+                              validation=validation_data,
+                              samples_per_epoch=no_norm_events)
 
     if debug:
         print("\nFree GPU Mem before train loop %s MiB " %
@@ -278,9 +284,11 @@ try:
                / 1024. / 1024.))
 
     print 'starting main training'
-    eta = (time.time() - time1) / NUM_EPOCHS_NONORM * EPOCHS
-    print 'rough ETA %s sec. -> finishes at %s' % (
-        int(eta), datetime.now() + timedelta(seconds=eta))
+
+    if no_norm_events:
+        eta = (time.time() - time1) / NUM_EPOCHS_NONORM * EPOCHS
+        print 'rough ETA %s sec. -> finishes at %s' % (
+            int(eta), datetime.now() + timedelta(seconds=eta))
 
     winsol.full_fit(data_gen=input_gen,
                     validation=validation_data,

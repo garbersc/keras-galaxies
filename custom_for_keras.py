@@ -273,6 +273,9 @@ def ll_error(self, normalisation=True, *args, **kwargs):
 
 def input_generator(train_gen):
     for chunk in train_gen:
+        if not chunk:
+            print 'WARNING: data input generator yielded ' + str(chunk)
+            + ', something went wrong'
         chunk_data, chunk_length = chunk
         y_chunk = chunk_data.pop()  # last element is labels.
         xs_chunk = chunk_data
