@@ -166,7 +166,7 @@ class kaggle_winsol:
                                                 self.PART_SIZE),
                         arguments={'part_size': self.PART_SIZE,
                                    'n_input_var': N_INPUT_VARIATION,
-                                   'include_flip': True,
+                                   'include_flip': include_flip,
                                    'random_flip': False}))
 
         # needed for the pylearn moduls used by kerasCudaConvnetConv2DLayer and
@@ -267,8 +267,12 @@ class kaggle_winsol:
         return True
 
     ''''
-    MEHTOD NOT FINISHED
+ 
     load weights from the winning solution
+
+    Arguments:
+    path: path to savefile
+    modelname: name of the model for which the weights are loaded, in default the models use all the same weight
     '''
 
     def getWinSolWeights(self,
@@ -285,23 +289,63 @@ class kaggle_winsol:
             w_kSorted.append(l_weights[-2 - 2 * i])
             w_kSorted.append(l_weights[-1 - 2 * i])
         w_load_worked = False
-        for l in self.models[modelname].layers:
-            if debug:
-                print '---'
+
+        if debug:
+            print len(w_kSorted)
+
+        def _load_direct():
+            for l in self.models[modelname].layers:
+                if debug:
+                    print '---'
                 if debug:
                     print len(l.get_weights())
-                    l_weights = l.get_weights()
-                    if len(l_weights) == len(w_kSorted):
-                        if debug:
-                            for i in range(len(l_weights)):
-                                print type(l_weights[i])
-                                print np.shape(l_weights[i])
-                                if not np.shape(l_weights[i]) == np.shape(w_kSorted[i]):
-                                    "somethings wrong with the loaded weight shapes"
+                l_weights = l.get_weights()
+                if len(l_weights) == len(w_kSorted):
+                    if debug:
+                        for i in range(len(l_weights)):
+                            print type(l_weights[i])
+                            print "load %s into %s" % (np.shape(w_kSorted[i]),
+                                                       np.shape(l_weights[i]))
+                    try:
                         l.set_weights(w_kSorted)
-                        w_load_worked = True
+                        return True
+                    except ValueError:
+                        print "found matching layer length but no mathing weights in direct try"
+            return False
+
+        def _load_maxout():
+            for l in self.models[modelname].layers:
+                l_weights = l.get_weights()
+                if len(l_weights) == len(w_kSorted):
+                    for i in range(len(l_weights)):
+                        if np.shape(l_weights[i]) != np.shape(w_kSorted[i]):
+                            if debug:
+                                print "reshaping weights of layer %s" % i
+                            shape = np.shape(w_kSorted[i])
+                            w_kSorted[i] = np.reshape(w_kSorted[i],
+                                                      (2, shape[0] / 2) if len(
+                                                          shape) == 1
+                                                      else (2,) + shape[0:-1]
+                                                      + (shape[-1] / 2,))
+                            if debug:
+                                print "load %s into %s" % (np.shape(w_kSorted[i]),
+                                                           np.shape(l_weights[i]))
+                    try:
+                        l.set_weights(w_kSorted)
+                        return True
+                    except ValueError:
+                        print "found matching length and tried to reshape weights for maxout layers: did not work"
+            return False
+
+        w_load_worked = _load_direct()
         if not w_load_worked:
-            print "no matching weight length were found"
+            w_load_worked = _load_maxout()
+            if not w_load_worked:
+                print "no matching weight length were found"
+            else:
+                print "reshaped weights from maxout via dense and dropout to real maxout"
+
+        return w_load_worked
 
     '''
     prints the loss and metric information of a model

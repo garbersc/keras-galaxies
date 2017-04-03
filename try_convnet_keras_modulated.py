@@ -19,6 +19,8 @@ predict = False  # not implemented
 continueAnalysis = False
 saveAtEveryValidation = True
 
+get_winsol_weights = False
+
 BATCH_SIZE = 256  # keep in mind
 
 NUM_INPUT_FEATURES = 3
@@ -51,7 +53,7 @@ LEARNING_RATE_SCHEDULE = {
     # 3200: 0.0008,
     # 4600: 0.0004,
 }
-if continueAnalysis:
+if continueAnalysis or get_winsol_weights:
     LEARNING_RATE_SCHEDULE = {
         0: 0.1,
         20: 0.05,
@@ -174,6 +176,9 @@ if continueAnalysis:
     winsol.load_weights(path=WEIGHTS_PATH)
     winsol.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
 
+if get_winsol_weights:
+    print "import weights from run with original kaggle winner solution"
+    winsol.load_weights()
 
 print "Set up data loading"
 
@@ -254,6 +259,16 @@ if debug:
     print("Free GPU Mem before first step %s MiB " %
           (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0] / 1024. / 1024.))
 
+
+def save_exit():
+    print "\nsaving..."
+    winsol.save()
+    print "Done!"
+    print ' run for %s' % timedelta(seconds=(time.time() - start_time))
+    exit()
+    sys.exit(0)
+
+
 try:
     print ''
     print "losses without training on validation sample up front"
@@ -298,16 +313,9 @@ try:
 
 except KeyboardInterrupt:
     print "\ngot keyboard interuption"
-    print "\nsaving..."
-    winsol.save('interrupt')
-    print ' run for %s' % timedelta(seconds=(time.time() - start_time))
-    exit()
-    sys.exit(0)
+    save_exit()
+except ValueError:
+    print "\ngot value error, could be the end of the generator in the fit"
+    save_exit()
 
-
-print "\nsaving..."
-winsol.save()
-print "Done!"
-print ' run for %s' % timedelta(seconds=(time.time() - start_time))
-exit()
-sys.exit(0)
+save_exit()
