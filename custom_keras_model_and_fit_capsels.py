@@ -137,42 +137,22 @@ class kaggle_winsol:
                                           self.input_sizes[0][0],
                                           self.input_sizes[0][1]),
                              dtype='float32', name='input_tensor')
+
         input_tensor_45 = Input(batch_shape=(self.BATCH_SIZE,
                                              self.NUM_INPUT_FEATURES,
                                              self.input_sizes[1][0],
                                              self.input_sizes[1][1]),
                                 dtype='float32', name='input_tensor_45')
 
-        # input_0 = Lambda(lambda x: x, output_shape=(self.NUM_INPUT_FEATURES,
-        #                                             self.input_sizes[0][0],
-        #                                             self.input_sizes[0][1]),
-        #                  batch_input_shape=(  # batch_input_shape should not be needed anymore
-        #     self.BATCH_SIZE, self.NUM_INPUT_FEATURES, self.input_sizes[0][0],
-        # self.input_sizes[0][1]), name='lambda_input_0')(input_tensor)
-
-        # input_45 = Lambda(lambda x: x, output_shape=(self.NUM_INPUT_FEATURES,
-        #                                              self.input_sizes[1][0],
-        #                                              self.input_sizes[1][1]),
-        #                   batch_input_shape=(  # batch_input_shape should not be needed anymore
-        #     self.BATCH_SIZE, self.NUM_INPUT_FEATURES, self.input_sizes[1][0],
-        # self.input_sizes[1][1]), name='lambda_input_45')(input_tensor_45)
-
         input_lay_0 = InputLayer(batch_input_shape=(
             self.BATCH_SIZE, self.NUM_INPUT_FEATURES, self.input_sizes[0][0],
             self.input_sizes[0][1]),
-            name='input_lay_seq_0')  # (input_0)
-        # model1 = Sequential(name='input_seq_0')
-        # model1.add(input_0)
-        # model1_ = model1(input_lay_0)
+            name='input_lay_seq_0')
 
-        # model2 = Sequential(name='input_seq_1')
-        # model2.add(
         input_lay_1 = InputLayer(batch_input_shape=(
             self.BATCH_SIZE, self.NUM_INPUT_FEATURES, self.input_sizes[1][0],
             self.input_sizes[1][1]),
-            name='input_lay_seq_1')  # )
-        # model2.add(input_45)
-        # model2_ = model2(input_tensor_45)
+            name='input_lay_seq_1')
 
         model = Sequential(name='main_seq')
 
@@ -262,33 +242,6 @@ class kaggle_winsol:
         self.models = {'model_norm': model_norm,
                        'model_norm_metrics': model_norm_metrics,
                        'model_noNorm': model_noNorm}
-
-        # for testing: is this a way to get to the interlaced output?
-        # try:
-        #     self.testmodel = Model(inputs=[input_tensor, input_tensor_45],
-        #                            outputs=dense_out.output)
-        #     print 'Model creation worked'
-        # except RuntimeError as e:
-        #     print '\n'
-        #     print 'model creation raised runtime error:'
-        #     print e
-        #     print '\n'
-        # except TypeError:
-        #     print 'model creation raised type error'
-
-        # try:
-        #     self.testfk = T.function([input_tensor, input_tensor_45],
-        #                              [output_layer_norm])
-        #     print 'function was created'
-        # except RuntimeError:
-        #     print 'function creation raised runtime error'
-        # except TypeError:
-        #     print 'function creation raised type error'
-        # except theano.gof.fg.MissingInputError as e:
-        #     print '\n'
-        #     print 'function creation raised missing input error'
-        #     print e
-        #     print '\n'
 
         self._compile_models()
 
@@ -691,27 +644,19 @@ class kaggle_winsol:
 
     def get_layer_output(self, layer, input_=None, modelname='model_norm',
                          main_layer='main_seq'):
-        # if type(layer) == int:
-        #     _layer = self.models[modelname].get_layer(main_layer).layers[layer]
-        # elif type(layer) == str:
-        #     _layer = self.models[modelname].get_layer(main_layer).get_layer(
-        #         layer)
-        # else:
-        #     raise ValueError('layer must be specified as int or string')
+        if type(layer) == int:
+            _layer = self.models[modelname].get_layer(main_layer).layers[layer]
+        elif type(layer) == str:
+            _layer = self.models[modelname].get_layer(main_layer).get_layer(
+                layer)
+        else:
+            raise ValueError('layer must be specified as int or string')
 
-        # if not input_:
-        #     input_ = T.variable(value=[np.ones(i)
-        # for i in self.models[modelname].input_shape])
+        if not input_:
+            input_ = [np.ones(shape=i)
+                      for i in self.models[modelname].layers[2].input_shape]
 
-        # print self.models[modelname].inputs
-        # print self.models[modelname].layers[2].get_input_at(0)
-        # print self.models[modelname].layers[2].get_input_at(1)
-        # print _layer.output
-
-        # layer_output_fkt = T.function(self.models[modelname].layers[2].get_input_at(0),
-        #                               [_layer.output])
-        # layer_output = layer_output_fkt([input_])[0]
-
-        # return layer_output
-
-        pass
+        intermediate_layer_model = Model(inputs=self.models['model_norm']
+                                         .get_layer(main_layer).get_input_at(0),
+                                         outputs=_layer.output)
+        return intermediate_layer_model.predict(input_)

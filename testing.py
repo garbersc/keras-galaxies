@@ -151,7 +151,7 @@ winsol.init_models()
 
 print 'output cuda_0'
 
-print winsol.get_layer_output(layer='cuda_0')
+winsol.get_layer_output(layer='cuda_0')
 
 print 'output maxout_2'
 
