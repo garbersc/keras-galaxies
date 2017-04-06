@@ -6,15 +6,22 @@ from datetime import datetime, timedelta
 import functools
 from copy import copy
 
+import theano  # just used for a exception catch in debugging
+
+from keras import backend as T
 from keras.models import Sequential, Model
 from keras.layers import Dense, Dropout, Input,  MaxoutDense
 from keras.layers.core import Lambda
 from keras.optimizers import SGD, Adam
-from keras.engine.topology import Merge
+# TODO will be removed from keras2, can this be achieved with a lambda
+# layer now?
+from keras.layers import Merge
 from keras.callbacks import LearningRateScheduler
+from keras.engine.topology import InputLayer
+from keras import initializers
 
 from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute, kerasCudaConvnetConv2DLayer
-from custom_for_keras import kaggle_MultiRotMergeLayer_output, OptimisedDivGalaxyOutput, kaggle_input, kaggle_sliced_accuracy, dense_weight_init_values, rmse, lr_function
+from custom_for_keras import kaggle_MultiRotMergeLayer_output, OptimisedDivGalaxyOutput, kaggle_input, sliced_accuracy_mean, sliced_accuracy_std, dense_weight_init_values, rmse, lr_function
 
 '''
 This class contains the winning solution model of the kaggle galaxies contest transferred to keras and function to fit it.
@@ -38,12 +45,15 @@ class kaggle_winsol:
     '''
 
     def __init__(self, BATCH_SIZE, NUM_INPUT_FEATURES, PART_SIZE, input_sizes,
-                 LEARNING_RATE_SCHEDULE, MOMENTUM, LOSS_PATH, WEIGHTS_PATH):
+                 include_flip=True,
+                 LEARNING_RATE_SCHEDULE=None, MOMENTUM=None, LOSS_PATH='./',
+                 WEIGHTS_PATH='./'):
         self.BATCH_SIZE = BATCH_SIZE
         self.NUM_INPUT_FEATURES = NUM_INPUT_FEATURES
         self.input_sizes = input_sizes
         self.PART_SIZE = PART_SIZE
-        self.LEARNING_RATE_SCHEDULE = LEARNING_RATE_SCHEDULE
+        self.LEARNING_RATE_SCHEDULE = LEARNING_RATE_SCHEDULE if LEARNING_RATE_SCHEDULE else [
+            0.1]
         self.current_lr = self.LEARNING_RATE_SCHEDULE[0]
         self.MOMENTUM = MOMENTUM
         self.WEIGHTS_PATH = WEIGHTS_PATH
@@ -52,6 +62,7 @@ class kaggle_winsol:
         self.first_loss_save = True
         self.models = {}
         self.reinit_counter = 0
+        self.include_flip = include_flip
 
     '''
     initialize loss and validation histories
@@ -105,7 +116,8 @@ class kaggle_winsol:
                                                       nesterov=True),
                                                   metrics=[rmse,
                                                            'categorical_accuracy',
-                                                           kaggle_sliced_accuracy])
+                                                           sliced_accuracy_mean,
+                                                           sliced_accuracy_std])
 
         self._init_hist_dics(self.models)
 
@@ -127,39 +139,51 @@ class kaggle_winsol:
                              dtype='float32', name='input_tensor')
         input_tensor_45 = Input(batch_shape=(self.BATCH_SIZE,
                                              self.NUM_INPUT_FEATURES,
-                                             self.input_sizes[0][0],
-                                             self.input_sizes[0][1]),
+                                             self.input_sizes[1][0],
+                                             self.input_sizes[1][1]),
                                 dtype='float32', name='input_tensor_45')
 
-        input_0 = Lambda(lambda x: x, output_shape=(self.NUM_INPUT_FEATURES,
-                                                    self.input_sizes[0][0],
-                                                    self.input_sizes[0][1]),
-                         batch_input_shape=(
+        # input_0 = Lambda(lambda x: x, output_shape=(self.NUM_INPUT_FEATURES,
+        #                                             self.input_sizes[0][0],
+        #                                             self.input_sizes[0][1]),
+        #                  batch_input_shape=(  # batch_input_shape should not be needed anymore
+        #     self.BATCH_SIZE, self.NUM_INPUT_FEATURES, self.input_sizes[0][0],
+        # self.input_sizes[0][1]), name='lambda_input_0')(input_tensor)
+
+        # input_45 = Lambda(lambda x: x, output_shape=(self.NUM_INPUT_FEATURES,
+        #                                              self.input_sizes[1][0],
+        #                                              self.input_sizes[1][1]),
+        #                   batch_input_shape=(  # batch_input_shape should not be needed anymore
+        #     self.BATCH_SIZE, self.NUM_INPUT_FEATURES, self.input_sizes[1][0],
+        # self.input_sizes[1][1]), name='lambda_input_45')(input_tensor_45)
+
+        input_lay_0 = InputLayer(batch_input_shape=(
             self.BATCH_SIZE, self.NUM_INPUT_FEATURES, self.input_sizes[0][0],
-                             self.input_sizes[0][1]), name='lambda_input_0')
-        input_45 = Lambda(lambda x: x, output_shape=(self.NUM_INPUT_FEATURES,
-                                                     self.input_sizes[1][0],
-                                                     self.input_sizes[1][1]),
-                          batch_input_shape=(
-            self.BATCH_SIZE, self.NUM_INPUT_FEATURES, self.input_sizes[0][0],
-                              self.input_sizes[0][1]), name='lambda_input_45')
+            self.input_sizes[0][1]),
+            name='input_lay_seq_0')  # (input_0)
+        # model1 = Sequential(name='input_seq_0')
+        # model1.add(input_0)
+        # model1_ = model1(input_lay_0)
 
-        model1 = Sequential()
-        model1.add(input_0)
+        # model2 = Sequential(name='input_seq_1')
+        # model2.add(
+        input_lay_1 = InputLayer(batch_input_shape=(
+            self.BATCH_SIZE, self.NUM_INPUT_FEATURES, self.input_sizes[1][0],
+            self.input_sizes[1][1]),
+            name='input_lay_seq_1')  # )
+        # model2.add(input_45)
+        # model2_ = model2(input_tensor_45)
 
-        model2 = Sequential()
-        model2.add(input_45)
-
-        model = Sequential()
+        model = Sequential(name='main_seq')
 
         N_INPUT_VARIATION = 2  # depends on the kaggle input settings
-        include_flip = True
+        include_flip = self.include_flip
 
         num_views = N_INPUT_VARIATION * (2 if include_flip else 1)
 
-        model.add(Merge([model1, model2], mode=kaggle_input,
-                        output_shape=lambda x: ((model1.output_shape[0]
-                                                 + model2.output_shape[0]) * 2
+        model.add(Merge([input_lay_0, input_lay_1], mode=kaggle_input,
+                        output_shape=lambda x: ((input_lay_0.output_shape[0]
+                                                 + input_lay_1.output_shape[0]) * 2
                                                 * N_INPUT_VARIATION,
                                                 self.NUM_INPUT_FEATURES,
                                                 self.PART_SIZE,
@@ -167,52 +191,53 @@ class kaggle_winsol:
                         arguments={'part_size': self.PART_SIZE,
                                    'n_input_var': N_INPUT_VARIATION,
                                    'include_flip': include_flip,
-                                   'random_flip': False}))
+                                   'random_flip': False}, name='input_merge'))
 
         # needed for the pylearn moduls used by kerasCudaConvnetConv2DLayer and
         # kerasCudaConvnetPooling2DLayer
-        model.add(fPermute((1, 2, 3, 0)))
+        model.add(fPermute((1, 2, 3, 0), name='input_perm'))
 
         model.add(kerasCudaConvnetConv2DLayer(
-            n_filters=32, filter_size=6, untie_biases=True))
-        model.add(kerasCudaConvnetPooling2DLayer())
+            n_filters=32, filter_size=6, untie_biases=True, name='cuda_0'))
+        model.add(kerasCudaConvnetPooling2DLayer(name='pool_0'))
 
         model.add(kerasCudaConvnetConv2DLayer(
-            n_filters=64, filter_size=5, untie_biases=True))
-        model.add(kerasCudaConvnetPooling2DLayer())
+            n_filters=64, filter_size=5, untie_biases=True, name='cuda_1'))
+        model.add(kerasCudaConvnetPooling2DLayer(name='pool_1'))
 
         model.add(kerasCudaConvnetConv2DLayer(
-            n_filters=128, filter_size=3, untie_biases=True))
+            n_filters=128, filter_size=3, untie_biases=True, name='cuda_2'))
         model.add(kerasCudaConvnetConv2DLayer(n_filters=128,
                                               filter_size=3,  weights_std=0.1,
-                                              untie_biases=True))
+                                              untie_biases=True, name='cuda_3'))
 
-        model.add(kerasCudaConvnetPooling2DLayer())
+        model.add(kerasCudaConvnetPooling2DLayer(name='pool_2'))
 
-        model.add(fPermute((3, 0, 1, 2)))
+        model.add(fPermute((3, 0, 1, 2), name='cuda_out_perm'))
 
         model.add(Lambda(function=kaggle_MultiRotMergeLayer_output,
                          output_shape=lambda x: (
                              x[0] // 4 // N_INPUT_VARIATION, (x[1] * x[2]
                                                               * x[3] * 4
                                                               * num_views)),
-                         arguments={'num_views': num_views}))
+                         arguments={'num_views': num_views}, name='cuda_out_merge'))
 
         model.add(Dropout(0.5))
         model.add(MaxoutDense(output_dim=2048, nb_feature=2,
                               weights=dense_weight_init_values(
-                                  model.output_shape[-1], 2048, nb_feature=2)))
+                                  model.output_shape[-1], 2048, nb_feature=2), name='maxout_1'))
 
         model.add(Dropout(0.5))
         model.add(MaxoutDense(output_dim=2048, nb_feature=2,
                               weights=dense_weight_init_values(
-                                  model.output_shape[-1], 2048, nb_feature=2)))
+                                  model.output_shape[-1], 2048, nb_feature=2), name='maxout_2'))
 
         model.add(Dropout(0.5))
-        model.add(Dense(output_dim=37, activation='relu',
-                        weights=dense_weight_init_values(
-                            model.output_shape[-1], 37, w_std=0.01,
-                            b_init_val=0.1)))
+        model.add(Dense(units=37, activation='relu',
+                        kernel_initializer=initializers.RandomNormal(
+                            stddev=0.01),
+                        bias_initializer=initializers.Constant(value=0.1),
+                        name='dense_output'))
 
         model_seq = model([input_tensor, input_tensor_45])
 
@@ -228,15 +253,42 @@ class kaggle_winsol:
                                                 'categorised': CATEGORISED})(model_seq)
 
         model_norm = Model(
-            input=[input_tensor, input_tensor_45], output=output_layer_norm)
+            inputs=[input_tensor, input_tensor_45], outputs=output_layer_norm, name='full_model_norm')
         model_norm_metrics = Model(
-            input=[input_tensor, input_tensor_45], output=output_layer_norm)
+            inputs=[input_tensor, input_tensor_45], outputs=output_layer_norm, name='full_model_metrics')
         model_noNorm = Model(
-            input=[input_tensor, input_tensor_45], output=output_layer_noNorm)
+            inputs=[input_tensor, input_tensor_45], outputs=output_layer_noNorm, name='full_model_noNorm')
 
         self.models = {'model_norm': model_norm,
                        'model_norm_metrics': model_norm_metrics,
                        'model_noNorm': model_noNorm}
+
+        # for testing: is this a way to get to the interlaced output?
+        # try:
+        #     self.testmodel = Model(inputs=[input_tensor, input_tensor_45],
+        #                            outputs=dense_out.output)
+        #     print 'Model creation worked'
+        # except RuntimeError as e:
+        #     print '\n'
+        #     print 'model creation raised runtime error:'
+        #     print e
+        #     print '\n'
+        # except TypeError:
+        #     print 'model creation raised type error'
+
+        # try:
+        #     self.testfk = T.function([input_tensor, input_tensor_45],
+        #                              [output_layer_norm])
+        #     print 'function was created'
+        # except RuntimeError:
+        #     print 'function creation raised runtime error'
+        # except TypeError:
+        #     print 'function creation raised type error'
+        # except theano.gof.fg.MissingInputError as e:
+        #     print '\n'
+        #     print 'function creation raised missing input error'
+        #     print e
+        #     print '\n'
 
         self._compile_models()
 
@@ -266,8 +318,7 @@ class kaggle_winsol:
                     ' into  model ' + modelname + '\n')
         return True
 
-    ''''
- 
+    '''
     load weights from the winning solution
 
     Arguments:
@@ -324,9 +375,9 @@ class kaggle_winsol:
                             shape = np.shape(w_kSorted[i])
                             w_kSorted[i] = np.reshape(w_kSorted[i],
                                                       (2, shape[0] / 2) if len(
-                                                          shape) == 1
-                                                      else (2,) + shape[0:-1]
-                                                      + (shape[-1] / 2,))
+                                shape) == 1
+                                else (2,) + shape[0:-1]
+                                + (shape[-1] / 2,))
                             if debug:
                                 print "load %s into %s" % (np.shape(w_kSorted[i]),
                                                            np.shape(l_weights[i]))
@@ -359,7 +410,7 @@ class kaggle_winsol:
         return True
 
     '''
-    evaluates a model according to true answeres, saves the information in the history 
+    evaluates a model according to true answeres, saves the information in the history
     Arguments:
     x: input sample
     y_valid: true answeres
@@ -383,6 +434,16 @@ class kaggle_winsol:
             self.print_last_hist()
 
         return evalHist
+
+    def predict(self, x, batch_size=None,
+                modelname='model_norm_metrics', verbose=1):
+        if not batch_size:
+            batch_size = self.BATCH_SIZE
+        predictions = self.models[modelname].predict(
+            x=x, batch_size=batch_size,
+            verbose=verbose)
+
+        return predictions
 
     def _make_lrs_fct(self):
         return functools.partial(lr_function,
@@ -415,10 +476,14 @@ class kaggle_winsol:
         else:
             _callbacks = callbacks
 
+        # FIXME think about how to handle the missing samples%batch_size
+        # samples
+        steps_per_epoch = samples_per_epoch // self.BATCH_SIZE
+
         hist = self.models[modelname].fit_generator(data_generator,
                                                     validation_data=validation,
-                                                    samples_per_epoch=samples_per_epoch,
-                                                    nb_epoch=nb_epoch,
+                                                    steps_per_epoch=steps_per_epoch,
+                                                    epochs=nb_epoch,
                                                     verbose=1,
                                                     callbacks=_callbacks)
 
@@ -537,6 +602,11 @@ class kaggle_winsol:
             timedeltas = []
         epochs_run = 0
         epoch_togo = nb_epochs
+
+        # FIXME think about how to handle the missing samples%batch_size
+        # samples
+        steps_per_epoch = samples_per_epoch // self.BATCH_SIZE
+
         for i in range(nb_epochs / validate_every if not nb_epochs
                        % validate_every else nb_epochs / validate_every + 1):
             if verbose:
@@ -558,8 +628,8 @@ class kaggle_winsol:
                 try:
                     hist = self.models['model_norm'].fit_generator(
                         data_gen, validation_data=validation_data,
-                        samples_per_epoch=samples_per_epoch,
-                        nb_epoch=nb_epoch,
+                        steps_per_epoch=steps_per_epoch,
+                        epochs=nb_epoch,
                         initial_epoch=initial_epoch, verbose=verbose,
                         callbacks=callbacks)
                     self._save_hist(hist.history)
@@ -616,3 +686,32 @@ class kaggle_winsol:
         self.first_loss_save = True
 
         self.init_models()
+
+        return True
+
+    def get_layer_output(self, layer, input_=None, modelname='model_norm',
+                         main_layer='main_seq'):
+        # if type(layer) == int:
+        #     _layer = self.models[modelname].get_layer(main_layer).layers[layer]
+        # elif type(layer) == str:
+        #     _layer = self.models[modelname].get_layer(main_layer).get_layer(
+        #         layer)
+        # else:
+        #     raise ValueError('layer must be specified as int or string')
+
+        # if not input_:
+        #     input_ = T.variable(value=[np.ones(i)
+        # for i in self.models[modelname].input_shape])
+
+        # print self.models[modelname].inputs
+        # print self.models[modelname].layers[2].get_input_at(0)
+        # print self.models[modelname].layers[2].get_input_at(1)
+        # print _layer.output
+
+        # layer_output_fkt = T.function(self.models[modelname].layers[2].get_input_at(0),
+        #                               [_layer.output])
+        # layer_output = layer_output_fkt([input_])[0]
+
+        # return layer_output
+
+        pass

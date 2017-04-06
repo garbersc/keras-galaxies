@@ -82,7 +82,7 @@ PART_SIZE = 45
 N_INPUT_VARIATION = 2
 
 
-GEN_BUFFER_SIZE = 2
+GEN_BUFFER_SIZE = 1
 
 
 y_train = np.load("data/solutions_train.npy")
@@ -163,7 +163,7 @@ post_augmented_data_gen = ra.post_augment_brightness_gen(
     augmented_data_gen, std=0.0)
 
 train_gen = load_data.buffered_gen_mp(
-    post_augmented_data_gen, buffer_size=GEN_BUFFER_SIZE, sleep_time=2)
+    post_augmented_data_gen, buffer_size=GEN_BUFFER_SIZE, sleep_time=1)
 
 input_gen = input_generator(train_gen)
 
@@ -207,4 +207,7 @@ stopped at 8305 iteration
 
 exactly same with train_gen dirctly
 exactly same on post_augmented_data_gen
+exactly same on augmented_data_gen
+
+now set genbuffer on 1
     '''

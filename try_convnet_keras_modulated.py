@@ -16,25 +16,25 @@ copy_to_ram_beforehand = False
 
 debug = True
 predict = False  # not implemented
-continueAnalysis = False
+continueAnalysis = True
 saveAtEveryValidation = True
 
 get_winsol_weights = False
 
-BATCH_SIZE = 256  # keep in mind
+BATCH_SIZE = 8  # 256  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-EPOCHS = 150
-VALIDATE_EVERY = 20  # 20 # 12 # 6 # 6 # 6 # 5 #
+EPOCHS = 4
+VALIDATE_EVERY = 2  # 20 # 12 # 6 # 6 # 6 # 5 #
 NUM_EPOCHS_NONORM = 0.1
 # this should be only a few, just .1 hopefully suffices.
 
 TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_convent_keras_modular_includeFlip_and_37relu.h5"
+WEIGHTS_PATH = "analysis/final/try_goodWeights.h5"
 
 LEARNING_RATE_SCHEDULE = {
     0: 0.4,
@@ -155,7 +155,7 @@ winsol = kaggle_winsol(BATCH_SIZE=BATCH_SIZE,
                        LEARNING_RATE_SCHEDULE=LEARNING_RATE_SCHEDULE,
                        MOMENTUM=MOMENTUM,
                        LOSS_PATH=TRAIN_LOSS_SF_PATH,
-                       WEIGHTS_PATH=WEIGHTS_PATH)
+                       WEIGHTS_PATH=WEIGHTS_PATH, include_flip=False)
 
 print "Build model"
 
