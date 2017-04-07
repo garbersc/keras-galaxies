@@ -4,9 +4,6 @@ import warnings
 import time
 from datetime import datetime, timedelta
 import functools
-from copy import copy
-
-import theano  # just used for a exception catch in debugging
 
 from keras import backend as T
 from keras.models import Sequential, Model
@@ -14,7 +11,8 @@ from keras.layers import Dense, Dropout, Input,  MaxoutDense
 from keras.layers.core import Lambda
 from keras.optimizers import SGD, Adam
 # TODO will be removed from keras2, can this be achieved with a lambda
-# layer now?
+# layer now? looks like it:
+# https://stackoverflow.com/questions/43160181/keras-merge-layer-warning
 from keras.layers import Merge
 from keras.callbacks import LearningRateScheduler
 from keras.engine.topology import InputLayer
@@ -63,6 +61,10 @@ class kaggle_winsol:
         self.models = {}
         self.reinit_counter = 0
         self.include_flip = include_flip
+
+        self.layer_formats = {'cuda_0': 1, 'cuda_1': 1, 'cuda_2': 1, 'pool_0': 1, 'pool_1': 1,
+                              'pool_2': 1, 'cuda_out_merge': 0, 'maxout_1': 0, 'maxout_2': 0,
+                              'dense_output': 0}
 
     '''
     initialize loss and validation histories
@@ -514,6 +516,28 @@ class kaggle_winsol:
 
         return True
 
+    def _load_one_loss(self, path, modelname):
+        loss_hist = {}
+        with open(path, 'r') as f:
+            d = (i for i in f.readlines()[::-1])
+            for line in d:
+                if line.find("{", 0, 1) != -1:
+                    loss_hist = json.loads(line)
+                if d.next() == "#history of model: " + modelname + '\n':
+                    break
+            if not loss_hist:
+                raise Warning('No model %s was found in %s' %
+                              (modelname, path))
+        return loss_hist
+
+    def load_loss(self, path='', modelname=''):
+        if not path:
+            path = self.LOSS_PATH
+        if modelname:
+            return self._load_one_loss(path, modelname)
+        else:
+            return [self._load_one_loss(path, name)for name in self.models]
+
     '''
     performs all saving task
     '''
@@ -643,20 +667,37 @@ class kaggle_winsol:
         return True
 
     def get_layer_output(self, layer, input_=None, modelname='model_norm',
-                         main_layer='main_seq'):
-        if type(layer) == int:
-            _layer = self.models[modelname].get_layer(main_layer).layers[layer]
-        elif type(layer) == str:
-            _layer = self.models[modelname].get_layer(main_layer).get_layer(
-                layer)
-        else:
-            raise ValueError('layer must be specified as int or string')
+                         main_layer='main_seq', prediction_batch_size=1):
+        _layer = self.models[modelname].get_layer(main_layer).get_layer(
+            layer)
 
         if not input_:
-            input_ = [np.ones(shape=i)
-                      for i in self.models[modelname].layers[2].input_shape]
+            input_ = [np.ones(shape=(prediction_batch_size,) + i[1:])
+                      for i in self.models[modelname].get_layer(main_layer).input_shape]
 
-        intermediate_layer_model = Model(inputs=self.models['model_norm']
+        if self.layer_formats[layer]:
+            output_layer = fPermute((3, 0, 1, 2))(_layer.output)
+            output_layer = Lambda(lambda x: T.reshape(x[0], (
+                prediction_batch_size,) + tuple(T.shape(output_layer)[1:])),
+                output_shape=lambda input_shape: (
+                prediction_batch_size,) + input_shape[1:])(output_layer)
+        else:
+            output_layer = _layer.output
+
+        intermediate_layer_model = Model(inputs=self.models[modelname]
                                          .get_layer(main_layer).get_input_at(0),
-                                         outputs=_layer.output)
-        return intermediate_layer_model.predict(input_)
+                                         outputs=output_layer)
+        return intermediate_layer_model.predict(input_,
+                                                batch_size=prediction_batch_size)
+
+    def get_layer_weights(self, layer,  modelname='model_norm',
+                          main_layer='main_seq'):
+        if type(layer) == int:
+            ret_weights = self.models[modelname].get_layer(
+                main_layer).layers[layer].get_weights()
+        elif type(layer) == str:
+            ret_weights = self.models[modelname].get_layer(main_layer).get_layer(
+                layer).get_weights()
+        else:
+            raise ValueError('layer must be specified as int or string')
+        return ret_weights

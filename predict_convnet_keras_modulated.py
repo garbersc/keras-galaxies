@@ -16,6 +16,7 @@ import os
 import cPickle as pickle
 import matplotlib.pyplot as plt
 from termcolor import colored
+import functools
 
 from custom_keras_model_and_fit_capsels import kaggle_winsol
 
@@ -32,17 +33,24 @@ BATCH_SIZE = 256  # keep in mind
 NUM_INPUT_FEATURES = 3
 
 TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
-# TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_convent_keras_modular_includeFlip_and_37relu.h5"
+#TARGET_PATH = "predictions/final/try_convnet.csv"
+WEIGHTS_PATH = "analysis/final/try_goodWeights.h5"
 
 input_sizes = [(69, 69), (69, 69)]
 PART_SIZE = 45
 
 N_INPUT_VARIATION = 2
 
+# set to True if the prediction and evaluation should be done when the
+# prediction file already exists
+REPREDICT_EVERYTIME = False
+
+# TODO built this as functions, not with the if's
 DO_VALID = True  # disable this to not bother with the validation set evaluation
 DO_VALID_CORR = False  # not implemented yet
-DO_VALID_SCATTER = True
+DO_VALID_SCATTER = False
+DO_PRINT_FILTERS = True
+
 
 VALID_CORR_OUTPUT_FILTER = np.zeros((37))
 VALID_CORR_OUTPUT_FILTER[2] = 1  # star or artifact
@@ -64,12 +72,21 @@ N_Corr_Filter_Images = np.sum(VALID_CORR_OUTPUT_FILTER)
 DO_VALIDSTUFF_ON_TRAIN = True
 
 DO_TEST = False  # disable this to not generate predictions on the testset
-DO_PRINT_FILTERS = False
 
-IMAGE_OUTPUT_PATH = "images_wColorbar_newYear2_realValid"
+IMAGE_OUTPUT_PATH = "images_keras_modulated"
 
 output_names = ["smooth", "featureOrdisk", "NoGalaxy", "EdgeOnYes", "EdgeOnNo", "BarYes", "BarNo", "SpiralYes", "SpiralNo", "BulgeNo", "BulgeJust", "BulgeObvious", "BulgDominant", "OddYes", "OddNo", "RoundCompletly", "RoundBetween", "RoundCigar",
                 "Ring", "Lense", "Disturbed", "Irregular", "Other", "Merger", "DustLane", "BulgeRound", "BlulgeBoxy", "BulgeNo2", "SpiralTight", "SpiralMedium", "SpiralLoose", "Spiral1Arm", "Spiral2Arm", "Spiral3Arm", "Spiral4Arm", "SpiralMoreArms", "SpiralCantTell"]
+
+
+# the putput of pylearn layers is permutated in another way than the real
+# theano layers
+layer_formats = {'cuda_0': 1, 'cuda_1': 1, 'cuda_2': 1, 'pool_0': 1, 'pool_1': 1,
+                 'pool_2': 1, 'cuda_out_merge': 0, 'maxout_1': 0, 'maxout_2': 0,
+                 'dense_output': 0}
+
+layer_names = layer_formats.keys()
+
 
 target_filename = os.path.basename(WEIGHTS_PATH).replace(".h5", ".npy.gz")
 target_path_valid = os.path.join(
@@ -140,7 +157,7 @@ winsol = kaggle_winsol(BATCH_SIZE=BATCH_SIZE,
                        PART_SIZE=PART_SIZE,
                        input_sizes=input_sizes,
                        LOSS_PATH=TRAIN_LOSS_SF_PATH,
-                       WEIGHTS_PATH=WEIGHTS_PATH)
+                       WEIGHTS_PATH=WEIGHTS_PATH, include_flip=False)
 
 print "Build model"
 
@@ -228,26 +245,37 @@ def save_exit():
     sys.exit(0)
 
 
-try:
-    print ''
+if not REPREDICT_EVERYTIME and os.path.isfile(
+        target_path_valid) and os.path.isfile(TRAIN_LOSS_SF_PATH):
+    print 'Loading validation predictions from %s and loss from %s ' % (
+        target_path_valid, TRAIN_LOSS_SF_PATH)
+    predictions = load_data.load_gz(target_path_valid)
+else:
+    try:
+        print ''
+        print 'Re-evalulating and predicting'
 
-    if DO_VALID:
-        evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
+        if DO_VALID:
+            evalHist = winsol.evaluate(
+                [xs_valid[0], xs_valid[1]], y_valid=y_valid)
+            winsol.save_loss(modelname='model_norm_metrics')
+            evalHist = winsol.load_loss(modelname='model_norm_metrics')
 
-    print ''
-    predictions = winsol.predict(
-        [xs_valid[0], xs_valid[1]])
+            print ''
+            predictions = winsol.predict(
+                [xs_valid[0], xs_valid[1]])
 
-    print "Write predictions to %s" % target_path_valid
-    load_data.save_gz(target_path_valid, predictions)
+            print "Write predictions to %s" % target_path_valid
+            load_data.save_gz(target_path_valid, predictions)
 
-except KeyboardInterrupt:
-    print "\ngot keyboard interuption"
-    save_exit()
-except ValueError:
-    print "\ngot value error, could be the end of the generator in the fit"
-    save_exit()
+    except KeyboardInterrupt:
+        print "\ngot keyboard interuption"
+        save_exit()
+    except ValueError:
+        print "\ngot value error, could be the end of the generator in the fit"
+        save_exit()
 
+evalHist = winsol.load_loss(modelname='model_norm_metrics')
 
 rmse_valid = evalHist['rmse'][-1]
 rmse_augmented = np.sqrt(np.mean((y_valid - predictions)**2))
@@ -273,7 +301,8 @@ for i in xrange(0, VALID_CORR_OUTPUT_FILTER.shape[0]):
 
 
 if DO_VALID_SCATTER:
-    print 'do scatter plots'
+    print 'Do scatter plots'
+    print '  they will be saved in the folder %s ' % IMAGE_OUTPUT_PATH
     if not os.path.isdir(IMAGE_OUTPUT_PATH):
         os.mkdir(IMAGE_OUTPUT_PATH)
     # plt.gray()
@@ -299,5 +328,84 @@ if DO_VALID_SCATTER:
         plt.close()
 
     os.chdir("../..")
+
+
+if DO_PRINT_FILTERS:
+    if not os.path.isdir(IMAGE_OUTPUT_PATH):
+        os.mkdir(IMAGE_OUTPUT_PATH)
+
+    # os.chdir("..")
+    print "Print filtered"
+
+    image_nr = 0  # 'ones'
+    input_img = [np.asarray([validation_data[0][0][image_nr]]),
+                 np.asarray([validation_data[0][1][image_nr]])]
+
+    # input_ = [np.ones(shape=(np.asarray([validation_data[0][0][0]]).shape)), np.ones(
+    #     shape=(np.asarray([validation_data[0][0][0]]).shape))]
+
+    print '  getting outputs'
+
+    intermediate_outputs = {}
+    for n in layer_names:
+        intermediate_outputs[n] = np.asarray(winsol.get_layer_output(
+            n, input_=input_img))
+        intermediate_outputs[n] = intermediate_outputs[n][0]
+        if not layer_formats[n]:
+            board_side = int(np.ceil(np.sqrt(len(intermediate_outputs[n]))))
+            board_square = int(board_side**2)
+            intermediate_outputs[n] = np.append(
+                intermediate_outputs[n], [0] * (board_square - len(intermediate_outputs[n])))
+            intermediate_outputs[n] = np.reshape(
+                intermediate_outputs[n], (board_side, board_side))
+
+    os.chdir(IMAGE_OUTPUT_PATH)
+    intermed_out_dir = 'intermediate_outputs'
+    if not os.path.isdir(intermed_out_dir):
+        os.mkdir(intermed_out_dir)
+    os.chdir(intermed_out_dir)
+
+    print '  output images will be saved at %s/intermediate_outputs' % IMAGE_OUTPUT_PATH
+
+    imshow_c = functools.partial(
+        plt.imshow, interpolation='none')  # , vmin=0.0, vmax=1.0)
+
+    print '  plotting outputs'
+
+    imshow_c(np.transpose(input_img[0][0], (1, 2, 0)))
+    plt.savefig('input_fig_%s_rotation_0.jpg' % (image_nr))
+    plt.close()
+
+    imshow_c(np.transpose(input_img[1][0], (1, 2, 0)))
+    plt.savefig('input_fig_%s_rotation_45.jpg' % (image_nr))
+    plt.close()
+
+    plt.gray()
+
+    for i in range(len(input_img[0][0])):
+        imshow_c(input_img[0][0][i])
+        plt.savefig('input_fig_%s_rotation_0_dim_%s.jpg' % (image_nr, i))
+        plt.close()
+
+    for i in range(len(input_img[1][0])):
+        imshow_c(input_img[1][0][i])
+        plt.savefig('input_fig_%s_rotation_45_dim_%s.jpg' % (image_nr, i))
+        plt.close()
+
+    for n in layer_names:
+        if layer_formats[n]:
+            for i in range(len(intermediate_outputs[n])):
+                imshow_c(intermediate_outputs[n][i])
+                plt.colorbar()
+                plt.savefig('output_fig_%s_%s_channel_%s.jpg' %
+                            (image_nr, n, i))
+                plt.close()
+        else:
+            imshow_c(intermediate_outputs[n])
+            plt.colorbar()
+            plt.savefig('output_fig_%s_%s.jpg' %
+                        (image_nr, n))
+            plt.close()
+    os.chdir('../../..')
 
 save_exit()
