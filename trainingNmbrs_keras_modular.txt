@@ -1,3 +1,84 @@
 #wRandFlip 
 #The training is running for 100 epochs, each with 20 images. The validation sample contains 6157 images. 
 #round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 100 epochs, each with 20 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 100 epochs, each with 20 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 100 epochs, each with 20 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 100 epochs, each with 20 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 100 epochs, each with 20 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 100 epochs, each with 20 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 100 epochs, each with 55421 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 100 epochs, each with 55421 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 2 epochs, each with 55421 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 2 epochs, each with 55421 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 2 epochs, each with 55421 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 2 epochs, each with 55421 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#eval losses and metrics:
+#history of model: model_norm_metrics
+{"loss": [0.042077117331358681, 0.029866878783993758], "sliced_accuracy_std": [0.25183317229812441, 0.23255815620408424], "categorical_accuracy": [0.59200909534347934, 0.59200909534347934], "sliced_accuracy_mean": [0.53113235690792371, 0.60030714108685657], "rmse": [0.20512163538146333, 0.17280562560831705]}
+#history of model: model_norm
+{"loss": [0.030125262711299668]}
+#history of model: model_norm_metrics
+{"loss": [0.042077117331358681, 0.029866878783993758, 0.029850332247629091], "sliced_accuracy_std": [0.25183317229812441, 0.23255815620408424, 0.23255815620408424], "categorical_accuracy": [0.59200909534347934, 0.59200909534347934, 0.59200909534347934], "sliced_accuracy_mean": [0.53113235690792371, 0.60030714108685657, 0.60030714108685657], "rmse": [0.20512163538146333, 0.17280562560831705, 0.17275760303084603]}
+#history of model: model_norm
+{"loss": [0.030125262711299668, 0.029807918508528569]}
+#wRandFlip 
+#The training is running for 20 epochs, each with 55421 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#eval losses and metrics:
+#history of model: model_norm_metrics
+{"loss": [0.041152444122208198, 0.029849710329261057], "sliced_accuracy_std": [0.3289532541734978, 0.23255815620408424], "categorical_accuracy": [0.59200909534347934, 0.59200909534347934], "sliced_accuracy_mean": [0.41834129367204614, 0.60030714108685657], "rmse": [0.20285582019172552, 0.17275537515840536]}
+#history of model: model_norm
+{"loss": [0.029947356927558916, 0.029847660503529626, 0.029908064103454625, 0.029751423267869774, 0.029939555520311408, 0.029852693148572512, 0.030010746176773254, 0.029833497428292527, 0.029748726277313103, 0.029903573847008407]}
+#history of model: model_norm_metrics
+{"loss": [0.041152444122208198, 0.029849710329261057, 0.025373844316403781], "sliced_accuracy_std": [0.3289532541734978, 0.23255815620408424, 0.20632156979704669], "categorical_accuracy": [0.59200909534347934, 0.59200909534347934, 0.62286828001133709], "sliced_accuracy_mean": [0.41834129367204614, 0.60030714108685657, 0.61498370084627818], "rmse": [0.20285582019172552, 0.17275537515840536, 0.15927707020901852]}
+#history of model: model_norm
+{"loss": [0.029947356927558916, 0.029847660503529626, 0.029908064103454625, 0.029751423267869774, 0.029939555520311408, 0.029852693148572512, 0.030010746176773254, 0.029833497428292527, 0.029748726277313103, 0.029903573847008407, 0.029774741158572905, 0.029961854065640257, 0.02988775932324042, 0.02978422675589356, 0.029834677815574025, 0.029800541083747092, 0.029610067469264388, 0.027667718913850434, 0.026443879931755024, 0.025976166881005697]}
+#continuing from analysis/final/goodWeightS_test.h5#wRandFlip 
+#The training is running for 20 epochs, each with 55421 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#continuing from analysis/final/goodWeightS_test.h5#wRandFlip 
+#The training is running for 20 epochs, each with 55421 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#continuing from analysis/final/goodWeightS_test.h5#wRandFlip 
+#The training is running for 20 epochs, each with 55421 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 6 epochs, each with 55421 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 6 epochs, each with 55421 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 6 epochs, each with 55421 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 150 epochs, each with 55421 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#wRandFlip 
+#The training is running for 150 epochs, each with 55421 images. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 

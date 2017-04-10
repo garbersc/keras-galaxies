@@ -21,7 +21,7 @@ debug = True
 predict = False  # not implemented
 
 continueAnalysis = True
-saveAtEveryValidation = True
+saveAtEveryValidation = False
 
 
 if copy_to_ram_beforehand:
@@ -74,8 +74,7 @@ train_indices = np.arange(num_train)
 valid_indices = np.arange(num_train, num_train + num_valid)
 test_indices = np.arange(num_test)
 
-
-BATCH_SIZE = 512  # keep in mind
+BATCH_SIZE = 16  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
@@ -83,8 +82,7 @@ LEARNING_RATE_SCHEDULE = {
     0: 0.1,
     20: 0.05,
     40: 0.01,
-    80: 0.005,
-    120: 0.0005
+    80: 0.005
     # 500: 0.04,
     # 0: 0.01,
     # 1800: 0.004,
@@ -97,10 +95,10 @@ LEARNING_RATE_SCHEDULE = {
 }
 if continueAnalysis:
     LEARNING_RATE_SCHEDULE = {
-        0: 0.005,
-        # 20: 0.05,
-        # 40: 0.01,
-        40: 0.0005
+        0: 0.1,
+        20: 0.05,
+        40: 0.01,
+        80: 0.005
         # 0: 0.0001,
         # 500: 0.002,
         # 800: 0.0004,
@@ -113,22 +111,22 @@ MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
 N_TRAIN = num_train
 N_VALID = num_valid
-EPOCHS = 150
-VALIDATE_EVERY = 20  # 20 # 12 # 6 # 6 # 6 # 5 #
+EPOCHS = 20
+VALIDATE_EVERY = 10  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 print("The training sample contains %s , the validation sample contains %s images. \n" %
       (ra.num_train,  ra.num_valid))
 # train without normalisation for this fraction of the traininng sample, to get the weights in
 # the right 'zone'.
-NUM_EPOCHS_NONORM = 0.
+NUM_EPOCHS_NONORM = 0.1
 # this should be only a few, just .1 hopefully suffices.
 
-GEN_BUFFER_SIZE = 1
+GEN_BUFFER_SIZE = 2
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_longRun.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular.txt"
 
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_convent_keras_modular_longRun_next.h5"
+WEIGHTS_PATH = "analysis/final/goodWeightS_test.h5"
 
 # maybe put into class
 with open(TRAIN_LOSS_SF_PATH, 'a')as f:
@@ -166,6 +164,7 @@ if debug:
            BATCH_SIZE))
 
 winsol.init_models()
+winsol.compile_models()
 
 if debug:
     winsol.print_summary()
@@ -206,7 +205,8 @@ post_augmented_data_gen = ra.post_augment_brightness_gen(
     augmented_data_gen, std=0.5)
 
 train_gen = load_data.buffered_gen_mp(
-    post_augmented_data_gen, buffer_size=GEN_BUFFER_SIZE, sleep_time=10)
+    post_augmented_data_gen, buffer_size=GEN_BUFFER_SIZE)
+
 input_gen = input_generator(train_gen)
 
 
@@ -245,16 +245,6 @@ if debug:
     print("Free GPU Mem before first step %s MiB " %
           (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0] / 1024. / 1024.))
 
-
-def save_exit():
-    print "\nsaving..."
-    winsol.save()
-    print "Done!"
-    print ' run for %s' % timedelta(seconds=(time.time() - start_time))
-    exit()
-    sys.exit(0)
-
-
 try:
     print ''
     print "losses without training on validation sample up front"
@@ -273,11 +263,19 @@ try:
 
     no_norm_events = int(NUM_EPOCHS_NONORM * N_TRAIN)
 
-    if no_norm_events:
-        hist = winsol.fit_gen(modelname='model_noNorm',
-                              data_generator=input_gen,
-                              validation=validation_data,
-                              samples_per_epoch=no_norm_events)
+    # hist = winsol.fit_gen(modelname='model_norm',
+    #                       data_generator=input_gen,
+    #                       validation=validation_data,
+    #                       samples_per_epoch=N_TRAIN)
+
+    # evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
+
+    print 'does this reset the weights?'
+
+    winsol.init_models()
+    winsol.compile_models()
+
+    evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
 
     if debug:
         print("\nFree GPU Mem before train loop %s MiB " %
@@ -285,22 +283,25 @@ try:
                / 1024. / 1024.))
 
     print 'starting main training'
-    if no_norm_events:
-        eta = (time.time() - time1) / NUM_EPOCHS_NONORM * EPOCHS
-        print 'rough ETA %s sec. -> finishes at %s' % (
-            int(eta), datetime.now() + timedelta(seconds=eta))
+    eta = (time.time() - time1) / NUM_EPOCHS_NONORM * EPOCHS
+    print 'rough ETA %s sec. -> finishes at %s' % (
+        int(eta), datetime.now() + timedelta(seconds=eta))
 
-    winsol.full_fit(data_gen=input_gen,
-                    validation=validation_data,
-                    samples_per_epoch=N_TRAIN,
-                    validate_every=VALIDATE_EVERY,
-                    nb_epochs=EPOCHS)
+    # winsol.full_fit(data_gen=input_gen,
+    #                 validation=validation_data,
+    #                 samples_per_epoch=N_TRAIN,
+    #                 validate_every=VALIDATE_EVERY,
+    #                 nb_epochs=EPOCHS)
 
 except KeyboardInterrupt:
     print "\ngot keyboard interuption"
-    save_exit()
-except ValueError:
-    print "\ngot value error, expect a end of the generator in the fit"
-    save_exit()
+    print ' run for %s' % timedelta(seconds=(time.time() - start_time))
+    exit()
+    sys.exit(0)
 
-save_exit()
+
+print "Done!"
+td = time.time() - start_time
+print ' run for %sh %sm %ss ' % (int(td // 3600), int(td // 60) % 60, td % 60)
+exit()
+sys.exit(0)

@@ -2,6 +2,8 @@ import numpy as np
 import json
 import time
 from datetime import datetime, timedelta
+import functools
+from copy import copy
 
 from keras.models import Sequential, Model
 from keras.layers import Dense, Dropout, Input,  MaxoutDense
@@ -11,10 +13,29 @@ from keras.engine.topology import Merge
 from keras.callbacks import LearningRateScheduler
 
 from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute, kerasCudaConvnetConv2DLayer
-from custom_for_keras import kaggle_MultiRotMergeLayer_output, OptimisedDivGalaxyOutput, kaggle_input, kaggle_sliced_accuracy, dense_weight_init_values, rmse
+from custom_for_keras import kaggle_MultiRotMergeLayer_output, OptimisedDivGalaxyOutput, kaggle_input, kaggle_sliced_accuracy, dense_weight_init_values, rmse, lr_function
+
+'''
+This class contains the winning solution model of the kaggle galaxies contest transferred to keras and function to fit it.
+
+TODO: a prediction function
+
+'''
 
 
 class kaggle_winsol:
+    '''
+   Arguments:
+    BATCH_SIZE: image fitted at the same time
+    NUM_INPUT_FEATURES: features per pixel, typ. colors
+    PART_SIZE: integer pixel heigth and width to which the input is cutted
+    input_sizes: list of tupel of int. pixel sizes of the input variations
+    LEARNING_RATE_SCHEDULE: learning rate schedule for SGD as epochs: learning rate dictionary
+    MOMENTUM: nestrenov momentum
+    LOSS_PATH: save path for the loss and validation history
+    WEIGHTS_PATH: load/save path of the model weights
+    '''
+
     def __init__(self, BATCH_SIZE, NUM_INPUT_FEATURES, PART_SIZE, input_sizes,
                  LEARNING_RATE_SCHEDULE, MOMENTUM, LOSS_PATH, WEIGHTS_PATH):
         self.BATCH_SIZE = BATCH_SIZE
@@ -29,17 +50,72 @@ class kaggle_winsol:
         self.hists = {}
         self.first_loss_save = False
         self.models = {}
+        self.reinit_counter = 0
 
-    def init_hist_dics(self, model_in):
-        for n in model_in:
+    '''
+    initialize loss and validation histories
+
+    Arguments:
+        model_in: collection of models, if None takes all models in the class
+
+    Returns:
+        empty dictionary of empty history dictionaries
+    '''
+
+    def _init_hist_dics(self, model_in=None):
+        if model_in:
+            _model_in = model_in
+        else:
+            _model_in = self.models
+
+        self.hists = {}
+
+        for n in _model_in:
             self.hists[n] = {}
             try:
-                for o in model_in[n].metrics_names:
+                for o in _model_in[n].metrics_names:
                     self.hists[n][o] = []
             except AttributeError:
                 pass
 
         return self.hists
+
+    '''
+    compliles all available models
+    initilises loss histories
+    '''
+
+    def _compile_models(self):
+        self.models['model_norm'].compile(loss='mean_squared_error',
+                                          optimizer=SGD(
+                                              lr=self.LEARNING_RATE_SCHEDULE[0],
+                                              momentum=self.MOMENTUM,
+                                              nesterov=True))
+        self.models['model_noNorm'].compile(loss='mean_squared_error',
+                                            optimizer=SGD(
+                                                lr=self.LEARNING_RATE_SCHEDULE[0],
+                                                momentum=self.MOMENTUM,
+                                                nesterov=True))
+
+        self.models['model_norm_metrics'].compile(loss='mean_squared_error',
+                                                  optimizer=SGD(
+                                                      lr=self.LEARNING_RATE_SCHEDULE[0],
+                                                      momentum=self.MOMENTUM,
+                                                      nesterov=True),
+                                                  metrics=[rmse,
+                                                           'categorical_accuracy',
+                                                           kaggle_sliced_accuracy])
+
+        self._init_hist_dics(self.models)
+
+        return True
+
+    '''
+    initiates models according to the kaggle galaxies winning solution
+
+    Returns:
+    dictinary with the model without normalisation, with normalisation and with normalisation and extra metrics for validation
+    '''
 
     def init_models(self):
         print "init model"
@@ -156,36 +232,26 @@ class kaggle_winsol:
                        'model_norm_metrics': model_norm_metrics,
                        'model_noNorm': model_noNorm}
 
+        self._compile_models()
+
         return self.models
 
-    def compile_models(self):
-        self.models['model_norm'].compile(loss='mean_squared_error',
-                                          optimizer=SGD(
-                                              lr=self.LEARNING_RATE_SCHEDULE[0],
-                                              momentum=self.MOMENTUM,
-                                              nesterov=True))
-        self.models['model_noNorm'].compile(loss='mean_squared_error',
-                                            optimizer=SGD(
-                                                lr=self.LEARNING_RATE_SCHEDULE[0],
-                                                momentum=self.MOMENTUM,
-                                                nesterov=True))
-
-        self.models['model_norm_metrics'].compile(loss='mean_squared_error',
-                                                  optimizer=SGD(
-                                                      lr=self.LEARNING_RATE_SCHEDULE[0],
-                                                      momentum=self.MOMENTUM,
-                                                      nesterov=True),
-                                                  metrics=[rmse,
-                                                           'categorical_accuracy',
-                                                           kaggle_sliced_accuracy])
-
-        self.init_hist_dics(self.models)
-
-        return True
+    '''
+    Arguments:
+    modelname: name of the model to be printed
+    '''
 
     def print_summary(self, modelname='model_norm'):
         self.models[modelname].summary()
         return True
+
+    '''
+    loads previously saved weights
+
+    Arguments:
+    path: path to savefile
+    modelname: name of the model for which the weights are loaded, in default the models use all the same weight
+    '''
 
     def load_weights(self, path, modelname='model_norm'):
         self.models[modelname].load_weights(path)
@@ -194,13 +260,27 @@ class kaggle_winsol:
                     ' into  model ' + modelname + '\n')
         return True
 
+    '''
+    prints the loss and metric information of a model
+
+    '''
+
     def print_last_hist(self, modelname='model_norm_metrics'):
         for n in self.hists['model_norm_metrics']:
             print "   %s : %.3f" % (
                 n, self.hists['model_norm_metrics'][n][-1])
         return True
 
-    def evaluate(self, x, y_valid, batch_size=0,
+    '''
+    evaluates a model according to true answeres, saves the information in the history 
+    Arguments:
+    x: input sample
+    y_valid: true answeres
+    batch_size: inputs evaluated at the same time, default uses batch size from class initialisation
+    verbose: interger, set to 0 to minimize oputput
+    '''
+
+    def evaluate(self, x, y_valid, batch_size=None,
                  modelname='model_norm_metrics', verbose=1):
         if not batch_size:
             batch_size = self.BATCH_SIZE
@@ -217,43 +297,67 @@ class kaggle_winsol:
 
         return evalHist
 
-    def lr_function(self, e):
-        if e in self.LEARNING_RATE_SCHEDULE:
-            _current_lr = self.LEARNING_RATE_SCHEDULE[e]
-            self.current_lr = _current_lr
-        else:
-            _current_lr = self.current_lr
-        return _current_lr
+    def _make_lrs_fct(self):
+        return functools.partial(lr_function,
+                                 lrs=self.LEARNING_RATE_SCHEDULE)
 
-    lr_callback = LearningRateScheduler(lr_function)
-
-    def save_hist(self, history, modelname='model_norm'):
+    def _save_hist(self, history, modelname='model_norm'):
         if not self.hists:
-            self.init_hist_dics(self.models)
+            self._init_hist_dics(self.models)
         for k in self.hists[modelname]:
-            self.hists[k] += history[k]
+            self.hists[modelname][k] += history[k]
 
         return True
 
+    '''
+    performs the fit
+
+    Arguments:
+    modelname: string name of the model to be fittet
+    data_generator: generator that yields the input data
+    validation: validation set as tuple of validation data and solution
+    samples_per_epoch: integer number of input samples per epoch, use this also to not run over the whole set
+    callbacks: list of callbacks to be excecuted, default uses learning rate schedule. more information at www.keras.io
+    nb_epoch: number of epochs to be fitted
+    '''
+
     def fit_gen(self, modelname, data_generator, validation, samples_per_epoch,
-                callbacks=[lr_callback], nb_epoch=1):
+                callbacks='default', nb_epoch=1):  # think about making nb_worker>1 work, problem: generator needs multiple instances
+        if callbacks == 'default':
+            _callbacks = [LearningRateScheduler(self._make_lrs_fct())]
+        else:
+            _callbacks = callbacks
 
         hist = self.models[modelname].fit_generator(data_generator,
                                                     validation_data=validation,
                                                     samples_per_epoch=samples_per_epoch,
                                                     nb_epoch=nb_epoch,
                                                     verbose=1,
-                                                    callbacks=callbacks)
+                                                    callbacks=_callbacks)
 
-        self.save_hist(hist.history, modelname=modelname)
+        self._save_hist(hist.history, modelname=modelname)
 
         return hist
 
-    def save_weights(self, modelname='model_norm', path=''):
+    '''
+    saves the modelweights as hdf5 file
+    Arguments:
+    path: the path were the weights are to be saved, if default the WEIGHTS_PATH with which the class was initialised is used
+    modelname: name of the model, default allmodels have the same weights
+    '''
+
+    def save_weights(self, path='', modelname='model_norm'):
         if not path:
             path = self.WEIGHTS_PATH
         self.models[modelname].save_weights(path)
         return path
+
+    '''
+    saves the loss and validation metric histories as json strings in a text file
+    Arguments:
+    path: default uses LOSS_PATH from initialisation
+    modelname: default saves history of all models
+    '''
 
     def save_loss(self, path='', modelname=''):
         if not path:
@@ -274,13 +378,30 @@ class kaggle_winsol:
 
         return True
 
+    '''
+    performs all saving task
+    '''
+
     def save(self):
         self.save_weights()
         self.save_loss(modelname='model_norm_metrics')
         self.save_loss(modelname='model_norm')
         return True
 
-    def full_fit(self, input_gen, validation, samples_per_epoch,
+    '''
+    main fitting function that calls a metrics model in addition to the validation after every epoch
+
+    Arguments:
+    data_gen: generator that yields the input samples
+    validation: tuple of validation data and solution
+    samples_per_epoch: number of samples in the fit data set
+    validate_every: number of epochs after which the extra metrics are calculated on the validation sample
+    nb_epochs: number of epochs to be fitted
+    verbose: set to 0 to minimize output
+    save_every_validation: save the losses and metrics after every 'validate_every' epochs, weights are overwritten
+    '''
+
+    def full_fit(self, data_gen, validation, samples_per_epoch,
                  validate_every,
                  nb_epochs, verbose=1, save_at_every_validation=True):
         if verbose:
@@ -297,14 +418,14 @@ class kaggle_winsol:
 
             # main fit
             hist = self.models['model_norm'].fit_generator(
-                input_gen, validation_data=validation,
+                data_gen, validation_data=validation,
                 samples_per_epoch=samples_per_epoch,
                 nb_epoch=np.min([
                     epoch_togo, validate_every]) + epochs_run,
                 initial_epoch=epochs_run, verbose=1,
-                callbacks=[self.lr_callback])
+                callbacks=[LearningRateScheduler(self._make_lrs_fct())])
 
-            self.save_hist(hist.history)
+            self._save_hist(hist.history)
 
             epoch_togo -= np.min([epoch_togo, validate_every])
             epochs_run += np.min([epoch_togo, validate_every])
@@ -312,7 +433,9 @@ class kaggle_winsol:
             if verbose:
                 print ''
                 print 'validate:'
-            self.evaluate(validation[0], y=validation[1], verbose=verbose)
+
+            self.evaluate(
+                validation[0], y_valid=validation[1], verbose=verbose)
 
             if verbose:
                 timedeltas.append(time.time() - time1)
@@ -326,3 +449,19 @@ class kaggle_winsol:
 
             if save_at_every_validation:
                 self.save()
+
+    def reinit(self, WEIGHTS_PATH=None, LOSS_PATH=None):
+        self.reinit_counter += 1
+        if WEIGHTS_PATH:
+            self.WEIGHTS_PATH = WEIGHTS_PATH
+        else:
+            self.WEIGHTS_PATH = ((self.WEIGHTS_PATH.split(
+                '.', 1)[0] + '_' + str(self.reinit_counter) + '.h5'))
+
+        if LOSS_PATH:
+            self.LOSS_PATH = LOSS_PATH
+        else:
+            self.LOSS_PATH = ((self.LOSS_PATH.split(
+                '.', 1)[0] + '_' + str(self.reinit_counter) + '.h5'))
+
+        self.init_models()

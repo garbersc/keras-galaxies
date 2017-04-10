@@ -98,9 +98,9 @@ LEARNING_RATE_SCHEDULE = {
 if continueAnalysis:
     LEARNING_RATE_SCHEDULE = {
         0: 0.005,
-        # 20: 0.05,
-        # 40: 0.01,
-        40: 0.0005
+        #20: 0.05,
+        #40: 0.01,
+        80: 0.0005
         # 0: 0.0001,
         # 500: 0.002,
         # 800: 0.0004,
@@ -113,7 +113,7 @@ MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
 N_TRAIN = num_train
 N_VALID = num_valid
-EPOCHS = 150
+EPOCHS = 100
 VALIDATE_EVERY = 20  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 print("The training sample contains %s , the validation sample contains %s images. \n" %
@@ -206,7 +206,8 @@ post_augmented_data_gen = ra.post_augment_brightness_gen(
     augmented_data_gen, std=0.5)
 
 train_gen = load_data.buffered_gen_mp(
-    post_augmented_data_gen, buffer_size=GEN_BUFFER_SIZE, sleep_time=10)
+    post_augmented_data_gen, buffer_size=GEN_BUFFER_SIZE, sleep_time = 4)
+
 input_gen = input_generator(train_gen)
 
 
@@ -244,16 +245,6 @@ print "  took %.2f seconds" % (t_val)
 if debug:
     print("Free GPU Mem before first step %s MiB " %
           (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0] / 1024. / 1024.))
-
-
-def save_exit():
-    print "\nsaving..."
-    winsol.save()
-    print "Done!"
-    print ' run for %s' % timedelta(seconds=(time.time() - start_time))
-    exit()
-    sys.exit(0)
-
 
 try:
     print ''
@@ -298,9 +289,16 @@ try:
 
 except KeyboardInterrupt:
     print "\ngot keyboard interuption"
-    save_exit()
-except ValueError:
-    print "\ngot value error, expect a end of the generator in the fit"
-    save_exit()
+    print "\nsaving..."
+    winsol.save()
+    print ' run for %s' % timedelta(seconds=(time.time() - start_time))
+    exit()
+    sys.exit(0)
 
-save_exit()
+
+print "\nsaving..."
+winsol.save()
+print "Done!"
+print ' run for %s' % timedelta(seconds=(time.time() - start_time))
+exit()
+sys.exit(0)

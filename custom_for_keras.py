@@ -3,6 +3,12 @@ import keras.backend as T
 from keras.metrics import categorical_accuracy, mean_squared_error
 
 
+def lr_function(e, lrs):
+    for i in xrange(e, -1, -1):
+        if i in lrs:
+            return lrs[i]
+
+
 def kaggle_MultiRotMergeLayer_output(x, num_views=2):
     # TODO: stop using mb_size argument! needed for events mod batch_size!=0!
     # build check?
@@ -267,6 +273,9 @@ def ll_error(self, normalisation=True, *args, **kwargs):
 
 def input_generator(train_gen):
     for chunk in train_gen:
+        if not chunk:
+            print 'WARNING: data input generator yielded ' + str(chunk)
+            + ', something went wrong'
         chunk_data, chunk_length = chunk
         y_chunk = chunk_data.pop()  # last element is labels.
         xs_chunk = chunk_data
