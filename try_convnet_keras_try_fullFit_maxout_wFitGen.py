@@ -178,7 +178,7 @@ WEIGHTS[4] = 1.5  # edge on no
 # WEIGHTS[24]=1  #dust lane
 WEIGHTS = WEIGHTS / WEIGHTS[WEIGHTS.argmax()]
 
-GEN_BUFFER_SIZE = 1
+GEN_BUFFER_SIZE = 2
 
 TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_hist_new.txt"
 
@@ -481,7 +481,7 @@ no_norm_events = int(NUM_EPOCHS_NONORM * N_TRAIN)
 no_norm_events = N_TRAIN
 # print 'nb_worker=4 test is on'
 hist = model_noNorm.fit_generator(input_gen, validation_data=(
-    [xs_valid[0], xs_valid[1]], y_valid), samples_per_epoch=N_TRAIN, nb_epoch=1, verbose=1, callbacks=[lr_callback], nb_worker=4)  # loss is squared!!! TODO nb_worker=4 test
+    [xs_valid[0], xs_valid[1]], y_valid), samples_per_epoch=N_TRAIN, nb_epoch=1, verbose=1, callbacks=[lr_callback], nb_worker=1)  # loss is squared!!! TODO nb_worker=4 test, does not work with this generator
 
 # hist = model_noNorm.fit(
 # x=[l0_input_var[:no_norm_events],l0_45_input_var[:no_norm_events]] ,

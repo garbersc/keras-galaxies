@@ -32,7 +32,7 @@ predict = False
 continueAnalysis = False
 saveAtEveryLearningRate = True
 
-getWinSolWeights = True
+getWinSolWeights = False
 
 if getWinSolWeights:
 	WINSOL_PATH = "analysis/final/try_convent_gpu1_win_sol_net_on_0p0775_validation.pkl"
@@ -110,7 +110,7 @@ LEARNING_RATE_SCHEDULE = {  #if adam is used the learning rate doesnt follow the
 }
 if continueAnalysis or getWinSolWeights :
     LEARNING_RATE_SCHEDULE = {
-        0: 0.01,	
+        0: 0.0001,	
         500: 0.002,
         #800: 0.0004,
         3200: 0.0002,
@@ -125,7 +125,7 @@ NUM_CHUNKS = 5#1000#7000 #2500 # 3000 # 1500 # 600 # 600 # 600 # 500
 VALIDATE_EVERY = 5 #20 # 12 # 6 # 6 # 6 # 5 # validate only every 5 chunks. MUST BE A DIVISOR OF NUM_CHUNKS!!!
 # else computing the analysis data does not work correctly, since it assumes that the validation set is still loaded.
 print("The training is running for %s chunks, each with %s images. That are about %s epochs. The validation sample contains %s images. \n" % (NUM_CHUNKS,CHUNK_SIZE,CHUNK_SIZE*NUM_CHUNKS / (ra.num_train-CHUNK_SIZE) ,  ra.num_valid ))
-NUM_CHUNKS_NONORM =  1 # train without normalisation for this many chunks, to get the weights in the right 'zone'.
+NUM_CHUNKS_NONORM = 0 #1 # train without normalisation for this many chunks, to get the weights in the right 'zone'.
 # this should be only a few, just 1 hopefully suffices.
 
 USE_ADAM = False #TODO not implemented
@@ -154,10 +154,10 @@ WEIGHTS=WEIGHTS/WEIGHTS[WEIGHTS.argmax()]
 
 GEN_BUFFER_SIZE = 1
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_start_w_winsolWeights.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_dropout_tryouts_test.txt"
 
 #TARGET_PATH = "predictions/final/try_convnet.csv"
-ANALYSIS_PATH = "analysis/final/try_convent_keras_start_w_winsolWeights.pkl"
+ANALYSIS_PATH = "analysis/final/try_convent_keras_dropout_tryouts_test.pkl"
 
 with open(TRAIN_LOSS_SF_PATH, 'a')as f:
 	if continueAnalysis: 
@@ -237,7 +237,7 @@ xs_valid = [x_valid.transpose(0, 3, 1, 2) for x_valid in xs_valid] # move the co
 print "  took %.2f seconds" % (time.time() - start_time)
 
 
-N_INPUT_VARIATION=4
+N_INPUT_VARIATION=2
 
 
 
@@ -261,7 +261,7 @@ if debug :print model1.output_shape
 
 model = Sequential()
 
-model.add(Merge([model1, model2], mode=kaggle_input , output_shape=lambda x: (BATCH_SIZE*4*N_INPUT_VARIATION, NUM_INPUT_FEATURES, PART_SIZE, PART_SIZE) , arguments={'part_size':PART_SIZE, 'n_input_var': N_INPUT_VARIATION, 'include_flip':True, 'random_flip':False}  ))
+model.add(Merge([model1, model2], mode=kaggle_input , output_shape=lambda x: (BATCH_SIZE*4*N_INPUT_VARIATION, NUM_INPUT_FEATURES, PART_SIZE, PART_SIZE) , arguments={'part_size':PART_SIZE, 'n_input_var': N_INPUT_VARIATION, 'include_flip':False, 'random_flip':True}  ))
 
 if debug : print model.output_shape
 
@@ -297,12 +297,13 @@ model.add(Lambda(function=kaggle_MultiRotMergeLayer_output, output_shape=lambda 
 if debug : print model.output_shape
 
 #model.add(Dense(output_dim=4096, init=functools.partial(initializations.normal, scale=0.001) )) 
-model.add(Dense(output_dim=4096, weights = dense_weight_init_values(model.output_shape[-1],4096) )) 
+model.add(Dense(output_dim=4096, weights = dense_weight_init_values(4096,4096) )) 
 model.add(Dropout(0.5))
 model.add(Reshape((4096,1))) 
 model.add(MaxPooling1D())
 model.add(Reshape((2048,)))
-model.add(Dense(output_dim=4096, weights = dense_weight_init_values(model.output_shape[-1],4096) ))
+#model.add(Dropout(0.))
+model.add(Dense(output_dim=4096, weights = dense_weight_init_values(2048,4096) ))
 
 if debug : print model.output_shape
 
@@ -313,8 +314,10 @@ model.add(MaxPooling1D())
 if debug : print model.output_shape
 
 model.add(Reshape((2048,)))
-model.add(Dense(output_dim=37, weights = dense_weight_init_values(model.output_shape[-1],37 ,w_std = 0.01 , b_init_val = 0.1 ) ))
+#model.add(Dropout(0.))
+model.add(Dense(output_dim=37, weights = dense_weight_init_values(2048,37 ,w_std = 0.01 , b_init_val = 0.1 ) ))
 model.add(Dropout(0.5))
+#model.add(Dropout(0.))
 
 if debug : print model.output_shape
 
@@ -423,9 +426,17 @@ for e in xrange(NUM_CHUNKS):
     	l0_45_input_var= xs_chunk[1][b*BATCH_SIZE:(b+1)*BATCH_SIZE]
 	l6_target_var=  y_chunk[b*BATCH_SIZE:(b+1)*BATCH_SIZE]
 	
-	if ((e + 1) % VALIDATE_EVERY) == 0: loss_test = model_inUse.test_on_batch([l0_input_var,l0_45_input_var], l6_target_var )[0]
+
 	lossaccuracy = model_inUse.train_on_batch( [l0_input_var,l0_45_input_var] , l6_target_var )
+	if ((e + 1) % VALIDATE_EVERY) == 0: loss_test = model_inUse.test_on_batch([l0_input_var,l0_45_input_var], l6_target_var )[0]	
 	loss = lossaccuracy[0]
+
+	if debug and not b and ((e + 1) % VALIDATE_EVERY) == 0: 
+		print 'test predictions'
+		test_predictions = model_inUse.predict_on_batch( [l0_input_var,l0_45_input_var] )
+		print 'max: %s' % np.amax(test_predictions)
+		print 'min: %s' % np.amin(test_predictions)
+		print 'std: %s' % np.std(test_predictions)
 
         losses.append(loss)
         if ((e + 1) % VALIDATE_EVERY) == 0: losses_test.append(loss_test)

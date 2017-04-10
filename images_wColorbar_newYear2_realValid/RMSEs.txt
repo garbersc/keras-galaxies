@@ -1,0 +1,86 @@
+valid(half):
+  MSE (last iteration): 0.081770
+  MSE (augmented):      0.080913  RMSE/mean: 0.592387 
+  MSE output wise (augmented):
+    output smooth (0):  0.122453  RMSE/mean: 0.282068 
+    output featureOrdisk (1):   0.126282  RMSE/mean: 0.233632 
+    output NoGalaxy (2):        0.028970  RMSE/mean: 1.14255 
+    output EdgeOnYes (3):       0.071793  RMSE/mean: 0.688135 
+    output EdgeOnNo (4):        0.128988  RMSE/mean: 0.295716 
+    output BarYes (5):  0.090579  RMSE/mean: 0.87755 
+    output BarNo (6):   0.134020  RMSE/mean: 0.4025 
+    output SpiralYes (7):       0.123371  RMSE/mean: 0.56617 
+    output SpiralNo (8):        0.130477  RMSE/mean: 0.597742 
+    output BulgeNo (9):         0.057884  RMSE/mean: 1.37013 
+    output BulgeJust (10):      0.102647  RMSE/mean: 0.569969 
+    output BulgeObvious (11):   0.110551  RMSE/mean: 0.622805 
+    output BulgDominant (12):   0.050525  RMSE/mean: 1.39023 
+    output OddYes (13):         0.105701  RMSE/mean: 0.458737 
+    output OddNo (14):  0.105701  RMSE/mean: 0.137348 
+    output RoundCompletly (15):         0.081776  RMSE/mean: 0.469719 
+    output RoundBetween (16):   0.094336  RMSE/mean: 0.454692 
+    output RoundCigar (17):     0.048511  RMSE/mean: 0.923 
+    output Ring (18):   0.052001  RMSE/mean: 1.56207 
+    output Lense (19):  0.025996  RMSE/mean: 1.87747 
+    output Disturbed (20):      0.043607  RMSE/mean: 1.34305 
+    output Irregular (21):      0.051281  RMSE/mean: 1.25744 
+    output Other (22):  0.056576  RMSE/mean: 0.879419 
+    output Merger (23):         0.053595  RMSE/mean: 1.26525 
+    output DustLane (24):       0.020160  RMSE/mean: 6.04029 
+    output BulgeRound (25):     0.062688  RMSE/mean: 0.976992 
+    output BlulgeBoxy (26):     0.027064  RMSE/mean: 2.60016 
+    output BulgeNo2 (27):       0.043179  RMSE/mean: 1.45101 
+    output SpiralTight (28):    0.089875  RMSE/mean: 0.947062 
+    output SpiralMedium (29):   0.076034  RMSE/mean: 0.903626 
+    output SpiralLoose (30):    0.058911  RMSE/mean: 1.5159 
+    output Spiral1Arm (31):     0.046249  RMSE/mean: 2.81735 
+    output Spiral2Arm (32):     0.100988  RMSE/mean: 1.05333 
+    output Spiral3Arm (33):     0.049030  RMSE/mean: 2.83005 
+    output Spiral4Arm (34):     0.029181  RMSE/mean: 4.03949 
+    output SpiralMoreArms (35):         0.029273  RMSE/mean: 4.07118 
+    output SpiralCantTell (36):         0.081292  RMSE/mean: 1.1004 
+
+
+train:
+
+  MSE (last iteration): 0.083783
+  MSE (augmented):      0.079546  RMSE/mean: 0.582613
+  MSE output wise (augmented):
+    output smooth (0):  0.119615  RMSE/mean: 0.276712 
+    output featureOrdisk (1):   0.123221  RMSE/mean: 0.227109 
+    output NoGalaxy (2):        0.027845  RMSE/mean: 1.10658 
+    output EdgeOnYes (3):       0.070436  RMSE/mean: 0.659272 
+    output EdgeOnNo (4):        0.125612  RMSE/mean: 0.288282 
+    output BarYes (5):  0.089712  RMSE/mean: 0.874648 
+    output BarNo (6):   0.132630  RMSE/mean: 0.398102 
+    output SpiralYes (7):       0.120567  RMSE/mean: 0.560051 
+    output SpiralNo (8):        0.128880  RMSE/mean: 0.584631 
+    output BulgeNo (9):         0.054188  RMSE/mean: 1.33157 
+    output BulgeJust (10):      0.100806  RMSE/mean: 0.558229 
+    output BulgeObvious (11):   0.108235  RMSE/mean: 0.608724 
+    output BulgDominant (12):   0.052060  RMSE/mean: 1.42074 
+    output OddYes (13):         0.104613  RMSE/mean: 0.450265 
+    output OddNo (14):  0.104613  RMSE/mean: 0.136275 
+    output RoundCompletly (15):         0.078098  RMSE/mean: 0.460684 
+    output RoundBetween (16):   0.091218  RMSE/mean: 0.439144 
+    output RoundCigar (17):     0.047762  RMSE/mean: 0.867945 
+    output Ring (18):   0.050437  RMSE/mean: 1.44149 
+    output Lense (19):  0.025920  RMSE/mean: 1.92895 
+    output Disturbed (20):      0.043740  RMSE/mean: 1.33039 
+    output Irregular (21):      0.049077  RMSE/mean: 1.22714 
+    output Other (22):  0.056947  RMSE/mean: 0.880135 
+    output Merger (23):         0.053007  RMSE/mean: 1.24975 
+    output DustLane (24):       0.022892  RMSE/mean: 5.83606 
+    output BulgeRound (25):     0.062388  RMSE/mean: 0.991243 
+    output BlulgeBoxy (26):     0.027144  RMSE/mean: 2.54067 
+    output BulgeNo2 (27):       0.044175  RMSE/mean: 1.32994 
+    output SpiralTight (28):    0.087309  RMSE/mean: 0.955623
+    output SpiralMedium (29):   0.075591  RMSE/mean: 0.901573
+    output SpiralLoose (30):    0.060455  RMSE/mean: 1.50866 
+    output Spiral1Arm (31):     0.044820  RMSE/mean: 2.93117 
+    output Spiral2Arm (32):     0.098027  RMSE/mean: 1.03927 
+    output Spiral3Arm (33):     0.050463  RMSE/mean: 2.87669 
+    output Spiral4Arm (34):     0.030110  RMSE/mean: 3.95259 
+    output SpiralMoreArms (35):         0.030794  RMSE/mean: 4.41623 
+    output SpiralCantTell (36):         0.080695  RMSE/mean: 1.09742
+

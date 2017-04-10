@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 
 #data=np.loadtxt(fname="trainingNmbrs_christmas.txt",delimiter=",")
-data=np.loadtxt(fname="trainingNmbrs_keras_maxout_start_w_winsolWeights_noDropout.txt",delimiter=",")
+data=np.loadtxt(fname="trainingNmbrs_keras_adam_expLR.txt",delimiter=",")
 data=data.transpose()
 
 print("adjusting rounds...")
@@ -20,14 +20,14 @@ for i in xrange(1,rounds.shape[0]):
 print("done")
 
 trainLoss=data[2]
-validLoss=data[3]
-validLoss_weighted=data[4]
+validLoss=data[5]
+validLoss_weighted=data[6]
 
 #trainP = plt.plot( rounds, trainLoss, 'ro',label="train")
 #validP = plt.plot(rounds, validLoss, 'bo',label="valid")
 trainP = plt.plot(  xrange(0,rounds.shape[0]), trainLoss, 'ro',label="train")
 validP = plt.plot( xrange(0,rounds.shape[0]), validLoss, 'go',label="valid")
-#validP = plt.plot( xrange(0,rounds.shape[0]), validLoss_weighted, 'bo',label="LL")
+validP = plt.plot( xrange(0,rounds.shape[0]), validLoss_weighted, 'bo',label="sliced_accuracy")
 
 plt.legend([trainP, validP],["train","valid"])
 

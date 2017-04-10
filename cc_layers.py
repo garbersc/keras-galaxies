@@ -51,6 +51,8 @@ class CudaConvnetConv2DLayer(object):
 
         self.filter_shape = (self.input_shape[0], filter_size, filter_size, n_filters)
 
+	print self.filter_shape
+
         self.W = layers.shared_single(4) # theano.shared(np.random.randn(*self.filter_shape).astype(np.float32) * self.weights_std)
 
         if self.untie_biases:

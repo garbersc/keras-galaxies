@@ -1,4 +1,5 @@
-import numpy as np 
+import sys
+import numpy as np
 from scipy import ndimage
 import glob
 import itertools
@@ -13,13 +14,12 @@ import Queue
 import multiprocessing as mp
 
 
-num_train = 61578 # 70948
-num_test = 79975 # 79971
+num_train = 61578  # 70948
+num_test = 79975  # 79971
 
 
 train_ids = np.load("data/train_ids.npy")
 test_ids = np.load("data/test_ids.npy")
-
 
 
 def load_images_from_jpg(subset="train", downsample_factor=None, normalise=True, from_ram=False):
@@ -28,12 +28,13 @@ def load_images_from_jpg(subset="train", downsample_factor=None, normalise=True,
     else:
         pattern = "data/raw/images_%s_rev1/*.jpg"
     paths = glob.glob(pattern % subset)
-    paths.sort() # alphabetic ordering is used everywhere.
+    paths.sort()  # alphabetic ordering is used everywhere.
     for path in paths:
         # img = ndimage.imread(path)
         img = skimage.io.imread(path)
         if normalise:
-            img = img.astype('float32') / 255.0 # normalise and convert to float
+            # normalise and convert to float
+            img = img.astype('float32') / 255.0
 
         if downsample_factor is None:
             yield img
@@ -44,7 +45,6 @@ def load_images_from_jpg(subset="train", downsample_factor=None, normalise=True,
 load_images = load_images_from_jpg
 
 
-
 ### data loading, chunking ###
 
 def images_gen(id_gen, *args, **kwargs):
@@ -53,19 +53,19 @@ def images_gen(id_gen, *args, **kwargs):
 
 
 def load_image(img_id, subset='train', normalise=True, from_ram=False):
-        if from_ram:
-            path = "/dev/shm/images_%s_rev1/%d.jpg" % (subset, img_id)
-        else:
-            path = "data/raw/images_%s_rev1/%d.jpg" % (subset, img_id)
-        # print "loading %s" % path # TODO DEBUG
-        img = skimage.io.imread(path)
-        if normalise:
-            img = img.astype('float32') / 255.0 # normalise and convert to float
-        return img
+    if from_ram:
+        path = "/dev/shm/images_%s_rev1/%d.jpg" % (subset, img_id)
+    else:
+        path = "data/raw/images_%s_rev1/%d.jpg" % (subset, img_id)
+    # print "loading %s" % path # TODO DEBUG
+    img = skimage.io.imread(path)
+    if normalise:
+        img = img.astype('float32') / 255.0  # normalise and convert to float
+    return img
 
 
-def cycle(l, shuffle=True): # l should be a NUMPY ARRAY of ids
-    l2 = list(l) # l.copy() # make a copy to avoid changing the input
+def cycle(l, shuffle=True):  # l should be a NUMPY ARRAY of ids
+    l2 = list(l)  # l.copy() # make a copy to avoid changing the input
     while True:
         if shuffle:
             np.random.shuffle(l2)
@@ -84,19 +84,22 @@ def chunks_gen(images_gen, shape=(100, 424, 424, 3)):
     size = shape[0]
 
     k = 0
-    for image in images_gen: 
+    for image in images_gen:
         chunk[k] = image
         k += 1
 
         if k >= size:
-            yield chunk, size # return the chunk as well as its size (this is useful because the final chunk may be smaller)
+            # return the chunk as well as its size (this is useful because the
+            # final chunk may be smaller)
+            yield chunk, size
             chunk = np.zeros(shape)
             k = 0
 
     # last bit of chunk
-    if k > 0: # there is leftover data
-        yield chunk, k # the chunk is a fullsize array, but only the first k entries are valid.
-
+    if k > 0:  # there is leftover data
+        # the chunk is a fullsize array, but only the first k entries are
+        # valid.
+        yield chunk, k
 
 
 ### threaded generator with a buffer ###
@@ -108,32 +111,31 @@ def _generation_thread(source_gen, buffer, buffer_lock, buffer_size=2, sleep_tim
             # print "DEBUG: loader: lock acquired, checking if buffer is full"
             buffer_is_full = (len(buffer) >= buffer_size)
             # print "DEBUG: loader: buffer length is %d" % len(buffer)
-            
+
         if buffer_is_full:
             # buffer is full, wait.
             # this if-clause has to be outside the with-clause, else the lock is held for no reason!
             # print "DEBUG: loader: buffer is full, waiting"
-            
-            #print "buffer is full, exiting (DEBUG)"
-            #break
+
+            # print "buffer is full, exiting (DEBUG)"
+            # break
             time.sleep(sleep_time)
         else:
             try:
                 data = source_gen.next()
             except StopIteration:
-                break # no more data. STAHP.
+                break  # no more data. STAHP.
             # print "DEBUG: loader: loading %s" % current_path
-     
+
             # stuff the data in the buffer as soon as it is free
             # print "DEBUG: loader: acquiring lock"
             with buffer_lock:
                 # print "DEBUG: loader: lock acquired, adding data to buffer"
                 buffer.append(data)
-                # print "DEBUG: loader: buffer length went from %d to %d" % (len(buffer) - 1, len(buffer))
+                # print "DEBUG: loader: buffer length went from %d to %d" %
+                # (len(buffer) - 1, len(buffer))
 
-            
-    
-    
+
 def threaded_gen(source_gen, buffer_size=2, sleep_time=1):
     """
     Generator that runs a slow source generator in a separate thread.
@@ -141,18 +143,20 @@ def threaded_gen(source_gen, buffer_size=2, sleep_time=1):
     """
     buffer_lock = threading.Lock()
     buffer = []
-    
-    thread = threading.Thread(target=_generation_thread, args=(source_gen, buffer, buffer_lock, buffer_size, sleep_time))
+
+    thread = threading.Thread(target=_generation_thread, args=(
+        source_gen, buffer, buffer_lock, buffer_size, sleep_time))
     thread.setDaemon(True)
     thread.start()
-    
+
     while True:
         # print "DEBUG: generator: acquiring lock"
         with buffer_lock:
-            # print "DEBUG: generator: lock acquired, checking if buffer is empty"
+            # print "DEBUG: generator: lock acquired, checking if buffer is
+            # empty"
             buffer_is_empty = (len(buffer) == 0)
             # print "DEBUG: generator: buffer length is %d" % len(buffer)
-            
+
         if buffer_is_empty:
             # there's nothing in the buffer, so wait a bit.
             # this if-clause has to be outside the with-clause, else the lock is held for no reason!
@@ -167,9 +171,11 @@ def threaded_gen(source_gen, buffer_size=2, sleep_time=1):
         else:
             # print "DEBUG: generator: acquiring lock"
             with buffer_lock:
-                # print "DEBUG: generator: lock acquired, removing data from buffer, yielding"
+                # print "DEBUG: generator: lock acquired, removing data from
+                # buffer, yielding"
                 data = buffer.pop(0)
-                # print "DEBUG: generator: buffer length went from %d to %d" % (len(buffer) + 1, len(buffer))
+                # print "DEBUG: generator: buffer length went from %d to %d" %
+                # (len(buffer) + 1, len(buffer))
             yield data
 
 
@@ -191,11 +197,11 @@ def im_flip(img, flip_h, flip_v):
 # this old version uses ndimage, which is a bit unreliable (lots of artifacts)
 def im_rotate_old(img, angle):
     # downsampling afterwards is recommended
-    return ndimage.rotate(img, angle, axes=(0,1), mode='reflect', reshape=False)
+    return ndimage.rotate(img, angle, axes=(0, 1), mode='reflect', reshape=False)
 
 
 def im_translate(img, shift_x, shift_y):
-    ## this could probably be a lot easier... meh.
+    # this could probably be a lot easier... meh.
     # downsampling afterwards is recommended
     translate_img = np.zeros_like(img, dtype=img.dtype)
 
@@ -225,11 +231,13 @@ def im_rescale(img, scale_factor):
     if scale_factor >= 1.0:
         shift_x = (zoomed.shape[0] - img.shape[0]) // 2
         shift_y = (zoomed.shape[1] - img.shape[1]) // 2
-        zoomed_img[:,:] = zoomed[shift_x:shift_x+img.shape[0], shift_y:shift_y+img.shape[1]]
+        zoomed_img[:, :] = zoomed[shift_x:shift_x +
+                                  img.shape[0], shift_y:shift_y + img.shape[1]]
     else:
         shift_x = (img.shape[0] - zoomed.shape[0]) // 2
         shift_y = (img.shape[1] - zoomed.shape[1]) // 2
-        zoomed_img[shift_x:shift_x+zoomed.shape[0], shift_y:shift_y+zoomed.shape[1]] = zoomed
+        zoomed_img[shift_x:shift_x + zoomed.shape[0],
+                   shift_y:shift_y + zoomed.shape[1]] = zoomed
 
     return zoomed_img
 
@@ -248,11 +256,13 @@ def im_rescale_old(img, scale_factor):
     if scale_factor >= 1.0:
         shift_x = (zoomed.shape[0] - img.shape[0]) // 2
         shift_y = (zoomed.shape[1] - img.shape[1]) // 2
-        zoomed_img[:,:] = zoomed[shift_x:shift_x+img.shape[0], shift_y:shift_y+img.shape[1]]
+        zoomed_img[:, :] = zoomed[shift_x:shift_x +
+                                  img.shape[0], shift_y:shift_y + img.shape[1]]
     else:
         shift_x = (img.shape[0] - zoomed.shape[0]) // 2
         shift_y = (img.shape[1] - zoomed.shape[1]) // 2
-        zoomed_img[shift_x:shift_x+zoomed.shape[0], shift_y:shift_y+zoomed.shape[1]] = zoomed
+        zoomed_img[shift_x:shift_x + zoomed.shape[0],
+                   shift_y:shift_y + zoomed.shape[1]] = zoomed
 
     return zoomed_img
 
@@ -260,8 +270,9 @@ def im_rescale_old(img, scale_factor):
 def im_downsample(img, ds_factor):
     return img[::ds_factor, ::ds_factor]
 
+
 def im_downsample_smooth(img, ds_factor):
-    return skimage.transform.rescale(img, 1.0/ds_factor)
+    return skimage.transform.rescale(img, 1.0 / ds_factor)
     # ndimage is unreliable, don't use it
     # channels = [ndimage.zoom(img[:,:, k], 1.0/ds_factor) for k in range(3)]
     # return np.dstack(channels)
@@ -277,7 +288,7 @@ def im_crop(img, ds_factor):
     shift_x = (size_x - cropped_size_x) // 2
     shift_y = (size_y - cropped_size_y) // 2
 
-    return img[shift_x:shift_x+cropped_size_x, shift_y:shift_y+cropped_size_y]
+    return img[shift_x:shift_x + cropped_size_x, shift_y:shift_y + cropped_size_y]
 
 
 def im_lcn(img, sigma_mean, sigma_std):
@@ -290,7 +301,6 @@ def im_lcn(img, sigma_mean, sigma_std):
     return img_centered / stds
 
 
-
 rgb2yuv = np.array([[0.299, 0.587, 0.114],
                     [-0.147, -0.289, 0.436],
                     [0.615, -0.515, -0.100]])
@@ -298,9 +308,9 @@ rgb2yuv = np.array([[0.299, 0.587, 0.114],
 yuv2rgb = np.linalg.inv(rgb2yuv)
 
 
-
 def im_rgb_to_yuv(img):
     return np.tensordot(img, rgb2yuv, [[2], [0]])
+
 
 def im_yuv_to_rgb(img):
     return np.tensordot(img, yuv2rgb, [[2], [0]])
@@ -314,7 +324,7 @@ def im_lcn_color(img, sigma_mean, sigma_std, std_bias):
     return im_yuv_to_rgb(img_yuv)
 
 
-def im_norm_01(img): # this is just for visualisation
+def im_norm_01(img):  # this is just for visualisation
     return (img - img.min()) / (img.max() - img.min())
 
 
@@ -324,7 +334,8 @@ def im_lcn_bias(img, sigma_mean, sigma_std, std_bias):
     """
     means = ndimage.gaussian_filter(img, sigma_mean)
     img_centered = img - means
-    stds = np.sqrt(ndimage.gaussian_filter(img_centered**2, sigma_std) + std_bias)
+    stds = np.sqrt(ndimage.gaussian_filter(
+        img_centered**2, sigma_std) + std_bias)
     return img_centered / stds
 
 
@@ -332,22 +343,23 @@ def im_luma(img):
     return np.tensordot(img, np.array([0.299, 0.587, 0.114], dtype='float32'), [[2], [0]])
 
 
-def chunk_luma(chunk): # faster than doing it per image, probably
+def chunk_luma(chunk):  # faster than doing it per image, probably
     return np.tensordot(chunk, np.array([0.299, 0.587, 0.114], dtype='float32'), [[3], [0]])
 
 
-def im_normhist(img, num_bins=256): # from http://www.janeriksolem.net/2009/06/histogram-equalization-with-python-and.html
+# from
+# http://www.janeriksolem.net/2009/06/histogram-equalization-with-python-and.html
+def im_normhist(img, num_bins=256):
     # this function only makes sense for grayscale images.
     img_flat = img.flatten()
     imhist, bins = np.histogram(img_flat, num_bins, normed=True)
-    cdf = imhist.cumsum() #cumulative distribution function
-    cdf = 255 * cdf / cdf[-1] #normalize
+    cdf = imhist.cumsum()  # cumulative distribution function
+    cdf = 255 * cdf / cdf[-1]  # normalize
 
-    #use linear interpolation of cdf to find new pixel values
+    # use linear interpolation of cdf to find new pixel values
     im2 = np.interp(img_flat, bins[:-1], cdf)
 
     return im2.reshape(img.shape)
-
 
 
 def chunk_lcn(chunk, sigma_mean, sigma_std, std_bias=0.0, rescale=1.0):
@@ -359,15 +371,17 @@ def chunk_lcn(chunk, sigma_mean, sigma_std, std_bias=0.0, rescale=1.0):
     """
     means = np.zeros(chunk.shape, dtype=chunk.dtype)
     for k in xrange(len(chunk)):
-        means[k] = skimage.filters.gaussian_filter(chunk[k], sigma_mean, multichannel=True)
+        means[k] = skimage.filters.gaussian_filter(
+            chunk[k], sigma_mean, multichannel=True)
 
-    chunk = chunk - means # centering
-    del means # keep memory usage in check
+    chunk = chunk - means  # centering
+    del means  # keep memory usage in check
 
     variances = np.zeros(chunk.shape, dtype=chunk.dtype)
     chunk_squared = chunk**2
     for k in xrange(len(chunk)):
-        variances[k] = skimage.filters.gaussian_filter(chunk_squared[k], sigma_std, multichannel=True)
+        variances[k] = skimage.filters.gaussian_filter(
+            chunk_squared[k], sigma_std, multichannel=True)
 
     chunk = chunk / np.sqrt(variances + std_bias)
 
@@ -376,18 +390,16 @@ def chunk_lcn(chunk, sigma_mean, sigma_std, std_bias=0.0, rescale=1.0):
     # TODO: make this 100x faster lol. otherwise it's not usable.
 
 
-
 def chunk_gcn(chunk, rescale=1.0):
-    means = chunk.reshape(chunk.shape[0], chunk.shape[1] * chunk.shape[2], chunk.shape[3]).mean(1).reshape(chunk.shape[0], 1, 1, chunk.shape[3])
+    means = chunk.reshape(chunk.shape[0], chunk.shape[1] * chunk.shape[2],
+                          chunk.shape[3]).mean(1).reshape(chunk.shape[0], 1, 1, chunk.shape[3])
     chunk -= means
 
-    stds = chunk.reshape(chunk.shape[0], chunk.shape[1] * chunk.shape[2], chunk.shape[3]).std(1).reshape(chunk.shape[0], 1, 1, chunk.shape[3])
+    stds = chunk.reshape(chunk.shape[0], chunk.shape[1] * chunk.shape[2],
+                         chunk.shape[3]).std(1).reshape(chunk.shape[0], 1, 1, chunk.shape[3])
     chunk /= stds
 
     return chunk
-
-
-
 
 
 def array_chunker_gen(data_list, chunk_size, loop=True, truncate=True, shuffle=True):
@@ -399,17 +411,19 @@ def array_chunker_gen(data_list, chunk_size, loop=True, truncate=True, shuffle=T
                 np.random.shuffle(data)
 
         if truncate:
-            num_chunks = data_list[0].shape[0] // chunk_size # integer division, we only want whole chunks
+            # integer division, we only want whole chunks
+            num_chunks = data_list[0].shape[0] // chunk_size
         else:
-            num_chunks = int(np.ceil(data_list[0].shape[0] / float(chunk_size)))
+            num_chunks = int(
+                np.ceil(data_list[0].shape[0] / float(chunk_size)))
 
         for k in xrange(num_chunks):
-            idx_range = slice(k * chunk_size, (k+1) * chunk_size, None)
+            idx_range = slice(k * chunk_size, (k + 1) * chunk_size, None)
             chunks = []
             for data in data_list:
                 c = data[idx_range]
                 current_size = c.shape[0]
-                if current_size < chunk_size: # incomplete chunk, pad zeros
+                if current_size < chunk_size:  # incomplete chunk, pad zeros
                     cs = list(c.shape)
                     cs[0] = chunk_size
                     c_full = np.zeros(tuple(cs), dtype=c.dtype)
@@ -423,8 +437,7 @@ def array_chunker_gen(data_list, chunk_size, loop=True, truncate=True, shuffle=T
             break
 
 
-
-def load_gz(path): # load a .npy.gz file
+def load_gz(path):  # load a .npy.gz file
     if path.endswith(".gz"):
         f = gzip.open(path, 'rb')
         return np.load(f)
@@ -432,13 +445,13 @@ def load_gz(path): # load a .npy.gz file
         return np.load(path)
 
 
-def save_gz(path, arr): # save a .npy.gz file
+def save_gz(path, arr):  # save a .npy.gz file
     tmp_path = os.path.join("/tmp", os.path.basename(path) + ".tmp.npy")
-    # tmp_path = path + ".tmp.npy" # temp file needs to end in .npy, else np.load adds it!
+    # tmp_path = path + ".tmp.npy" # temp file needs to end in .npy, else
+    # np.load adds it!
     np.save(tmp_path, arr)
     os.system("gzip -c %s > %s" % (tmp_path, path))
     os.remove(tmp_path)
-
 
 
 def numpy_loader_gen(paths_gen, shuffle=True):
@@ -452,7 +465,8 @@ def numpy_loader_gen(paths_gen, shuffle=True):
                 np.random.set_state(rs)
                 np.random.shuffle(data)
 
-        yield data_list, data_list[0].shape[0] # 'chunk' length needs to be the last entry
+        # 'chunk' length needs to be the last entry
+        yield data_list, data_list[0].shape[0]
 
 
 def augmented_data_gen(path_patterns):
@@ -470,7 +484,8 @@ def post_augmented_data_gen(path_patterns):
         # print "DEBUG: post augmenting..."
         start_time = time.time()
         data_list = post_augment_chunk(data_list)
-        # print "DEBUG: post augmenting done. took %.4f seconds." % (time.time() - start_time)
+        # print "DEBUG: post augmenting done. took %.4f seconds." %
+        # (time.time() - start_time)
         yield data_list, chunk_length
 
 
@@ -486,7 +501,7 @@ def post_augment_chunk(data_list):
 
     for x in data_list:
         if x.ndim <= 3:
-            continue # don't apply the transformations to anything that isn't an image
+            continue  # don't apply the transformations to anything that isn't an image
 
         for k in xrange(chunk_size):
             x_k = np.rot90(x[k], k=rotations[k])
@@ -500,7 +515,6 @@ def post_augment_chunk(data_list):
             x[k] = x_k
 
     return data_list
-
 
 
 ### better threaded/buffered generator using the Queue class ###
@@ -529,17 +543,18 @@ def buffered_gen(source_gen, buffer_size=2, sleep_time=1):
                 break
 
             buffer.put(data)
-    
-    thread = threading.Thread(target=_buffered_generation_thread, args=(source_gen, buffer))
+
+    thread = threading.Thread(
+        target=_buffered_generation_thread, args=(source_gen, buffer))
     thread.setDaemon(True)
     thread.start()
-    
+
     while True:
         yield buffer.get()
         buffer.task_done()
 
 
-### better version using multiprocessing, because the threading module acts weird,
+# better version using multiprocessing, because the threading module acts weird,
 # the background thread seems to slow down significantly. When the main thread is
 # busy, i.e. computation time is not divided fairly.
 
@@ -555,22 +570,30 @@ def buffered_gen_mp(source_gen, buffer_size=2, sleep_time=1):
             # we block here when the buffer is full. There's no point in generating more data
             # when the buffer is full, it only causes extra memory usage and effectively
             # increases the buffer size by one.
+            # fullBuffer=False
             while buffer.full():
+                # if not fullBuffer:
+                #	time1=time.time()
+                #	fullBuffer=True
                 # print "DEBUG: buffer is full, waiting to generate more data."
                 time.sleep(sleep_time)
+
+            # if fullBuffer:
+                # print "sleeped for %.2f" % (time.time()-time1)
 
             try:
                 data = source_gen.next()
             except StopIteration:
                 # print "DEBUG: OUT OF DATA, CLOSING BUFFER"
-                buffer.close() # signal that we're done putting data in the buffer
+                buffer.close()  # signal that we're done putting data in the buffer
                 break
 
             buffer.put(data)
-    
-    process = mp.Process(target=_buffered_generation_process, args=(source_gen, buffer))
+
+    process = mp.Process(target=_buffered_generation_process,
+                         args=(source_gen, buffer))
     process.start()
-    
+
     while True:
         try:
             # yield buffer.get()
@@ -582,17 +605,19 @@ def buffered_gen_mp(source_gen, buffer_size=2, sleep_time=1):
                 yield buffer.get(True, timeout=sleep_time)
             except Queue.Empty:
                 if not process.is_alive():
-                    break # no more data is going to come. This is a workaround because the buffer.close() signal does not seem to be reliable.
+                    # no more data is going to come. This is a workaround
+                    # because the buffer.close() signal does not seem to be
+                    # reliable.
+                    break
 
                 # print "DEBUG: queue is empty, waiting..."
-                pass # ignore this, just try again.
+                pass  # ignore this, just try again.
 
-        except IOError: # if the buffer has been closed, calling get() on it will raise IOError.
+        except IOError:  # if the buffer has been closed, calling get() on it will raise IOError.
             # this means that we're done iterating.
-            # print "DEBUG: buffer closed, stopping."
+            print "DEBUG from load_data.buffered_gen_mp: buffer closed, stopping."
+            print sys.exc_info()
             break
-
-
 
 
 def hms(seconds):

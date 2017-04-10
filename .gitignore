@@ -56,10 +56,15 @@ docs/_build/
 
 data/
 *.pyc
+*~
 analysis/
 predictions/
 *.jpeg
 *.jpg
 *.gz
-*.npy
+trainingNmbrs*.txt
+
+# emacs autosave files and hidden files
+\#*
+.*
 

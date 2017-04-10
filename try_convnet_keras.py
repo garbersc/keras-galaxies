@@ -1,5 +1,6 @@
 import theano.sandbox.cuda.basic_ops as sbcuda
 import numpy as np
+# import pandas as pd
 import keras.backend as T
 import load_data
 import realtime_augmentation as ra
@@ -10,18 +11,18 @@ import cPickle as pickle
 from datetime import datetime, timedelta
 
 from keras.models import Sequential, Model
-from keras.layers import Dense, Activation, MaxPooling1D, Dropout, Input, Convolution2D
-from keras.layers.core import Lambda, Flatten, Reshape, Permute
+from keras.layers import Dense, Activation, Convolution2D, MaxPooling2D, MaxPooling1D, Dropout, Input
+from keras.layers.core import Lambda, Flatten, Reshape
 from keras.optimizers import SGD, Adam
 from keras.engine.topology import Merge
 from keras.callbacks import LearningRateScheduler
-from keras import initializations
-import functools
 
-from keras_extra_layers import kerasCudaConvnetPooling2DLayer, kerasCudaConvnetConv2DLayer, fPermute
-from custom_for_keras import kaggle_MultiRotMergeLayer_output, OptimisedDivGalaxyOutput, kaggle_input, kaggle_sliced_accuracy, dense_weight_init_values
+# import matplotlib.pyplot as plt 
+# plt.ion()
+# import utils
 
 debug = False
+predict = False
 
 continueAnalysis = False
 saveAtEveryLearningRate = True
@@ -34,7 +35,7 @@ ra.y_train=y_train
 # split training data into training + a small validation set
 ra.num_train = y_train.shape[0]
 
-ra.num_valid = ra.num_train // 10 # integer division, is defining validation size
+ra.num_valid = ra.num_train // 20 # integer division, is defining validation size
 ra.num_train -= ra.num_valid
 
 ra.y_valid = ra.y_train[ra.num_train:]
@@ -72,12 +73,21 @@ test_indices = np.arange(num_test)
 BATCH_SIZE = 16
 NUM_INPUT_FEATURES = 3
 
-LEARNING_RATE_SCHEDULE = {
+LEARNING_RATE_SCHEDULE = {  #if adam is used the learning rate doesnt follow the schedule
     0: 0.04,
-    1800: 0.004,
-    2300: 0.0004,
+    200: 0.05,
+    400: 0.001,
+    800: 0.0005
+    #500: 0.04,
+    #0: 0.01,
+    #1800: 0.004,
+    #2300: 0.0004,
+   # 0: 0.08,
+   # 50: 0.04,
+   # 2000: 0.008,
+   # 3200: 0.0008,
+   # 4600: 0.0004,
 }
-
 if continueAnalysis:
     LEARNING_RATE_SCHEDULE = {
         0: 0.002,	
@@ -90,8 +100,8 @@ if continueAnalysis:
 
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-CHUNK_SIZE = 10000#1008#10000 # 30000 # this should be a multiple of the batch size, ideally.
-NUM_CHUNKS = 200#1000#7000 #2500 # 3000 # 1500 # 600 # 600 # 600 # 500   
+CHUNK_SIZE = 1008#1008#10000 # 30000 # this should be a multiple of the batch size, ideally.
+NUM_CHUNKS = 10#1000#7000 #2500 # 3000 # 1500 # 600 # 600 # 600 # 500   
 VALIDATE_EVERY = 10 #20 # 12 # 6 # 6 # 6 # 5 # validate only every 5 chunks. MUST BE A DIVISOR OF NUM_CHUNKS!!!
 # else computing the analysis data does not work correctly, since it assumes that the validation set is still loaded.
 print("The training is running for %s chunks, each with %s images. That are about %s epochs. The validation sample contains %s images. \n" % (NUM_CHUNKS,CHUNK_SIZE,CHUNK_SIZE*NUM_CHUNKS / (ra.num_train-CHUNK_SIZE) ,  ra.num_valid ))
@@ -124,10 +134,10 @@ WEIGHTS=WEIGHTS/WEIGHTS[WEIGHTS.argmax()]
 
 GEN_BUFFER_SIZE = 1
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_test.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_no_relu_inConv.txt"
 
-ANALYSIS_PATH = "analysis/final/try_convent_keras_test.pkl"
-WEIGHTS_PATH = "analysis/final/try_convent_keras_weights_test.h5"
+#TARGET_PATH = "predictions/final/try_convnet.csv"
+ANALYSIS_PATH = "analysis/final/try_convent_keras_no_relu_inConv.pkl"
 
 with open(TRAIN_LOSS_SF_PATH, 'a')as f:
 	if continueAnalysis: 
@@ -139,7 +149,7 @@ with open(TRAIN_LOSS_SF_PATH, 'a')as f:
 
 
 if continueAnalysis:
-    print "Loading model-loss data"
+    print "Loading model data"
     analysis = np.load(ANALYSIS_PATH)
 
 print "Set up data loading"
@@ -209,7 +219,7 @@ print "  took %.2f seconds" % (time.time() - start_time)
 
 N_INPUT_VARIATION=2
 
-
+from custom_for_keras import kaggle_MultiRotMergeLayer_output, OptimisedDivGalaxyOutputLayer, kaggle_input, kaggle_sliced_accuracy
 
 print "Build model"
 
@@ -235,30 +245,18 @@ model.add(Merge([model1, model2], mode=kaggle_input , output_shape=lambda x: (BA
 
 if debug : print model.output_shape
 
-model.add(fPermute((1,2,3,0)))
+model.add(Convolution2D(nb_filter=32, nb_row=6, nb_col=6,activation='relu')) #FIXME add relu for conv layers 
+model.add(MaxPooling2D())
+
+model.add(Convolution2D(nb_filter=64, nb_row=5, nb_col=5,activation='relu'))
+model.add(MaxPooling2D())
+
+model.add(Convolution2D(nb_filter=128, nb_row=3, nb_col=3,activation='relu'))
+model.add(Convolution2D(nb_filter=128, nb_row=3, nb_col=3,activation='relu'))
 
 if debug : print model.output_shape
 
-model.add(kerasCudaConvnetConv2DLayer(n_filters=32, filter_size=6 )) 
-if debug : print model.output_shape
-model.add(kerasCudaConvnetPooling2DLayer())
-
-if debug : print model.output_shape
-
-model.add(kerasCudaConvnetConv2DLayer(n_filters=64, filter_size=5)) 
-if debug : print model.output_shape
-model.add(kerasCudaConvnetPooling2DLayer())
-
-model.add(kerasCudaConvnetConv2DLayer(n_filters=128, filter_size=3)) 
-model.add(kerasCudaConvnetConv2DLayer(n_filters=128, filter_size=3,  weights_std=0.1 )) 
-
-if debug : print model.output_shape
-
-model.add(kerasCudaConvnetPooling2DLayer())
-
-if debug : print model.output_shape
-
-model.add(fPermute((3,0,1,2)))
+model.add(MaxPooling2D())
 
 if debug : print model.output_shape
 
@@ -266,12 +264,12 @@ model.add(Lambda(function=kaggle_MultiRotMergeLayer_output, output_shape=lambda 
 
 if debug : print model.output_shape
 
-model.add(Dense(output_dim=4096, weights = dense_weight_init_values(4096,4096) )) #TODO maybe mxaout layers instead, were goes the dropout there?
+model.add(Dense(output_dim=4096, init='uniform')) 
 model.add(Dropout(0.5))
 model.add(Reshape((4096,1))) 
 model.add(MaxPooling1D())
 model.add(Reshape((2048,)))
-model.add(Dense(output_dim=4096, weights = dense_weight_init_values(2048,4096) ))
+model.add(Dense(output_dim=4096, init='uniform'))
 
 if debug : print model.output_shape
 
@@ -282,15 +280,15 @@ model.add(MaxPooling1D())
 if debug : print model.output_shape
 
 model.add(Reshape((2048,)))
-model.add(Dense(output_dim=37, weights = dense_weight_init_values(2048,37 ,w_std = 0.01 , b_init_val = 0.1 ) ))
+model.add(Dense(output_dim=37))
 model.add(Dropout(0.5))
 
 if debug : print model.output_shape
 
 model_seq=model([input_tensor,input_tensor_45])
 
-output_layer_norm = Lambda(function=OptimisedDivGalaxyOutput , output_shape=lambda x: x ,arguments={'mb_size': BATCH_SIZE,'normalised':True,'categorised':CATEGORISED})(model_seq)
-output_layer_noNorm = Lambda(function=OptimisedDivGalaxyOutput , output_shape=lambda x: x ,arguments={'mb_size': BATCH_SIZE,'normalised':False,'categorised':CATEGORISED})(model_seq)
+output_layer_norm = Lambda(function=OptimisedDivGalaxyOutputLayer , output_shape=lambda x: x ,arguments={'mb_size': BATCH_SIZE,'normalised':True,'categorised':CATEGORISED})(model_seq)
+output_layer_noNorm = Lambda(function=OptimisedDivGalaxyOutputLayer , output_shape=lambda x: x ,arguments={'mb_size': BATCH_SIZE,'normalised':False,'categorised':CATEGORISED})(model_seq)
 
 model_norm=Model(input=[input_tensor,input_tensor_45],output=output_layer_norm)
 model_noNorm=Model(input=[input_tensor,input_tensor_45],output=output_layer_noNorm)
@@ -318,12 +316,13 @@ model_noNorm.compile(loss='mean_squared_error', optimizer=SGD(lr=LEARNING_RATE_S
 #model_norm.compile(loss='mean_squared_error', optimizer=adam, metrics=['categorical_accuracy',kaggle_sliced_accuracy])
 #model_noNorm.compile(loss='mean_squared_error', optimizer=adam, metrics=['categorical_accuracy'])
 
-xs_shared = [np.zeros((1,1,1,1), dtype='float32') for _ in xrange(num_input_representations)] 
-y_shared = np.zeros((1,1), dtype='float32')
+xs_shared = [T.variable(np.zeros((1,1,1,1), dtype='float32')) for _ in xrange(num_input_representations)] 
+y_shared = T.variable(np.zeros((1,1), dtype='float32'))
 
-if continueAnalysis:
-    print "Load model weights"
-    model_norm.load_weights(WEIGHTS_PATH)
+
+if continueAnalysis:#TODO
+    print "Load model parameters"
+    #layers.set_param_values(l6, analysis['param_values'])
 
 print "Train model"
 start_time = time.time()
@@ -355,12 +354,16 @@ for e in xrange(NUM_CHUNKS):
         model_inUse = model_noNorm
         #if  USE_LLERROR:  train = train_nonorm_ll
 
+    print "  load training data onto GPU"
+    for x_shared, x_chunk in zip(xs_shared, xs_chunk):
+        x_shared.set_value(x_chunk)
+    y_shared.set_value(y_chunk)
     num_batches_chunk = x_chunk.shape[0] // BATCH_SIZE
 
-    #update learning rate, use chunks on epoch function 
-    lr_callback.model = model_inUse
-    lr_callback.on_epoch_begin(e)
-    if e in LEARNING_RATE_SCHEDULE: print "  setting learning rate to %.6f" % current_lr
+    #update learning rate, use chunks on epoch function #FIXME reanable lr schedule
+    #lr_callback.model = model_inUse
+    #lr_callback.on_epoch_begin(e)
+    #if e in LEARNING_RATE_SCHEDULE: print "  setting learning rate to %.6f" % current_lr
 
     print "  batch SGD"
     losses = []
@@ -369,12 +372,16 @@ for e in xrange(NUM_CHUNKS):
     losses_weighted = []
     for b in xrange(num_batches_chunk):
 
-	l0_input_var= xs_chunk[0][b*BATCH_SIZE:(b+1)*BATCH_SIZE]
-    	l0_45_input_var= xs_chunk[1][b*BATCH_SIZE:(b+1)*BATCH_SIZE]
-	l6_target_var=  y_chunk[b*BATCH_SIZE:(b+1)*BATCH_SIZE]
+	l0_input_var= xs_shared[0][b*BATCH_SIZE:(b+1)*BATCH_SIZE]
+    	l0_45_input_var= xs_shared[1][b*BATCH_SIZE:(b+1)*BATCH_SIZE]
+	l6_target_var=  y_shared[b*BATCH_SIZE:(b+1)*BATCH_SIZE]
+
+	l0_input_var_eval=l0_input_var.eval()
+	l0_45_input_var_eval=l0_45_input_var.eval()
+	l6_target_var_eval=l6_target_var.eval()
 	
-	if ((e + 1) % VALIDATE_EVERY) == 0: loss_test = model_inUse.test_on_batch([l0_input_var,l0_45_input_var], l6_target_var )[0]
-	lossaccuracy = model_inUse.train_on_batch( [l0_input_var,l0_45_input_var] , l6_target_var )
+	if ((e + 1) % VALIDATE_EVERY) == 0: loss_test = model_inUse.test_on_batch([l0_input_var_eval,l0_45_input_var_eval], l6_target_var_eval )[0]
+	lossaccuracy = model_inUse.train_on_batch( [l0_input_var_eval,l0_45_input_var_eval] , l6_target_var_eval )
 	loss = lossaccuracy[0]
 
         losses.append(loss)
@@ -395,6 +402,10 @@ for e in xrange(NUM_CHUNKS):
     if ((e + 1) % VALIDATE_EVERY) == 0:
         print
         print "VALIDATING"
+        print "  load validation data onto GPU"
+        for x_shared, x_valid in zip(xs_shared, xs_valid):
+            x_shared.set_value(x_valid)
+        y_shared.set_value(y_valid)
 
         print "  compute losses"
         losses = []
@@ -404,12 +415,19 @@ for e in xrange(NUM_CHUNKS):
 	losses_ll = []
 	losses_weighted = []
         for b in xrange(num_batches_valid):
+            # if b % 1000 == 0:
+            #     print "  batch %d/%d" % (b + 1, num_batches_valid)
 
-	    l0_input_var= xs_valid[0][b*BATCH_SIZE:(b+1)*BATCH_SIZE]
-    	    l0_45_input_var= xs_valid[1][b*BATCH_SIZE:(b+1)*BATCH_SIZE]
-	    l6_target_var=  y_valid[b*BATCH_SIZE:(b+1)*BATCH_SIZE]
 
-	    lossaccuracy = model_norm.test_on_batch([l0_input_var,l0_45_input_var] , l6_target_var)
+	    l0_input_var= xs_shared[0][b*BATCH_SIZE:(b+1)*BATCH_SIZE]
+    	    l0_45_input_var= xs_shared[1][b*BATCH_SIZE:(b+1)*BATCH_SIZE]
+	    l6_target_var=  y_shared[b*BATCH_SIZE:(b+1)*BATCH_SIZE]
+
+	    l0_input_var_eval=l0_input_var.eval()
+	    l0_45_input_var_eval=l0_45_input_var.eval()
+	    l6_target_var_eval=l6_target_var.eval()
+
+	    lossaccuracy = model_norm.test_on_batch([l0_input_var_eval,l0_45_input_var_eval] , l6_target_var_eval)
 	    #loss = model_norm.test_on_batch([l0_input_var,l0_45_input_var] , l6_target_var )[0]	
 
 	    loss = lossaccuracy[0]
@@ -438,6 +456,9 @@ for e in xrange(NUM_CHUNKS):
         mean_sliced_accuracy = np.mean(sliced_accuracies)
         mean_sliced_accuracy_std = np.mean(sliced_accuracies_std)
     	#mean_valid_loss_ll = np.mean(losses_ll)
+
+
+        #if USE_WEIGHTS:  mean_valid_loss_weighted = np.sqrt(np.mean(losses_weighted))
 
         print "  mean validation loss (RMSE):\t\t%.6f" % mean_valid_loss
         print "  mean validation accuracy:\t\t%.6f" % mean_accuracy
@@ -488,7 +509,8 @@ for e in xrange(NUM_CHUNKS):
         			'losses_train': losses_train,
         			'losses_valid': losses_valid
     				}, f, pickle.HIGHEST_PROTOCOL)
-		model_inUse.save_weights(WEIGHTS_PATH)
+		LR_PATH = ((ANALYSIS_PATH.split('.',1)[0]+'toLearningRate%s.h5')%current_lr)
+		model_inUse.save_weights(LR_PATH)
 		
 	with open(TRAIN_LOSS_SF_PATH, 'a')as f:
 	   f.write("#  setting learning rate to %.6f \n" % current_lr )
@@ -498,13 +520,20 @@ for e in xrange(NUM_CHUNKS):
 
 print "Compute predictions on validation set for analysis in batches"
 predictions_list = []
-
+for x_shared, x_valid in zip(xs_shared, xs_valid):
+    x_shared.set_value(x_valid)
+y_shared.set_value(y_valid)
 for b in xrange(num_batches_valid):
+    # if b % 1000 == 0:
+    #     print "  batch %d/%d" % (b + 1, num_batches_valid)
 
-    l0_input_var= xs_valid[0][b*BATCH_SIZE:(b+1)*BATCH_SIZE]
-    l0_45_input_var= xs_valid[1][b*BATCH_SIZE:(b+1)*BATCH_SIZE]
+    l0_input_var= xs_shared[0][b*BATCH_SIZE:(b+1)*BATCH_SIZE]
+    l0_45_input_var= xs_shared[1][b*BATCH_SIZE:(b+1)*BATCH_SIZE]
 
-    predictions = model_norm.predict_on_batch([l0_input_var,l0_45_input_var] )
+    l0_input_var_eval=l0_input_var.eval()
+    l0_45_input_var_eval=l0_45_input_var.eval()
+	
+    predictions = model_norm.predict_on_batch([l0_input_var_eval,l0_45_input_var_eval] )
     predictions_list.append(predictions)
 
 all_predictions = np.vstack(predictions_list)
@@ -526,12 +555,107 @@ with open(ANALYSIS_PATH, 'w') as f:
         'losses_train': losses_train,
         'losses_valid': losses_valid
     }, f, pickle.HIGHEST_PROTOCOL)
-model_norm.save_weights(WEIGHTS_PATH)
+LR_PATH = (ANALYSIS_PATH.split('.',1)[0]+'.h5')
+model_norm.save_weights(LR_PATH)
 
 
 del chunk_data, xs_chunk, x_chunk, y_chunk, xs_valid, x_valid # memory cleanup
 del predictions_list, all_predictions # memory cleanup
 
-print "Done!"
 
-exit()
+
+
+if not predict:
+	exit()
+
+'''
+
+print "Computing predictions on test data"
+predictions_list = []
+for e, (xs_chunk, chunk_length) in enumerate(create_test_gen()):
+    print "Chunk %d" % (e + 1)
+    xs_chunk = [x_chunk.transpose(0, 3, 1, 2) for x_chunk in xs_chunk] # move the colour dimension up.
+
+    for x_shared, x_chunk in zip(xs_shared, xs_chunk):
+        x_shared.set_value(x_chunk)
+
+    num_batches_chunk = int(np.ceil(chunk_length / float(BATCH_SIZE)))  # need to round UP this time to account for all data
+
+    # make predictions for testset, don't forget to cute off the zeros at the end
+    for b in xrange(num_batches_chunk):
+        # if b % 1000 == 0:
+        #     print "  batch %d/%d" % (b + 1, num_batches_chunk)
+
+        predictions = compute_output(b)
+        predictions_list.append(predictions)
+
+
+all_predictions = np.vstack(predictions_list)
+all_predictions = all_predictions[:num_test] # truncate back to the correct length
+
+# postprocessing: clip all predictions to 0-1
+all_predictions[all_predictions > 1] = 1.0
+all_predictions[all_predictions < 0] = 0.0
+
+
+print "Write predictions to %s" % TARGET_PATH
+# test_ids = np.load("data/test_ids.npy")
+
+
+with open(TARGET_PATH, 'wb') as csvfile:
+    writer = csv.writer(csvfile) # , delimiter=',', quoting=csv.QUOTE_MINIMAL)
+
+    # write header
+    writer.writerow(['GalaxyID', 'Class1.1', 'Class1.2', 'Class1.3', 'Class2.1', 'Class2.2', 'Class3.1', 'Class3.2', 'Class4.1', 'Class4.2', 'Class5.1', 'Class5.2', 'Class5.3', 'Class5.4', 'Class6.1', 'Class6.2', 'Class7.1', 'Class7.2', 'Class7.3', 'Class8.1', 'Class8.2', 'Class8.3', 'Class8.4', 'Class8.5', 'Class8.6', 'Class8.7', 'Class9.1', 'Class9.2', 'Class9.3', 'Class10.1', 'Class10.2', 'Class10.3', 'Class11.1', 'Class11.2', 'Class11.3', 'Class11.4', 'Class11.5', 'Class11.6'])
+
+    # write data
+    for k in xrange(test_ids.shape[0]):
+        row = [test_ids[k]] + all_predictions[k].tolist()
+        writer.writerow(row)
+
+print "Gzipping..."
+os.system("gzip -c %s > %s.gz" % (TARGET_PATH, TARGET_PATH))
+
+
+del all_predictions, predictions_list, xs_chunk, x_chunk # memory cleanup
+
+'''
+
+# # need to reload training data because it has been split and shuffled.
+# # don't need to reload test data
+# x_train = load_data.load_gz(DATA_TRAIN_PATH)
+# x2_train = load_data.load_gz(DATA2_TRAIN_PATH)
+# x_train = x_train.transpose(0, 3, 1, 2) # move the colour dimension up
+# x2_train = x2_train.transpose(0, 3, 1, 2)
+# train_gen_features = load_data.array_chunker_gen([x_train, x2_train], chunk_size=CHUNK_SIZE, loop=False, truncate=False, shuffle=False)
+# test_gen_features = load_data.array_chunker_gen([x_test, x2_test], chunk_size=CHUNK_SIZE, loop=False, truncate=False, shuffle=False)
+
+
+# for name, gen, num in zip(['train', 'test'], [train_gen_features, test_gen_features], [x_train.shape[0], x_test.shape[0]]):
+#     print "Extracting feature representations for all galaxies: %s" % name
+#     features_list = []
+#     for e, (xs_chunk, chunk_length) in enumerate(gen):
+#         print "Chunk %d" % (e + 1)
+#         x_chunk, x2_chunk = xs_chunk
+#         x_shared.set_value(x_chunk)
+#         x2_shared.set_value(x2_chunk)
+
+#         num_batches_chunk = int(np.ceil(chunk_length / float(BATCH_SIZE)))  # need to round UP this time to account for all data
+
+#         # compute features for set, don't forget to cute off the zeros at the end
+#         for b in xrange(num_batches_chunk):
+#             if b % 1000 == 0:
+#                 print "  batch %d/%d" % (b + 1, num_batches_chunk)
+
+#             features = compute_features(b)
+#             features_list.append(features)
+
+#     all_features = np.vstack(features_list)
+#     all_features = all_features[:num] # truncate back to the correct length
+
+#     features_path = FEATURES_PATTERN % name 
+#     print "  write features to %s" % features_path
+#     np.save(features_path, all_features)
+
+
+print "Done!"

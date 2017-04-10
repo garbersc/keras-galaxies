@@ -1,19 +1,25 @@
 import numpy as np
 import json
+import warnings
 import time
 from datetime import datetime, timedelta
 import functools
-from copy import copy
 
+from keras import backend as T
 from keras.models import Sequential, Model
 from keras.layers import Dense, Dropout, Input,  MaxoutDense
 from keras.layers.core import Lambda
 from keras.optimizers import SGD, Adam
-from keras.engine.topology import Merge
+# TODO will be removed from keras2, can this be achieved with a lambda
+# layer now? looks like it:
+# https://stackoverflow.com/questions/43160181/keras-merge-layer-warning
+from keras.layers import Merge
 from keras.callbacks import LearningRateScheduler
+from keras.engine.topology import InputLayer
+from keras import initializers
 
 from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute, kerasCudaConvnetConv2DLayer
-from custom_for_keras import kaggle_MultiRotMergeLayer_output, OptimisedDivGalaxyOutput, kaggle_input, kaggle_sliced_accuracy, dense_weight_init_values, rmse, lr_function
+from custom_for_keras import kaggle_MultiRotMergeLayer_output, OptimisedDivGalaxyOutput, kaggle_input, sliced_accuracy_mean, sliced_accuracy_std, dense_weight_init_values, rmse, lr_function
 
 '''
 This class contains the winning solution model of the kaggle galaxies contest transferred to keras and function to fit it.
@@ -37,20 +43,28 @@ class kaggle_winsol:
     '''
 
     def __init__(self, BATCH_SIZE, NUM_INPUT_FEATURES, PART_SIZE, input_sizes,
-                 LEARNING_RATE_SCHEDULE, MOMENTUM, LOSS_PATH, WEIGHTS_PATH):
+                 include_flip=True,
+                 LEARNING_RATE_SCHEDULE=None, MOMENTUM=None, LOSS_PATH='./',
+                 WEIGHTS_PATH='./'):
         self.BATCH_SIZE = BATCH_SIZE
         self.NUM_INPUT_FEATURES = NUM_INPUT_FEATURES
         self.input_sizes = input_sizes
         self.PART_SIZE = PART_SIZE
-        self.LEARNING_RATE_SCHEDULE = LEARNING_RATE_SCHEDULE
+        self.LEARNING_RATE_SCHEDULE = LEARNING_RATE_SCHEDULE if LEARNING_RATE_SCHEDULE else [
+            0.1]
         self.current_lr = self.LEARNING_RATE_SCHEDULE[0]
         self.MOMENTUM = MOMENTUM
         self.WEIGHTS_PATH = WEIGHTS_PATH
         self.LOSS_PATH = LOSS_PATH
         self.hists = {}
-        self.first_loss_save = False
+        self.first_loss_save = True
         self.models = {}
         self.reinit_counter = 0
+        self.include_flip = include_flip
+
+        self.layer_formats = {'cuda_0': 1, 'cuda_1': 1, 'cuda_2': 1, 'pool_0': 1, 'pool_1': 1,
+                              'pool_2': 1, 'cuda_out_merge': 0, 'maxout_1': 0, 'maxout_2': 0,
+                              'dense_output': 0}
 
     '''
     initialize loss and validation histories
@@ -104,7 +118,8 @@ class kaggle_winsol:
                                                       nesterov=True),
                                                   metrics=[rmse,
                                                            'categorical_accuracy',
-                                                           kaggle_sliced_accuracy])
+                                                           sliced_accuracy_mean,
+                                                           sliced_accuracy_std])
 
         self._init_hist_dics(self.models)
 
@@ -124,89 +139,87 @@ class kaggle_winsol:
                                           self.input_sizes[0][0],
                                           self.input_sizes[0][1]),
                              dtype='float32', name='input_tensor')
+
         input_tensor_45 = Input(batch_shape=(self.BATCH_SIZE,
                                              self.NUM_INPUT_FEATURES,
-                                             self.input_sizes[0][0],
-                                             self.input_sizes[0][1]),
+                                             self.input_sizes[1][0],
+                                             self.input_sizes[1][1]),
                                 dtype='float32', name='input_tensor_45')
 
-        input_0 = Lambda(lambda x: x, output_shape=(self.NUM_INPUT_FEATURES,
-                                                    self.input_sizes[0][0],
-                                                    self.input_sizes[0][1]),
-                         batch_input_shape=(
+        input_lay_0 = InputLayer(batch_input_shape=(
             self.BATCH_SIZE, self.NUM_INPUT_FEATURES, self.input_sizes[0][0],
-                             self.input_sizes[0][1]), name='lambda_input_0')
-        input_45 = Lambda(lambda x: x, output_shape=(self.NUM_INPUT_FEATURES,
-                                                     self.input_sizes[1][0],
-                                                     self.input_sizes[1][1]),
-                          batch_input_shape=(
-            self.BATCH_SIZE, self.NUM_INPUT_FEATURES, self.input_sizes[0][0],
-                              self.input_sizes[0][1]), name='lambda_input_45')
+            self.input_sizes[0][1]),
+            name='input_lay_seq_0')
 
-        model1 = Sequential()
-        model1.add(input_0)
+        input_lay_1 = InputLayer(batch_input_shape=(
+            self.BATCH_SIZE, self.NUM_INPUT_FEATURES, self.input_sizes[1][0],
+            self.input_sizes[1][1]),
+            name='input_lay_seq_1')
 
-        model2 = Sequential()
-        model2.add(input_45)
-
-        model = Sequential()
+        model = Sequential(name='main_seq')
 
         N_INPUT_VARIATION = 2  # depends on the kaggle input settings
+        include_flip = self.include_flip
 
-        model.add(Merge([model1, model2], mode=kaggle_input,
-                        output_shape=lambda x: ((model1.output_shape[0]
-                                                 + model2.output_shape[0]) * 2
+        num_views = N_INPUT_VARIATION * (2 if include_flip else 1)
+
+        model.add(Merge([input_lay_0, input_lay_1], mode=kaggle_input,
+                        output_shape=lambda x: ((input_lay_0.output_shape[0]
+                                                 + input_lay_1.output_shape[0]) * 2
                                                 * N_INPUT_VARIATION,
                                                 self.NUM_INPUT_FEATURES,
                                                 self.PART_SIZE,
                                                 self.PART_SIZE),
                         arguments={'part_size': self.PART_SIZE,
                                    'n_input_var': N_INPUT_VARIATION,
-                                   'include_flip': False,
-                                   'random_flip': True}))
+                                   'include_flip': include_flip,
+                                   'random_flip': False}, name='input_merge'))
 
         # needed for the pylearn moduls used by kerasCudaConvnetConv2DLayer and
         # kerasCudaConvnetPooling2DLayer
-        model.add(fPermute((1, 2, 3, 0)))
+        model.add(fPermute((1, 2, 3, 0), name='input_perm'))
 
         model.add(kerasCudaConvnetConv2DLayer(
-            n_filters=32, filter_size=6, untie_biases=True))
-        model.add(kerasCudaConvnetPooling2DLayer())
+            n_filters=32, filter_size=6, untie_biases=True, name='cuda_0'))
+        model.add(kerasCudaConvnetPooling2DLayer(name='pool_0'))
 
         model.add(kerasCudaConvnetConv2DLayer(
-            n_filters=64, filter_size=5, untie_biases=True))
-        model.add(kerasCudaConvnetPooling2DLayer())
+            n_filters=64, filter_size=5, untie_biases=True, name='cuda_1'))
+        model.add(kerasCudaConvnetPooling2DLayer(name='pool_1'))
 
         model.add(kerasCudaConvnetConv2DLayer(
-            n_filters=128, filter_size=3, untie_biases=True))
+            n_filters=128, filter_size=3, untie_biases=True, name='cuda_2'))
         model.add(kerasCudaConvnetConv2DLayer(n_filters=128,
                                               filter_size=3,  weights_std=0.1,
-                                              untie_biases=True))
+                                              untie_biases=True, name='cuda_3'))
 
-        model.add(kerasCudaConvnetPooling2DLayer())
+        model.add(kerasCudaConvnetPooling2DLayer(name='pool_2'))
 
-        model.add(fPermute((3, 0, 1, 2)))
+        model.add(fPermute((3, 0, 1, 2), name='cuda_out_perm'))
 
         model.add(Lambda(function=kaggle_MultiRotMergeLayer_output,
                          output_shape=lambda x: (
                              x[0] // 4 // N_INPUT_VARIATION, (x[1] * x[2]
                                                               * x[3] * 4
-                                                              * N_INPUT_VARIATION)),
-                         arguments={'num_views': N_INPUT_VARIATION}))
+                                                              * num_views)),
+                         arguments={'num_views': num_views}, name='cuda_out_merge'))
 
         model.add(Dropout(0.5))
         model.add(MaxoutDense(output_dim=2048, nb_feature=2,
                               weights=dense_weight_init_values(
-                                  model.output_shape[-1], 2048, nb_feature=2)))
+                                  model.output_shape[-1], 2048, nb_feature=2), name='maxout_1'))
 
         model.add(Dropout(0.5))
         model.add(MaxoutDense(output_dim=2048, nb_feature=2,
                               weights=dense_weight_init_values(
-                                  model.output_shape[-1], 2048, nb_feature=2)))
+                                  model.output_shape[-1], 2048, nb_feature=2), name='maxout_2'))
 
         model.add(Dropout(0.5))
-        model.add(Dense(output_dim=37, weights=dense_weight_init_values(
-            model.output_shape[-1], 37, w_std=0.01, b_init_val=0.1)))
+        model.add(Dense(units=37, activation='relu',
+                        kernel_initializer=initializers.RandomNormal(
+                            stddev=0.01),
+                        bias_initializer=initializers.Constant(value=0.1),
+                        name='dense_output'))
 
         model_seq = model([input_tensor, input_tensor_45])
 
@@ -222,11 +235,11 @@ class kaggle_winsol:
                                                 'categorised': CATEGORISED})(model_seq)
 
         model_norm = Model(
-            input=[input_tensor, input_tensor_45], output=output_layer_norm)
+            inputs=[input_tensor, input_tensor_45], outputs=output_layer_norm, name='full_model_norm')
         model_norm_metrics = Model(
-            input=[input_tensor, input_tensor_45], output=output_layer_norm)
+            inputs=[input_tensor, input_tensor_45], outputs=output_layer_norm, name='full_model_metrics')
         model_noNorm = Model(
-            input=[input_tensor, input_tensor_45], output=output_layer_noNorm)
+            inputs=[input_tensor, input_tensor_45], outputs=output_layer_noNorm, name='full_model_noNorm')
 
         self.models = {'model_norm': model_norm,
                        'model_norm_metrics': model_norm_metrics,
@@ -261,6 +274,86 @@ class kaggle_winsol:
         return True
 
     '''
+    load weights from the winning solution
+
+    Arguments:
+    path: path to savefile
+    modelname: name of the model for which the weights are loaded, in default the models use all the same weight
+    '''
+
+    def getWinSolWeights(self,
+                         modelname='model_norm',
+                         path="analysis/final/try_convent_gpu1_win_sol_net_on_0p0775_validation.pkl",
+                         debug=False):
+        analysis = np.load(path)
+        l_weights = analysis['param_values']
+        # w_pairs=[]
+        # for i in range(len(l_weights)/2):
+        #	w_pairs.append([l_weights[2*i],l_weights[2*i+1]])
+        w_kSorted = []
+        for i in range(len(l_weights) / 2):
+            w_kSorted.append(l_weights[-2 - 2 * i])
+            w_kSorted.append(l_weights[-1 - 2 * i])
+        w_load_worked = False
+
+        if debug:
+            print len(w_kSorted)
+
+        def _load_direct():
+            for l in self.models[modelname].layers:
+                if debug:
+                    print '---'
+                if debug:
+                    print len(l.get_weights())
+                l_weights = l.get_weights()
+                if len(l_weights) == len(w_kSorted):
+                    if debug:
+                        for i in range(len(l_weights)):
+                            print type(l_weights[i])
+                            print "load %s into %s" % (np.shape(w_kSorted[i]),
+                                                       np.shape(l_weights[i]))
+                    try:
+                        l.set_weights(w_kSorted)
+                        return True
+                    except ValueError:
+                        print "found matching layer length but no mathing weights in direct try"
+            return False
+
+        def _load_maxout():
+            for l in self.models[modelname].layers:
+                l_weights = l.get_weights()
+                if len(l_weights) == len(w_kSorted):
+                    for i in range(len(l_weights)):
+                        if np.shape(l_weights[i]) != np.shape(w_kSorted[i]):
+                            if debug:
+                                print "reshaping weights of layer %s" % i
+                            shape = np.shape(w_kSorted[i])
+                            w_kSorted[i] = np.reshape(w_kSorted[i],
+                                                      (2, shape[0] / 2) if len(
+                                shape) == 1
+                                else (2,) + shape[0:-1]
+                                + (shape[-1] / 2,))
+                            if debug:
+                                print "load %s into %s" % (np.shape(w_kSorted[i]),
+                                                           np.shape(l_weights[i]))
+                    try:
+                        l.set_weights(w_kSorted)
+                        return True
+                    except ValueError:
+                        print "found matching length and tried to reshape weights for maxout layers: did not work"
+            return False
+
+        w_load_worked = _load_direct()
+        if not w_load_worked:
+            w_load_worked = _load_maxout()
+            if not w_load_worked:
+                print "no matching weight length were found"
+            else:
+                print "reshaped weights from maxout via dense and dropout to real maxout"
+
+        return w_load_worked
+
+    '''
     prints the loss and metric information of a model
 
     '''
@@ -272,7 +365,7 @@ class kaggle_winsol:
         return True
 
     '''
-    evaluates a model according to true answeres, saves the information in the history 
+    evaluates a model according to true answeres, saves the information in the history
     Arguments:
     x: input sample
     y_valid: true answeres
@@ -296,6 +389,16 @@ class kaggle_winsol:
             self.print_last_hist()
 
         return evalHist
+
+    def predict(self, x, batch_size=None,
+                modelname='model_norm_metrics', verbose=1):
+        if not batch_size:
+            batch_size = self.BATCH_SIZE
+        predictions = self.models[modelname].predict(
+            x=x, batch_size=batch_size,
+            verbose=verbose)
+
+        return predictions
 
     def _make_lrs_fct(self):
         return functools.partial(lr_function,
@@ -328,10 +431,14 @@ class kaggle_winsol:
         else:
             _callbacks = callbacks
 
+        # FIXME think about how to handle the missing samples%batch_size
+        # samples
+        steps_per_epoch = samples_per_epoch // self.BATCH_SIZE
+
         hist = self.models[modelname].fit_generator(data_generator,
                                                     validation_data=validation,
-                                                    samples_per_epoch=samples_per_epoch,
-                                                    nb_epoch=nb_epoch,
+                                                    steps_per_epoch=steps_per_epoch,
+                                                    epochs=nb_epoch,
                                                     verbose=1,
                                                     callbacks=_callbacks)
 
@@ -362,30 +469,93 @@ class kaggle_winsol:
     def save_loss(self, path='', modelname=''):
         if not path:
             path = self.LOSS_PATH
-        with open(path, 'a')as f:
-            if not self.first_loss_save:
+        if self.first_loss_save:
+            with open(path, 'a')as f:
                 f.write("#eval losses and metrics:\n")
-                self.first_loss_save = True
+                if modelname:
+                    f.write("#history of model: " + modelname + '\n')
+                    json.dump(self.hists[modelname], f)
+                else:
+                    f.write("#histories of all models:\n")
+                    for k in self.models:
+                        f.write("#history of model: " + k + '\n')
+                        json.dump(self.hists[k], f)
+                f.write("\n")
+            self.first_loss_save = False
+        else:
             if modelname:
-                f.write("#history of model: " + modelname + '\n')
-                json.dump(self.hists[modelname], f)
+                with open(path, "r+") as f:
+                    d = f.readlines()
+                    f.seek(0)
+                    rewrite_next_json = False
+                    model_found = False
+                    for i in d:
+                        if i != "#history of model: " + modelname + '\n':
+                            if rewrite_next_json:
+                                if i.find("{", 0, 1) != -1:
+                                    json.dump(self.hists[modelname], f)
+                                    rewrite_next_json = False
+                                else:
+                                    print 'WARNING: loss history save file is not in the expected stats'
+                                    json.dump(self.hists[modelname], f)
+                                    rewrite_next_json = False
+                                    f.write(i)
+                            else:
+                                f.write(i)
+                        else:
+                            f.write(i)
+                            model_found = True
+                            rewrite_next_json = True
+                    if not model_found:
+                        f.write("#history of model: " + modelname + '\n')
+                        json.dump(self.hists[modelname], f)
+                    f.write('\n')
             else:
-                f.write("#histories of all models:\n")
                 for k in self.models:
-                    f.write("#history of model: " + k + '\n')
-                    json.dump(self.hists[k], f)
-            f.write("\n")
+                    self.save_loss(path=path, modelname=k)
 
         return True
+
+    def _load_one_loss(self, path, modelname):
+        loss_hist = {}
+        with open(path, 'r') as f:
+            d = (i for i in f.readlines()[::-1])
+            for line in d:
+                if line.find("{", 0, 1) != -1:
+                    loss_hist = json.loads(line)
+                if d.next() == "#history of model: " + modelname + '\n':
+                    break
+            if not loss_hist:
+                raise Warning('No model %s was found in %s' %
+                              (modelname, path))
+        return loss_hist
+
+    def load_loss(self, path='', modelname=''):
+        if not path:
+            path = self.LOSS_PATH
+        if modelname:
+            return self._load_one_loss(path, modelname)
+        else:
+            return [self._load_one_loss(path, name)for name in self.models]
 
     '''
     performs all saving task
     '''
 
-    def save(self):
-        self.save_weights()
-        self.save_loss(modelname='model_norm_metrics')
-        self.save_loss(modelname='model_norm')
+    def save(self, option_string=None):
+        if not option_string:
+            self.save_weights()
+            self.save_loss(modelname='model_norm_metrics')
+            self.save_loss(modelname='model_norm')
+        elif option_string == 'interrupt':
+            self.save_weights(path=self.WEIGHTS_PATH + '_interrupted.h5')
+            self.save_loss(path=self.LOSS_PATH + '_interrupted.txt',
+                           modelname='model_norm_metrics')
+            self.save_loss(path=self.LOSS_PATH + '_interrupted.txt',
+                           modelname='model_norm')
+        else:
+            print 'WARNING: unknown saving opotion *' + option_string + '*'
+            self.save()
         return True
 
     '''
@@ -403,11 +573,17 @@ class kaggle_winsol:
 
     def full_fit(self, data_gen, validation, samples_per_epoch,
                  validate_every,
-                 nb_epochs, verbose=1, save_at_every_validation=True):
+                 nb_epochs, verbose=1, save_at_every_validation=True,
+                 data_gen_creator=None):
         if verbose:
             timedeltas = []
         epochs_run = 0
         epoch_togo = nb_epochs
+
+        # FIXME think about how to handle the missing samples%batch_size
+        # samples
+        steps_per_epoch = samples_per_epoch // self.BATCH_SIZE
+
         for i in range(nb_epochs / validate_every if not nb_epochs
                        % validate_every else nb_epochs / validate_every + 1):
             if verbose:
@@ -417,15 +593,35 @@ class kaggle_winsol:
                     epochs_run, epoch_togo)
 
             # main fit
-            hist = self.models['model_norm'].fit_generator(
-                data_gen, validation_data=validation,
-                samples_per_epoch=samples_per_epoch,
-                nb_epoch=np.min([
-                    epoch_togo, validate_every]) + epochs_run,
-                initial_epoch=epochs_run, verbose=1,
-                callbacks=[LearningRateScheduler(self._make_lrs_fct())])
+            def _main_fit(
+                    self,
+                    data_gen, validation_data=validation,
+                    samples_per_epoch=samples_per_epoch,
+                    nb_epoch=np.min([
+                        epoch_togo, validate_every]) + epochs_run,
+                    initial_epoch=epochs_run, verbose=1,
+                    callbacks=[LearningRateScheduler(self._make_lrs_fct())],
+                    data_gen_creator=data_gen_creator):
+                try:
+                    hist = self.models['model_norm'].fit_generator(
+                        data_gen, validation_data=validation_data,
+                        steps_per_epoch=steps_per_epoch,
+                        epochs=nb_epoch,
+                        initial_epoch=initial_epoch, verbose=verbose,
+                        callbacks=callbacks)
+                    self._save_hist(hist.history)
+                except ValueError:
+                    warnings.warn(
+                        'Value Error in the main fit. Generator will be reinitialised.')
+                    print 'saving'
+                    self.save()
+                    if data_gen_creator:
+                        _main_fit(self, data_gen=data_gen_creator())
+                    else:
+                        raise ValueError(
+                            'no reinitilizer of the data generator defined')
 
-            self._save_hist(hist.history)
+            _main_fit(self, data_gen)
 
             epoch_togo -= np.min([epoch_togo, validate_every])
             epochs_run += np.min([epoch_togo, validate_every])
@@ -464,4 +660,44 @@ class kaggle_winsol:
             self.LOSS_PATH = ((self.LOSS_PATH.split(
                 '.', 1)[0] + '_' + str(self.reinit_counter) + '.h5'))
 
+        self.first_loss_save = True
+
         self.init_models()
+
+        return True
+
+    def get_layer_output(self, layer, input_=None, modelname='model_norm',
+                         main_layer='main_seq', prediction_batch_size=1):
+        _layer = self.models[modelname].get_layer(main_layer).get_layer(
+            layer)
+
+        if not input_:
+            input_ = [np.ones(shape=(prediction_batch_size,) + i[1:])
+                      for i in self.models[modelname].get_layer(main_layer).input_shape]
+
+        if self.layer_formats[layer]:
+            output_layer = fPermute((3, 0, 1, 2))(_layer.output)
+            output_layer = Lambda(lambda x: T.reshape(x[0], (
+                prediction_batch_size,) + tuple(T.shape(output_layer)[1:])),
+                output_shape=lambda input_shape: (
+                prediction_batch_size,) + input_shape[1:])(output_layer)
+        else:
+            output_layer = _layer.output
+
+        intermediate_layer_model = Model(inputs=self.models[modelname]
+                                         .get_layer(main_layer).get_input_at(0),
+                                         outputs=output_layer)
+        return intermediate_layer_model.predict(input_,
+                                                batch_size=prediction_batch_size)
+
+    def get_layer_weights(self, layer,  modelname='model_norm',
+                          main_layer='main_seq'):
+        if type(layer) == int:
+            ret_weights = self.models[modelname].get_layer(
+                main_layer).layers[layer].get_weights()
+        elif type(layer) == str:
+            ret_weights = self.models[modelname].get_layer(main_layer).get_layer(
+                layer).get_weights()
+        else:
+            raise ValueError('layer must be specified as int or string')
+        return ret_weights

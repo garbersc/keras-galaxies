@@ -164,7 +164,6 @@ if debug:
            BATCH_SIZE))
 
 winsol.init_models()
-winsol.compile_models()
 
 if debug:
     winsol.print_summary()
@@ -273,7 +272,6 @@ try:
     print 'does this reset the weights?'
 
     winsol.init_models()
-    winsol.compile_models()
 
     evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
 
@@ -302,6 +300,6 @@ except KeyboardInterrupt:
 
 print "Done!"
 td = time.time() - start_time
-print ' run for %sh %sm %ss ' % (int(td // 3600), int(td // 60) % 60, td % 60)
+print ' run for %sh %sm %ss ' % (int(td // 3600), int(td // 60) % 60, int(td) % 60)
 exit()
 sys.exit(0)

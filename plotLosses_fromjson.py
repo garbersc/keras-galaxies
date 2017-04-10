@@ -7,7 +7,7 @@ import json
 #data=np.loadtxt(fname="trainingNmbrs_keras_adam_expLR.txt",delimiter=",")
 #data=data.transpose()
 
-f = open("trainingNmbrs_keras_ev1.txt","r")
+f = open("trainingNmbrs_keras_hist_test3.txt","r")
 f_lines = f. readlines()
 
 print len(f_lines)
@@ -45,11 +45,8 @@ for dic in dics:
 	print dic.keys()	
 
 
-trainLoss=dics[-2]["rmse"]
-validLoss=dics[-2]["sliced_accuracy_mean"]
-
-#trainLoss=dics[-1]["loss"]
-#validLoss=dics[-1]["val_loss"]
+trainLoss=dics[-1]["loss"]
+validLoss=dics[-1]["val_loss"]
 #validLoss_weighted=data[6]
 
 #trainP = plt.plot( rounds, trainLoss, 'ro',label="train")

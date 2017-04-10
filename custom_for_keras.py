@@ -58,6 +58,7 @@ def kaggle_input(x, part_size=45, n_input_var=2, include_flip=False, random_flip
     return T.concatenate(parts, axis=0)
 
 
+# unfortunately keras2 does not support dicts as output for metrics anymore...
 def kaggle_sliced_accuracy(y_true, y_pred, slice_weights=[1.] * 11):
     question_slices = [slice(0, 3), slice(3, 5), slice(5, 7), slice(7, 9), slice(9, 13), slice(13, 15),
                        slice(15, 18), slice(18, 25), slice(25, 28), slice(28, 31), slice(31, 37)]
@@ -68,8 +69,20 @@ def kaggle_sliced_accuracy(y_true, y_pred, slice_weights=[1.] * 11):
     return {'sliced_accuracy_mean': T.mean(accuracy_slices), 'sliced_accuracy_std':  T.std(accuracy_slices)}
 
 
+def sliced_accuracy_mean(y_true, y_pred, slice_weights=[1.] * 11):
+    return kaggle_sliced_accuracy(y_true, y_pred, slice_weights)['sliced_accuracy_mean']
+
+
+def sliced_accuracy_std(y_true, y_pred, slice_weights=[1.] * 11):
+    return kaggle_sliced_accuracy(y_true, y_pred, slice_weights)['sliced_accuracy_std']
+
+
 def rmse(y_true, y_pred):
     return T.sqrt(mean_squared_error(y_true, y_pred))
+
+
+# in keras 2 weights cant be set directly on layer creation. constant
+# initilizer are now available. orth_style will need custom initilizer
 
 
 def dense_weight_init_values(n_inputs, n_outputs, nb_feature=None, w_std=0.001, b_init_val=0.01, orth_style=False):
@@ -88,11 +101,14 @@ def dense_weight_init_values(n_inputs, n_outputs, nb_feature=None, w_std=0.001, 
             raise ValueError(
                 'For orthagonal matrixes in weight init the numer of input and output dimension must be one')
         if nb_feature:
-            weights = (weights[0] + np.repeat([np.eye(n_inputs[0], n_outputs[0],
-                                                      dtype=np.float32) - w_std / 2], nb_feature, 0), weights[1])
+            weights = (weights[0] + np.repeat(
+                [np.eye(n_inputs[0], n_outputs[0],
+                        dtype=np.float32) - w_std / 2], nb_feature, 0),
+                weights[1])
         else:
             weights = (weights[0] + np.eye(n_inputs[0], n_outputs[0],
-                                           dtype=np.float32) - w_std / 2, weights[1])
+                                           dtype=np.float32) - w_std / 2,
+                       weights[1])
     return weights
 
 

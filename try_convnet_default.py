@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 # plt.ion()
 # import utils
 
-debug = False
+debug = True
 predict = False
 
 continueAnalysis = False
@@ -31,7 +31,7 @@ ra.y_train=y_train
 # split training data into training + a small validation set
 ra.num_train = y_train.shape[0]
 
-ra.num_valid = ra.num_train // 10 # integer division, is defining validation size
+ra.num_valid = ra.num_train // 20 # integer division, is defining validation size
 ra.num_train -= ra.num_valid
 
 ra.y_valid = ra.y_train[ra.num_train:]
@@ -69,30 +69,34 @@ test_indices = np.arange(num_test)
 BATCH_SIZE = 16
 NUM_INPUT_FEATURES = 3
 
-LEARNING_RATE_SCHEDULE = {
-    0: 0.04,
+LEARNING_RATE_SCHEDULE = {  #if adam is used the learning rate doesnt follow the schedule
+    0: 0.02,
+    #1000: 0.04,
+    1000: 0.04,
+    #0: 0.01,
     1800: 0.004,
     2300: 0.0004,
+   # 0: 0.08,
+   # 50: 0.04,
+   # 2000: 0.008,
+   # 3200: 0.0008,
+   # 4600: 0.0004,
 }
-
 if continueAnalysis:
     LEARNING_RATE_SCHEDULE = {
         0: 0.002,	
-        200: 0.004,
-        800: 0.0004,
-	1500: 0.0001,
+        500: 0.002,
+        #800: 0.0004,
         3200: 0.0002,
         4600: 0.0001,
     }
 
 
-
-
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-CHUNK_SIZE = 10000 # 30000 # this should be a multiple of the batch size, ideally.
-NUM_CHUNKS = 2500 # 3000 # 1500 # 600 # 600 # 600 # 500 
-VALIDATE_EVERY = 20 # 12 # 6 # 6 # 6 # 5 # validate only every 5 chunks. MUST BE A DIVISOR OF NUM_CHUNKS!!!
+CHUNK_SIZE = 1008#1008#10000 # 30000 # this should be a multiple of the batch size, ideally.
+NUM_CHUNKS = 1000#1000#7000 #2500 # 3000 # 1500 # 600 # 600 # 600 # 500   
+VALIDATE_EVERY = 5 #20 # 12 # 6 # 6 # 6 # 5 # validate only every 5 chunks. MUST BE A DIVISOR OF NUM_CHUNKS!!!
 # else computing the analysis data does not work correctly, since it assumes that the validation set is still loaded.
 print("The training is running for %s chunks, each with %s images. That are about %s epochs. The validation sample contains %s images. \n" % (NUM_CHUNKS,CHUNK_SIZE,CHUNK_SIZE*NUM_CHUNKS / (ra.num_train-CHUNK_SIZE) ,  ra.num_valid ))
 NUM_CHUNKS_NONORM = 1  # train without normalisation for this many chunks, to get the weights in the right 'zone'.
@@ -124,10 +128,10 @@ WEIGHTS=WEIGHTS/WEIGHTS[WEIGHTS.argmax()]
 
 GEN_BUFFER_SIZE = 1
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_gpu1_data_in_RAM.txt" 
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_default_test.txt" #TODO wrong, is LL error and SGD, change txt name afterwards
 
 TARGET_PATH = "predictions/final/try_convnet.csv"
-ANALYSIS_PATH = "analysis/final/try_convent_gpu1_data_in_RAM.pkl"
+ANALYSIS_PATH = "analysis/final/try_convent_default_test.pkl"
 
 with open(TRAIN_LOSS_SF_PATH, 'a')as f:
 	if continueAnalysis: 
@@ -227,18 +231,12 @@ if debug : print("input size: %s x %s x %s x %s" % (input_sizes[0][0],input_size
 l0 = layers.Input2DLayer(BATCH_SIZE, NUM_INPUT_FEATURES, input_sizes[0][0], input_sizes[0][1])
 l0_45 = layers.Input2DLayer(BATCH_SIZE, NUM_INPUT_FEATURES, input_sizes[1][0], input_sizes[1][1])
 
-l0r = layers.MultiRotSliceLayer([l0, l0_45], part_size=45, include_flip=True)
-
-#l0r = layers.MultiRotSliceLayer([l0, l0_45], part_size=45, random_flip=True)
+l0r = layers.MultiRotSliceLayer([l0, l0_45], part_size=45, random_flip=True)
 
 l0s = cc_layers.ShuffleBC01ToC01BLayer(l0r) 
 
 l1a = cc_layers.CudaConvnetConv2DLayer(l0s, n_filters=32, filter_size=6, weights_std=0.01, init_bias_value=0.1, dropout=0.0, partial_sum=1, untie_biases=True)
 l1 = cc_layers.CudaConvnetPooling2DLayer(l1a, pool_size=2)
-#l12 = cc_layers.CudaConvnetPooling2DLayer(l1a, pool_size=4)
-
-#l3a = cc_layers.CudaConvnetConv2DLayer(l12, n_filters=64, filter_size=7, pad=0, weights_std=0.1, init_bias_value=0.1, dropout=0.0, partial_sum=1, untie_biases=True)
-#l3 = cc_layers.CudaConvnetPooling2DLayer(l3a, pool_size=2)
 
 l2a = cc_layers.CudaConvnetConv2DLayer(l1, n_filters=64, filter_size=5, weights_std=0.01, init_bias_value=0.1, dropout=0.0, partial_sum=1, untie_biases=True)
 l2 = cc_layers.CudaConvnetPooling2DLayer(l2a, pool_size=2)
@@ -247,10 +245,9 @@ l3a = cc_layers.CudaConvnetConv2DLayer(l2, n_filters=128, filter_size=3, weights
 l3b = cc_layers.CudaConvnetConv2DLayer(l3a, n_filters=128, filter_size=3, pad=0, weights_std=0.1, init_bias_value=0.1, dropout=0.0, partial_sum=1, untie_biases=True)
 l3 = cc_layers.CudaConvnetPooling2DLayer(l3b, pool_size=2)
 
-#l3s = cc_layers.ShuffleC01BToBC01Layer(l3)
 l3s = cc_layers.ShuffleC01BToBC01Layer(l3)
 
-j3 = layers.MultiRotMergeLayer(l3s, num_views=4) # 2) # merge convolutional parts
+j3 = layers.MultiRotMergeLayer(l3s, num_views=2) # 4) # merge convolutional parts
 
 
 l4a = layers.DenseLayer(j3, n_outputs=4096, weights_std=0.001, init_bias_value=0.01, dropout=0.5, nonlinearity=layers.identity)
@@ -266,9 +263,9 @@ l5 = layers.DenseLayer(l4, n_outputs=37, weights_std=0.01, init_bias_value=0.1, 
 #l5 = layers.DenseLayer(l4bc, n_outputs=37, weights_std=0.01, init_bias_value=0.1, nonlinearity=layers.identity)
 
 ## l6 = layers.OutputLayer(l5, error_measure='mse')
-l6 = custom.OptimisedDivGalaxyOutputLayer(l5,categorised=False) # this incorporates the constraints on the output (probabilities sum to one, weighting, etc.)
+l6 = custom.OptimisedDivGalaxyOutputLayer(l5,categorised=True) # this incorporates the constraints on the output (probabilities sum to one, weighting, etc.)
 
-if debug : print("output shapes: l0 %s , l0r %s , l1 %s , l3 %s , j3 %s , l4 %s , l5 %s" % ( l0.get_output_shape(), l0r.get_output_shape(), l1.get_output_shape(), l3.get_output_shape(), j3.get_output_shape(), l4.get_output_shape(), l5.get_output_shape()))
+if debug : print("output shapes: l0 %s , l0r %s ,l0s %s, l1a %s , l1 %s , l2a %s , l3 %s , j3 %s , l4 %s , l5 %s" % ( l0.get_output_shape(), l0r.get_output_shape(), l0s.get_output_shape(), l1a.get_output_shape(), l1.get_output_shape(), l2a.get_output_shape(), l3.get_output_shape(), j3.get_output_shape(), l4.get_output_shape(), l5.get_output_shape()))
 
 #train_loss_nonorm = l6.error(normalisation=False)
 #train_loss = l6.error() # but compute and print this!

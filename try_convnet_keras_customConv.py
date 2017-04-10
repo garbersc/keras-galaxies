@@ -40,7 +40,7 @@ ra.y_train=y_train
 # split training data into training + a small validation set
 ra.num_train = y_train.shape[0]
 
-ra.num_valid = ra.num_train // 10 # integer division, is defining validation size
+ra.num_valid = ra.num_train // 20 # integer division, is defining validation size
 ra.num_train -= ra.num_valid
 
 ra.y_valid = ra.y_train[ra.num_train:]
@@ -105,9 +105,9 @@ if continueAnalysis:
 
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-CHUNK_SIZE = 10000#1008#10000 # 30000 # this should be a multiple of the batch size, ideally.
-NUM_CHUNKS = 200#1000#7000 #2500 # 3000 # 1500 # 600 # 600 # 600 # 500   
-VALIDATE_EVERY = 20 #20 # 12 # 6 # 6 # 6 # 5 # validate only every 5 chunks. MUST BE A DIVISOR OF NUM_CHUNKS!!!
+CHUNK_SIZE = 1008#1008#10000 # 30000 # this should be a multiple of the batch size, ideally.
+NUM_CHUNKS = 10#1000#7000 #2500 # 3000 # 1500 # 600 # 600 # 600 # 500   
+VALIDATE_EVERY = 10 #20 # 12 # 6 # 6 # 6 # 5 # validate only every 5 chunks. MUST BE A DIVISOR OF NUM_CHUNKS!!!
 # else computing the analysis data does not work correctly, since it assumes that the validation set is still loaded.
 print("The training is running for %s chunks, each with %s images. That are about %s epochs. The validation sample contains %s images. \n" % (NUM_CHUNKS,CHUNK_SIZE,CHUNK_SIZE*NUM_CHUNKS / (ra.num_train-CHUNK_SIZE) ,  ra.num_valid ))
 NUM_CHUNKS_NONORM =  1 # train without normalisation for this many chunks, to get the weights in the right 'zone'.
@@ -139,10 +139,10 @@ WEIGHTS=WEIGHTS/WEIGHTS[WEIGHTS.argmax()]
 
 GEN_BUFFER_SIZE = 1
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_test.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_no_relu_inConv.txt"
 
 #TARGET_PATH = "predictions/final/try_convnet.csv"
-ANALYSIS_PATH = "analysis/final/try_convent_keras_test.pkl"
+ANALYSIS_PATH = "analysis/final/try_convent_keras_no_relu_inConv.pkl"
 
 with open(TRAIN_LOSS_SF_PATH, 'a')as f:
 	if continueAnalysis: 
@@ -388,30 +388,18 @@ for e in xrange(NUM_CHUNKS):
     losses_test = []
     #losses_ll = []
     losses_weighted = []
-    time_inEval = []
-    time_inModel = []
     for b in xrange(num_batches_chunk):
 
 	l0_input_var= xs_shared[0][b*BATCH_SIZE:(b+1)*BATCH_SIZE]
     	l0_45_input_var= xs_shared[1][b*BATCH_SIZE:(b+1)*BATCH_SIZE]
 	l6_target_var=  y_shared[b*BATCH_SIZE:(b+1)*BATCH_SIZE]
-	
-	if debug and b==0: print type(l0_input_var)
 
-	time_in = time.time()
-	
 	l0_input_var_eval=l0_input_var.eval()
 	l0_45_input_var_eval=l0_45_input_var.eval()
 	l6_target_var_eval=l6_target_var.eval()
 	
-	time_inEval.append(time.time()-time_in)
-
 	if ((e + 1) % VALIDATE_EVERY) == 0: loss_test = model_inUse.test_on_batch([l0_input_var_eval,l0_45_input_var_eval], l6_target_var_eval )[0]
-
-	time_in = time.time()
 	lossaccuracy = model_inUse.train_on_batch( [l0_input_var_eval,l0_45_input_var_eval] , l6_target_var_eval )
-	time_inModel.append(time.time()-time_in)
-
 	loss = lossaccuracy[0]
 
         losses.append(loss)
@@ -424,8 +412,6 @@ for e in xrange(NUM_CHUNKS):
     #else: mean_train_loss = np.sqrt(np.mean(losses))
 	  #mean_train_loss_ll = np.mean(losses_ll)
     print "  mean training loss (RMSE):\t\t%.6f" % mean_train_loss
-    print "  time in eval step: %.2f " % sum(time_inEval)
-    print "  time in model training step: %.2f " % sum(time_inModel)
     if ((e + 1) % VALIDATE_EVERY) == 0:  print "  mean test loss (RMSE):\t\t%.6f" % mean_train_loss_test
     #print "  mean training loss (LL):\t\t%.6f" % mean_train_loss_ll
     losses_train.append(mean_train_loss)
@@ -446,7 +432,6 @@ for e in xrange(NUM_CHUNKS):
 	sliced_accuracies_std = []
 	losses_ll = []
 	losses_weighted = []
-
         for b in xrange(num_batches_valid):
             # if b % 1000 == 0:
             #     print "  batch %d/%d" % (b + 1, num_batches_valid)
@@ -516,9 +501,6 @@ for e in xrange(NUM_CHUNKS):
     est_time_left = time_since_start * (float(NUM_CHUNKS - (e + 1)) / float(e + 1))
     eta = datetime.now() + timedelta(seconds=est_time_left)
     eta_str = eta.strftime("%c")
-
-    print "  time in other: %.2f " % (time_since_prev - sum(time_inEval) - sum(time_inModel) )
-
     print "  %s since start (%.2f s)" % (load_data.hms(time_since_start), time_since_prev)
     print "  estimated %s to go (ETA: %s)" % (load_data.hms(est_time_left), eta_str)
     print
