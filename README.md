@@ -1,6 +1,13 @@
 kaggle-galaxies
 ===============
 
+This is the original README of the kaggle-galaxies winning solution found at  github.com/benanne/kaggle-galaxies.git by Sander Dieleman. It has not been updated to the state of this repository yet.
+The solution in this repo implements the main model of the winning solution in keras (github.com/fchollet/keras)
+
+
+
+
+
 Winning solution for the Galaxy Challenge on Kaggle (http://www.kaggle.com/c/galaxy-zoo-the-galaxy-challenge).
 
 Documentation about the method and the code is available in `doc/documentation.pdf`. Information on how to generate the solution file can also be found below.
