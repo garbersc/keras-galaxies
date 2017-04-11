@@ -383,8 +383,8 @@ for i in xrange(0, VALID_CORR_OUTPUT_FILTER.shape[0]):
     if i in [slice.start for slice in question_slices]:
         print '----------------------------------------------------'
     oneMSE = np.sqrt(np.mean((y_valid.T[i] - predictions.T[i])**2))
-    if oneMSE / np.mean(y_valid.T[i]) > 1.2 * rmse_augmented / np.mean(
-            y_valid):
+    if P(i)<0.5:#oneMSE / np.mean(y_valid.T[i]) > 1.2 * rmse_augmented / np.mean(
+        #    y_valid):
         print colored("    output %s (%s): \t%.6f  RMSE/mean: %.2f \t N global pred.,valid,agree %i,%i,%i \t N sliced pred.,valid,agree %i,%i,%i, P %.3f, R %.3f \t w_req N sliced pred.,valid,agree %i,%i,%i, P %.3f, R %.3f " % (
             output_names[i], i, oneMSE, oneMSE / np.mean(y_valid.T[i]),
             n_global_cat_pred[i], n_global_cat_valid[i], n_global_cat_agrement[i],
@@ -394,8 +394,8 @@ for i in xrange(0, VALID_CORR_OUTPUT_FILTER.shape[0]):
             n_sliced_cat_agrement_wreq[i],
             P_wreq(i), R_wreq(i)),
             'red')
-    elif oneMSE / np.mean(y_valid.T[i]) < 0.8 * rmse_augmented / np.mean(
-            y_valid):
+    elif P(i)>0.9:#oneMSE / np.mean(y_valid.T[i]) < 0.8 * rmse_augmented / np.mean(
+            #y_valid):
         print colored("    output %s (%s): \t%.6f  RMSE/mean: %.2f \t N global pred.,valid,agree %i,%i,%i \t N sliced pred.,valid,agree %i,%i,%i, P %.3f, R %.3f \t w_req N sliced pred.,valid,agree %i,%i,%i, P %.3f, R %.3f " % (
             output_names[i], i, oneMSE, oneMSE / np.mean(y_valid.T[i]),
             n_global_cat_pred[i], n_global_cat_valid[i], n_global_cat_agrement[i],
