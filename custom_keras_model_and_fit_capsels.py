@@ -62,8 +62,10 @@ class kaggle_winsol:
         self.reinit_counter = 0
         self.include_flip = include_flip
 
-        self.layer_formats = {'cuda_0': 1, 'cuda_1': 1, 'cuda_2': 1, 'pool_0': 1, 'pool_1': 1,
-                              'pool_2': 1, 'cuda_out_merge': 0, 'maxout_1': 0, 'maxout_2': 0,
+        self.layer_formats = {'conv_0': 1, 'conv_1': 1, 'conv_2': 1,
+                              'conv_3': 1, 'pool_0': 2, 'pool_1': 2,
+                              'pool_2': 2, 'conv_out_merge': -1,
+                              'maxout_0': 0, 'maxout_1': 0,
                               'dense_output': 0}
 
     '''
@@ -180,18 +182,18 @@ class kaggle_winsol:
         model.add(fPermute((1, 2, 3, 0), name='input_perm'))
 
         model.add(kerasCudaConvnetConv2DLayer(
-            n_filters=32, filter_size=6, untie_biases=True, name='cuda_0'))
+            n_filters=32, filter_size=6, untie_biases=True, name='conv_0'))
         model.add(kerasCudaConvnetPooling2DLayer(name='pool_0'))
 
         model.add(kerasCudaConvnetConv2DLayer(
-            n_filters=64, filter_size=5, untie_biases=True, name='cuda_1'))
+            n_filters=64, filter_size=5, untie_biases=True, name='conv_1'))
         model.add(kerasCudaConvnetPooling2DLayer(name='pool_1'))
 
         model.add(kerasCudaConvnetConv2DLayer(
-            n_filters=128, filter_size=3, untie_biases=True, name='cuda_2'))
+            n_filters=128, filter_size=3, untie_biases=True, name='conv_2'))
         model.add(kerasCudaConvnetConv2DLayer(n_filters=128,
                                               filter_size=3,  weights_std=0.1,
-                                              untie_biases=True, name='cuda_3'))
+                                              untie_biases=True, name='conv_3'))
 
         model.add(kerasCudaConvnetPooling2DLayer(name='pool_2'))
 
@@ -202,17 +204,17 @@ class kaggle_winsol:
                              x[0] // 4 // N_INPUT_VARIATION, (x[1] * x[2]
                                                               * x[3] * 4
                                                               * num_views)),
-                         arguments={'num_views': num_views}, name='cuda_out_merge'))
+                         arguments={'num_views': num_views}, name='conv_out_merge'))
+
+        model.add(Dropout(0.5))
+        model.add(MaxoutDense(output_dim=2048, nb_feature=2,
+                              weights=dense_weight_init_values(
+                                  model.output_shape[-1], 2048, nb_feature=2), name='maxout_0'))
 
         model.add(Dropout(0.5))
         model.add(MaxoutDense(output_dim=2048, nb_feature=2,
                               weights=dense_weight_init_values(
                                   model.output_shape[-1], 2048, nb_feature=2), name='maxout_1'))
-
-        model.add(Dropout(0.5))
-        model.add(MaxoutDense(output_dim=2048, nb_feature=2,
-                              weights=dense_weight_init_values(
-                                  model.output_shape[-1], 2048, nb_feature=2), name='maxout_2'))
 
         model.add(Dropout(0.5))
         model.add(Dense(units=37, activation='relu',
@@ -675,14 +677,20 @@ class kaggle_winsol:
             input_ = [np.ones(shape=(prediction_batch_size,) + i[1:])
                       for i in self.models[modelname].get_layer(main_layer).input_shape]
 
-        if self.layer_formats[layer]:
+        if self.layer_formats[layer] > 0:
             output_layer = fPermute((3, 0, 1, 2))(_layer.output)
             output_layer = Lambda(lambda x: T.reshape(x[0], (
                 prediction_batch_size,) + tuple(T.shape(output_layer)[1:])),
                 output_shape=lambda input_shape: (
                 prediction_batch_size,) + input_shape[1:])(output_layer)
         else:
-            output_layer = _layer.output
+            try:
+                output_layer = _layer.output
+            except AttributeError:
+                print 'debug infos after Attribute error'
+                print layer
+                print _layer
+                raise AttributeError
 
         intermediate_layer_model = Model(inputs=self.models[modelname]
                                          .get_layer(main_layer).get_input_at(0),
