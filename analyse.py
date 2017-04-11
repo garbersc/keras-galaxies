@@ -7,6 +7,6 @@ exec open('predict_convnet_keras_modulated.py').read() in globals()
 
 # xvalid_scatter()
 # print_filters()
-print_filters(3, norm=True)
+#print_filters(3, norm=True)
 
 save_exit()
