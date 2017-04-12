@@ -101,27 +101,27 @@ class kaggle_winsol:
     initilises loss histories
     '''
 
-    def _compile_models(self):
-        self.models['model_norm'].compile(loss='mean_squared_error',
-                                          optimizer=SGD(
-                                              lr=self.LEARNING_RATE_SCHEDULE[0],
-                                              momentum=self.MOMENTUM,
-                                              nesterov=True))
-        self.models['model_noNorm'].compile(loss='mean_squared_error',
-                                            optimizer=SGD(
-                                                lr=self.LEARNING_RATE_SCHEDULE[0],
-                                                momentum=self.MOMENTUM,
-                                                nesterov=True))
+    def _compile_models(self, postfix=''):
+        self.models['model_norm' + postfix].compile(loss='mean_squared_error',
+                                                    optimizer=SGD(
+                                                        lr=self.LEARNING_RATE_SCHEDULE[0],
+                                                        momentum=self.MOMENTUM,
+                                                        nesterov=True))
+        self.models['model_noNorm' + postfix].compile(loss='mean_squared_error',
+                                                      optimizer=SGD(
+                                                          lr=self.LEARNING_RATE_SCHEDULE[0],
+                                                          momentum=self.MOMENTUM,
+                                                          nesterov=True))
 
-        self.models['model_norm_metrics'].compile(loss='mean_squared_error',
-                                                  optimizer=SGD(
-                                                      lr=self.LEARNING_RATE_SCHEDULE[0],
-                                                      momentum=self.MOMENTUM,
-                                                      nesterov=True),
-                                                  metrics=[rmse,
-                                                           'categorical_accuracy',
-                                                           sliced_accuracy_mean,
-                                                           sliced_accuracy_std])
+        self.models['model_norm_metrics' + postfix].compile(loss='mean_squared_error',
+                                                            optimizer=SGD(
+                                                                lr=self.LEARNING_RATE_SCHEDULE[0],
+                                                                momentum=self.MOMENTUM,
+                                                                nesterov=True),
+                                                            metrics=[rmse,
+                                                                     'categorical_accuracy',
+                                                                     sliced_accuracy_mean,
+                                                                     sliced_accuracy_std])
 
         self._init_hist_dics(self.models)
 
@@ -251,6 +251,63 @@ class kaggle_winsol:
 
         return self.models
 
+    def init_models_ellipse(self):
+        print "init model"
+        input_tensor = Input(batch_shape=(self.BATCH_SIZE,
+                                          2),
+                             dtype='float32', name='input_tensor')
+
+        input_lay_0 = InputLayer(batch_input_shape=(
+            self.BATCH_SIZE, 2),
+            name='input_lay_seq_0')
+
+        model = Sequential(name='main_seq')
+
+        model.add(Dropout(0.5, input_shape=(2,)))
+        model.add(MaxoutDense(output_dim=2048, nb_feature=2,
+                              weights=dense_weight_init_values(
+                                  model.output_shape[-1], 2048, nb_feature=2), name='maxout_0'))
+
+        model.add(Dropout(0.5))
+        model.add(MaxoutDense(output_dim=2048, nb_feature=2,
+                              weights=dense_weight_init_values(
+                                  model.output_shape[-1], 2048, nb_feature=2), name='maxout_1'))
+
+        model.add(Dropout(0.5))
+        model.add(Dense(units=37, activation='relu',
+                        kernel_initializer=initializers.RandomNormal(
+                            stddev=0.01),
+                        bias_initializer=initializers.Constant(value=0.1),
+                        name='dense_output'))
+
+        model_seq = model([input_tensor])
+
+        CATEGORISED = False  # FXME has to be implemented
+
+        output_layer_norm = Lambda(function=OptimisedDivGalaxyOutput,
+                                   output_shape=lambda x: x,
+                                   arguments={'normalised': True,
+                                              'categorised': CATEGORISED})(model_seq)
+        output_layer_noNorm = Lambda(function=OptimisedDivGalaxyOutput,
+                                     output_shape=lambda x: x,
+                                     arguments={'normalised': False,
+                                                'categorised': CATEGORISED})(model_seq)
+
+        model_norm = Model(
+            inputs=[input_tensor], outputs=output_layer_norm, name='full_model_norm_ellipse')
+        model_norm_metrics = Model(
+            inputs=[input_tensor], outputs=output_layer_norm, name='full_model_metrics_ellipse')
+        model_noNorm = Model(
+            inputs=[input_tensor], outputs=output_layer_noNorm, name='full_model_noNorm_ellipse')
+
+        self.models = {'model_norm_ellipse': model_norm,
+                       'model_norm_metrics_ellipse': model_norm_metrics,
+                       'model_noNorm_ellipse': model_noNorm}
+
+        self._compile_models(postfix='_ellipse')
+
+        return self.models
+
     '''
     Arguments:
     modelname: name of the model to be printed
@@ -360,10 +417,12 @@ class kaggle_winsol:
 
     '''
 
-    def print_last_hist(self, modelname='model_norm_metrics'):
-        for n in self.hists['model_norm_metrics']:
+    def print_last_hist(self, modelname='model_norm_metrics', postfix=''):
+        modelname += postfix
+        print ''
+        for n in self.hists[modelname]:
             print "   %s : %.3f" % (
-                n, self.hists['model_norm_metrics'][n][-1])
+                n, self.hists[modelname][n][-1])
         return True
 
     '''
@@ -376,7 +435,8 @@ class kaggle_winsol:
     '''
 
     def evaluate(self, x, y_valid, batch_size=None,
-                 modelname='model_norm_metrics', verbose=1):
+                 modelname='model_norm_metrics', verbose=1, postfix=''):
+        modelname = modelname + postfix
         if not batch_size:
             batch_size = self.BATCH_SIZE
         evalHist = self.models[modelname].evaluate(
@@ -388,12 +448,13 @@ class kaggle_winsol:
                 evalHist[i])
 
         if verbose:
-            self.print_last_hist()
+            self.print_last_hist(postfix=postfix)
 
         return evalHist
 
     def predict(self, x, batch_size=None,
-                modelname='model_norm_metrics', verbose=1):
+                modelname='model_norm_metrics', verbose=1, postfix=''):
+        modelname += postfix
         if not batch_size:
             batch_size = self.BATCH_SIZE
         predictions = self.models[modelname].predict(
@@ -406,7 +467,8 @@ class kaggle_winsol:
         return functools.partial(lr_function,
                                  lrs=self.LEARNING_RATE_SCHEDULE)
 
-    def _save_hist(self, history, modelname='model_norm'):
+    def _save_hist(self, history, modelname='model_norm', postfix=''):
+        modelname += postfix
         if not self.hists:
             self._init_hist_dics(self.models)
         for k in self.hists[modelname]:
@@ -455,7 +517,8 @@ class kaggle_winsol:
     modelname: name of the model, default allmodels have the same weights
     '''
 
-    def save_weights(self, path='', modelname='model_norm'):
+    def save_weights(self, path='', modelname='model_norm', postfix=''):
+        modelname += postfix
         if not path:
             path = self.WEIGHTS_PATH
         self.models[modelname].save_weights(path)
@@ -468,7 +531,7 @@ class kaggle_winsol:
     modelname: default saves history of all models
     '''
 
-    def save_loss(self, path='', modelname=''):
+    def save_loss(self, path='', modelname='', postfix=''):
         if not path:
             path = self.LOSS_PATH
         if self.first_loss_save:
@@ -544,20 +607,21 @@ class kaggle_winsol:
     performs all saving task
     '''
 
-    def save(self, option_string=None):
+    def save(self, option_string=None, postfix=''):
         if not option_string:
-            self.save_weights()
-            self.save_loss(modelname='model_norm_metrics')
-            self.save_loss(modelname='model_norm')
+            self.save_weights(postfix=postfix)
+            self.save_loss(modelname='model_norm_metrics' + postfix)
+            self.save_loss(modelname='model_norm' + postfix)
         elif option_string == 'interrupt':
-            self.save_weights(path=self.WEIGHTS_PATH + '_interrupted.h5')
+            self.save_weights(path=self.WEIGHTS_PATH +
+                              '_interrupted.h5', postfix=postfix)
             self.save_loss(path=self.LOSS_PATH + '_interrupted.txt',
-                           modelname='model_norm_metrics')
+                           modelname='model_norm_metrics' + postfix)
             self.save_loss(path=self.LOSS_PATH + '_interrupted.txt',
-                           modelname='model_norm')
+                           modelname='model_norm' + postfix)
         else:
             print 'WARNING: unknown saving opotion *' + option_string + '*'
-            self.save()
+            self.save(postfix=postfix)
         return True
 
     '''
@@ -576,7 +640,7 @@ class kaggle_winsol:
     def full_fit(self, data_gen, validation, samples_per_epoch,
                  validate_every,
                  nb_epochs, verbose=1, save_at_every_validation=True,
-                 data_gen_creator=None):
+                 data_gen_creator=None, postfix=''):
         if verbose:
             timedeltas = []
         epochs_run = 0
@@ -603,9 +667,9 @@ class kaggle_winsol:
                         epoch_togo, validate_every]) + epochs_run,
                     initial_epoch=epochs_run, verbose=1,
                     callbacks=[LearningRateScheduler(self._make_lrs_fct())],
-                    data_gen_creator=data_gen_creator):
+                    data_gen_creator=data_gen_creator, postfix=postfix):
                 try:
-                    hist = self.models['model_norm'].fit_generator(
+                    hist = self.models['model_norm' + postfix].fit_generator(
                         data_gen, validation_data=validation_data,
                         steps_per_epoch=steps_per_epoch,
                         epochs=nb_epoch,
@@ -633,7 +697,7 @@ class kaggle_winsol:
                 print 'validate:'
 
             self.evaluate(
-                validation[0], y_valid=validation[1], verbose=verbose)
+                validation[0], y_valid=validation[1], verbose=verbose, postfix=postfix)
 
             if verbose:
                 timedeltas.append(time.time() - time1)
