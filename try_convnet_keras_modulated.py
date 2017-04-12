@@ -10,18 +10,22 @@ from datetime import datetime, timedelta
 
 from custom_keras_model_and_fit_capsels import kaggle_winsol
 
-starting_time = time.time()
+start_time = time.time()
 
 copy_to_ram_beforehand = False
 
 debug = True
 predict = False  # not implemented
-continueAnalysis = True
+continueAnalysis = False
 saveAtEveryValidation = True
 
 get_winsol_weights = False
 
-BATCH_SIZE = 8  # 256  # keep in mind
+# only relevant if not continued and not gets winsol weights, see http://arxiv.org/abs/1511.06422 for
+# describtion
+DO_LSUV_INIT = True
+
+BATCH_SIZE = 256  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
@@ -171,14 +175,6 @@ winsol.init_models()
 if debug:
     winsol.print_summary()
 
-if continueAnalysis:
-    print "Load model weights"
-    winsol.load_weights(path=WEIGHTS_PATH)
-    winsol.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
-
-if get_winsol_weights:
-    print "import weights from run with original kaggle winner solution"
-    winsol.load_weights()
 
 print "Set up data loading"
 
@@ -236,7 +232,7 @@ def create_valid_gen():
 
 
 print "Preprocess validation data upfront"
-start_time = time.time()
+start_time_val1 = time.time()
 
 xs_valid = [[] for _ in xrange(num_input_representations)]
 
@@ -251,8 +247,24 @@ xs_valid = [x_valid.transpose(0, 3, 1, 2) for x_valid in xs_valid]
 validation_data = (
     [xs_valid[0], xs_valid[1]], y_valid)
 
-t_val = (time.time() - start_time)
+t_val = (time.time() - start_time_val1)
 print "  took %.2f seconds" % (t_val)
+
+
+if continueAnalysis:
+    print "Load model weights"
+    winsol.load_weights(path=WEIGHTS_PATH)
+    winsol.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
+elif get_winsol_weights:
+    print "import weights from run with original kaggle winner solution"
+    winsol.load_weights()
+elif DO_LSUV_INIT:
+    start_time_lsuv = time.time()
+    print 'Starting LSUV initialisation'
+    # TODO check influence on the first epoch of the data generation of this
+    # .next()
+    winsol.LSUV_init(train_batch=input_gen.next())
+    print "  took %.2f seconds" % (time.time(-start_time_lsuv))
 
 
 if debug:
