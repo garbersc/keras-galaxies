@@ -20,6 +20,8 @@ from keras import initializers
 
 from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute, kerasCudaConvnetConv2DLayer
 from custom_for_keras import kaggle_MultiRotMergeLayer_output, OptimisedDivGalaxyOutput, kaggle_input, sliced_accuracy_mean, sliced_accuracy_std, dense_weight_init_values, rmse, lr_function
+from lsuv_init import LSUVinit
+
 
 '''
 This class contains the winning solution model of the kaggle galaxies contest transferred to keras and function to fit it.
@@ -675,7 +677,7 @@ class kaggle_winsol:
                         epochs=nb_epoch,
                         initial_epoch=initial_epoch, verbose=verbose,
                         callbacks=callbacks)
-                    self._save_hist(hist.history)
+                    self._save_hist(hist.history, postfix=postfix)
                 except ValueError:
                     warnings.warn(
                         'Value Error in the main fit. Generator will be reinitialised.')
@@ -711,6 +713,11 @@ class kaggle_winsol:
 
             if save_at_every_validation:
                 self.save()
+
+    def LSUV_init(self, train_batch, modelname='model_norm', postfix='',
+                  sub_modelname='main_seq'):
+        modelname = modelname + postfix
+        LSUVinit(self.models[modelname].get_layer(sub_modelname), train_batch)
 
     def reinit(self, WEIGHTS_PATH=None, LOSS_PATH=None):
         self.reinit_counter += 1

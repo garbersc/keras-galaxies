@@ -32,9 +32,13 @@ BATCH_SIZE = 256  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
+TRAIN_LOSS_SF_PATH = 'dummy.txt'
+# TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_goodWeights.h5"
+WEIGHTS_PATH = "analysis/final/try_dummy.h5"
+TXT_OUTPUT_PATH = "init_pred/init_prediction_output_0.txt"
+
+DONT_LOAD_WEIGHTS = True
 
 input_sizes = [(69, 69), (69, 69)]
 PART_SIZE = 45
@@ -43,7 +47,7 @@ N_INPUT_VARIATION = 2
 
 # set to True if the prediction and evaluation should be done when the
 # prediction file already exists
-REPREDICT_EVERYTIME = False
+REPREDICT_EVERYTIME = True
 
 # TODO built this as functions, not with the if's
 DO_VALID = True  # disable this to not bother with the validation set evaluation
@@ -95,6 +99,7 @@ target_path_valid = os.path.join(
     "predictions/final/augmented/valid", target_filename)
 target_path_test = os.path.join(
     "predictions/final/augmented/test", target_filename)
+
 
 if copy_to_ram_beforehand:
     ra.myLoadFrom_RAM = True
@@ -178,9 +183,10 @@ winsol.init_models()
 if debug:
     winsol.print_summary()
 
-print "Load model weights"
-winsol.load_weights(path=WEIGHTS_PATH)
-winsol.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
+if not DONT_LOAD_WEIGHTS:
+    print "Load model weights"
+    winsol.load_weights(path=WEIGHTS_PATH)
+    winsol.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
 
 if get_winsol_weights:
     print "import weights from run with original kaggle winner solution"
@@ -370,6 +376,23 @@ def R_wreq(i):
                 n_sliced_cat_agrement_wreq[i] + false_neg) else 0.
 
 
+output_dic = {}
+output_dic_short_hand_names = {'rmse': 'rmse',
+                               'rmse/mean': 'rmse/mean',
+                               'global categorized prediction': 'pred',
+                               'global categorized valid': 'val',
+                               'global categorized agree': 'agree',
+                               'slice categorized prediction': 'qPred',
+                               'slice categorized valid': 'qVal',
+                               'slice categorized agree': 'qAgree',
+                               'precision': 'P',
+                               'recall': 'R',
+                               'slice categorized prediction including tree requierement': 'qPred_req',
+                               'slice categorized valid including tree requieremnet': 'qVal_req',
+                               'slice categorized agree including tree requirement': 'qAgree_req',
+                               'precision including tree requierement': 'P_req',
+                               'recall including tree requierement': 'R_req'}
+
 rmse_valid = evalHist['rmse'][-1]
 rmse_augmented = np.sqrt(np.mean((y_valid - predictions)**2))
 print "  MSE (last iteration):\t%.6f" % rmse_valid
@@ -379,10 +402,29 @@ print "  MSE (augmented):\t%.6f  RMSE/mean: %.2f " % (rmse_augmented,
                                                       rmse_augmented / np.mean(
                                                           y_valid))
 print "  MSE output wise (augmented): P(recision), R(ecall)"
+qsc = 0
 for i in xrange(0, VALID_CORR_OUTPUT_FILTER.shape[0]):
+    oneMSE = np.sqrt(np.mean((y_valid.T[i] - predictions.T[i])**2))
+    if not str(qsc) in output_dic.keys():
+        output_dic[str(qsc)] = {}
+    output_dic[str(qsc)][output_names[i]] = {'rmse': float(oneMSE),
+                                             'rmse/mean': float(oneMSE / np.mean(y_valid.T[i])),
+                                             'global categorized prediction': n_global_cat_pred[i],
+                                             'global categorized valid': n_global_cat_valid[i],
+                                             'global categorized agree': n_global_cat_agrement[i],
+                                             'slice categorized prediction': n_sliced_cat_pred[i],
+                                             'slice categorized valid': n_sliced_cat_valid[i],
+                                             'slice categorized agree': n_sliced_cat_agrement[i],
+                                             'precision': P(i),
+                                             'recall': R(i),
+                                             'slice categorized prediction including tree requierement': n_sliced_cat_pred_wreq[i],
+                                             'slice categorized valid including tree requieremnet': n_sliced_cat_valid_wreq[i],
+                                             'slice categorized agree including tree requirement': n_sliced_cat_agrement_wreq[i],
+                                             'precision including tree requierement': P_wreq(i),
+                                             'recall including tree requierement': R_wreq(i)}
     if i in [slice.start for slice in question_slices]:
         print '----------------------------------------------------'
-    oneMSE = np.sqrt(np.mean((y_valid.T[i] - predictions.T[i])**2))
+        qsc += 1
     if P(i) < 0.5:  # oneMSE / np.mean(y_valid.T[i]) > 1.2 * rmse_augmented / np.mean(
            # y_valid):
         print colored("    output %s (%s): \t%.6f  RMSE/mean: %.2f \t N global pred.,valid,agree %i,%i,%i \t N sliced pred.,valid,agree %i,%i,%i, P %.3f, R %.3f \t w_req N sliced pred.,valid,agree %i,%i,%i, P %.3f, R %.3f " % (
@@ -416,6 +458,12 @@ for i in xrange(0, VALID_CORR_OUTPUT_FILTER.shape[0]):
                 n_sliced_cat_pred_wreq[i], n_sliced_cat_valid_wreq[i],
                 n_sliced_cat_agrement_wreq[i],
                 P_wreq(i), R_wreq(i)))
+
+with open(TXT_OUTPUT_PATH, 'a+') as f:
+    json.dump(output_dic_short_hand_names, f)
+    f.write('\n')
+    json.dump(output_dic, f)
+    f.write('\n')
 
 imshow_c = functools.partial(
     plt.imshow, interpolation='none')  # , vmin=0.0, vmax=1.0)
