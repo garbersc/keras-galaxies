@@ -714,10 +714,13 @@ class kaggle_winsol:
             if save_at_every_validation:
                 self.save()
 
-    def LSUV_init(self, train_batch, modelname='model_norm', postfix='',
+    def LSUV_init(self, train_batch, batch_size=None, modelname='model_norm', postfix='',
                   sub_modelname='main_seq'):
         modelname = modelname + postfix
-        LSUVinit(self.models[modelname].get_layer(sub_modelname), train_batch)
+        if not batch_size:
+            batch_size = self.BATCH_SIZE
+        LSUVinit(self.models[modelname].get_layer(sub_modelname),
+                 train_batch, batch_size=batch_size)
 
     def reinit(self, WEIGHTS_PATH=None, LOSS_PATH=None):
         self.reinit_counter += 1

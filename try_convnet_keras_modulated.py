@@ -263,8 +263,12 @@ elif DO_LSUV_INIT:
     print 'Starting LSUV initialisation'
     # TODO check influence on the first epoch of the data generation of this
     # .next()
-    winsol.LSUV_init(train_batch=input_gen.next())
-    print "  took %.2f seconds" % (time.time(-start_time_lsuv))
+    train_batch = input_gen.next()[0]
+    if debug:
+        print type(train_batch)
+        print np.shape(train_batch)
+    winsol.LSUV_init(train_batch)
+    print "  took %.2f seconds" % (time.time() - start_time_lsuv)
 
 
 if debug:
