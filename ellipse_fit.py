@@ -147,9 +147,10 @@ def _get_ellipse_kaggle_par(input_):
         print np.shape(input_)
         raise LinAlgError(e)
     ax_len = ellipse_axis_length(a)
+    ax_frac = ax_len[0] / (ax_len[1] + Epsilon)
+    ax_frac_sqr = ax_frac**2
     quad_distance = get_quad_distance(get_ellipse_par_from_a(a), x, y)
-    return {'axis_fraction': (ax_len[0] / (ax_len[1] + Epsilon)),
-            'quad_distance': quad_distance}
+    return list(a) + [ax_frac, ax_frac_sqr, quad_distance]
 
 
 def get_ellipse_kaggle_par(input_):

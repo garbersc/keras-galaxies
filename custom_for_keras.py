@@ -309,6 +309,6 @@ def input_generator(train_gen):
 
 def ellipse_par_gen(train_gen):
     for img, target in input_generator(train_gen):
-        yield (np.array(map(lambda x: x.values(), get_ellipse_kaggle_par(img[0])) if len(
-            np.shape(img[0])) >= 4 else get_ellipse_kaggle_par(img[0]).values()),
+        yield (np.array(map(lambda x: x, get_ellipse_kaggle_par(img[0])) if len(
+            np.shape(img[0])) >= 4 else get_ellipse_kaggle_par(img[0])),
             target)
