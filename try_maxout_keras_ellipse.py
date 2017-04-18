@@ -23,7 +23,7 @@ get_winsol_weights = False
 
 # only relevant if not continued and not gets winsol weights, see http://arxiv.org/abs/1511.06422 for
 # describtion
-DO_LSUV_INIT = True
+DO_LSUV_INIT = False
 
 BATCH_SIZE = 512  # 256  # keep in mind
 
@@ -243,6 +243,8 @@ xs_valid = [np.vstack(x_valid) for x_valid in xs_valid]
 # move the colour dimension up
 xs_valid = [x_valid.transpose(0, 3, 1, 2) for x_valid in xs_valid]
 
+if debug:
+    print np.shape(xs_valid[0])
 
 from numpy.linalg.linalg import LinAlgError
 
@@ -250,16 +252,15 @@ validation_data = ([], y_valid)
 c = 0
 for x in xs_valid[0]:
     try:
-        validation_data[0].append(np.asarray(
-            get_ellipse_kaggle_par(x)))
+        validation_data[0].append(
+            get_ellipse_kaggle_par(x))
     except LinAlgError, e:
         print 'try_conv'
         print c
         raise LinAlgError(e)
     c += 1
-validation_data = (np.asarray(validation_data[0]), validation_data[1])
-print np.shape(validation_data[0])
 
+validation_data = (np.asarray(validation_data[0]), validation_data[1])
 
 t_val = (time.time() - start_time)
 print "  took %.2f seconds" % (t_val)

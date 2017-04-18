@@ -1,5 +1,5 @@
 # main code from http://nicky.vanforeest.com/misc/fitEllipse/fitEllipse.html
-
+import warnings
 import numpy as np
 import math
 from numpy.linalg import eig, inv
@@ -76,16 +76,16 @@ def fitEllipse(x, y):
     try:
         E, V = eig(np.dot(inv(S), C))
     except LinAlgError, e:
-        if np.shape(x)[0] and e != 'Singular matrix':
+        if np.shape(x)[0] and e != 'Singular matrix\n':
             print '\n'
-            print e
+            print repr(e)
             print '\n'
             raise LinAlgError(e)
         else:
-            # raise Warning(
-            # 'No entries in fitEllipse inputs, a is gonne be set to zeros')
+            warnings.warn(
+                'No entries in fitEllipse inputs, a is gonne be set to zeros')
             E = 0
-            V = np.zeros((10, 1))
+            V = np.zeros((6, 1))
     n = np.argmax(np.abs(E))
     a = V[:, n]
     # print a
@@ -142,6 +142,10 @@ def _get_ellipse_kaggle_par(input_):
     x, y = points_from_input(get_contour_from_img(input_), threshhold=1.)
     try:
         a = fitEllipse(x, y)
+        if len(a) > 9:
+            warnings.warn(
+                'from ellipse a was cut: %s, this warning shpuld not be raised anymore' % a[6:-1])
+            a = a[0:6]
     except LinAlgError, e:
         print 'get_ellipse_kaggle_par'
         print np.shape(input_)
@@ -150,7 +154,8 @@ def _get_ellipse_kaggle_par(input_):
     ax_frac = ax_len[0] / (ax_len[1] + Epsilon)
     ax_frac_sqr = ax_frac**2
     quad_distance = get_quad_distance(get_ellipse_par_from_a(a), x, y)
-    return list(a) + [ax_frac, ax_frac_sqr, quad_distance]
+    return_ = list(a) + [ax_frac, ax_frac_sqr, quad_distance]
+    return np.array(return_)
 
 
 def get_ellipse_kaggle_par(input_):

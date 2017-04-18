@@ -253,19 +253,19 @@ class kaggle_winsol:
 
         return self.models
 
-    def init_models_ellipse(self):
+    def init_models_ellipse(self, input_shape=9):
         print "init model"
         input_tensor = Input(batch_shape=(self.BATCH_SIZE,
-                                          2),
+                                          input_shape),
                              dtype='float32', name='input_tensor')
 
         input_lay_0 = InputLayer(batch_input_shape=(
-            self.BATCH_SIZE, 2),
+            self.BATCH_SIZE, input_shape),
             name='input_lay_seq_0')
 
         model = Sequential(name='main_seq')
 
-        model.add(Dropout(0.5, input_shape=(2,)))
+        model.add(Dropout(0.5, input_shape=(input_shape,)))
         model.add(MaxoutDense(output_dim=2048, nb_feature=2,
                               weights=dense_weight_init_values(
                                   model.output_shape[-1], 2048, nb_feature=2), name='maxout_0'))
