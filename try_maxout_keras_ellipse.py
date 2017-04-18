@@ -245,15 +245,13 @@ xs_valid = [x_valid.transpose(0, 3, 1, 2) for x_valid in xs_valid]
 
 
 from numpy.linalg.linalg import LinAlgError
-# validation_data = ([get_ellipse_kaggle_par(
-#     x).values for x in xs_valid[0]], y_valid)
 
 validation_data = ([], y_valid)
 c = 0
 for x in xs_valid[0]:
     try:
         validation_data[0].append(np.asarray(
-            get_ellipse_kaggle_par(x).values()))
+            get_ellipse_kaggle_par(x)))
     except LinAlgError, e:
         print 'try_conv'
         print c
