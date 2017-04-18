@@ -76,7 +76,10 @@ def fitEllipse(x, y):
     try:
         E, V = eig(np.dot(inv(S), C))
     except LinAlgError, e:
-        if np.shape(x)[0]:
+        if np.shape(x)[0] and e != 'Singular matrix':
+            print '\n'
+            print e
+            print '\n'
             raise LinAlgError(e)
         else:
             # raise Warning(

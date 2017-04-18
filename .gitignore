@@ -65,6 +65,8 @@ predictions/
 trainingNmbrs*.txt
 dummy.txt
 init_pred/
+img_example/
+best*.txt
 
 # emacs autosave files and hidden files
 \#*

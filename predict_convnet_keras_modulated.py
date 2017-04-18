@@ -26,19 +26,22 @@ copy_to_ram_beforehand = False
 
 debug = True
 
-get_winsol_weights = False
+get_winsol_weights = True
 
-BATCH_SIZE = 256  # keep in mind
+BATCH_SIZE = 16  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
-TRAIN_LOSS_SF_PATH = 'dummy.txt'
+included_flipped = True
+
+TRAIN_LOSS_SF_PATH = 'best_withOrigCode_loss.txt'
 # TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_dummy.h5"
-TXT_OUTPUT_PATH = "init_pred/init_prediction_output_0.txt"
+WEIGHTS_PATH = "analysis/final/try_convnet_Christmas2.pkl"
+TXT_OUTPUT_PATH = 'best_withOrigCode_precisions.txt'
+IMAGE_OUTPUT_PATH = "images_best_withOrigCode"
 
-DONT_LOAD_WEIGHTS = True
+DONT_LOAD_WEIGHTS = False
 
 input_sizes = [(69, 69), (69, 69)]
 PART_SIZE = 45
@@ -74,7 +77,6 @@ DO_VALIDSTUFF_ON_TRAIN = True
 
 DO_TEST = False  # disable this to not generate predictions on the testset
 
-IMAGE_OUTPUT_PATH = "images_keras_modulated"
 
 output_names = ["smooth", "featureOrdisk", "NoGalaxy", "EdgeOnYes", "EdgeOnNo", "BarYes", "BarNo", "SpiralYes", "SpiralNo", "BulgeNo", "BulgeJust", "BulgeObvious", "BulgDominant", "OddYes", "OddNo", "RoundCompletly", "RoundBetween", "RoundCigar",
                 "Ring", "Lense", "Disturbed", "Irregular", "Other", "Merger", "DustLane", "BulgeRound", "BlulgeBoxy", "BulgeNo2", "SpiralTight", "SpiralMedium", "SpiralLoose", "Spiral1Arm", "Spiral2Arm", "Spiral3Arm", "Spiral4Arm", "SpiralMoreArms", "SpiralCantTell"]
@@ -94,7 +96,10 @@ question_requierement[10] = question_slices[4].start
 
 print 'Question requirements: %s' % question_requierement
 
+
 target_filename = os.path.basename(WEIGHTS_PATH).replace(".h5", ".npy.gz")
+if get_winsol_weights:
+    target_filename = os.path.basename(WEIGHTS_PATH).replace(".pkl", ".npy.gz")
 target_path_valid = os.path.join(
     "predictions/final/augmented/valid", target_filename)
 target_path_test = os.path.join(
@@ -164,7 +169,8 @@ winsol = kaggle_winsol(BATCH_SIZE=BATCH_SIZE,
                        PART_SIZE=PART_SIZE,
                        input_sizes=input_sizes,
                        LOSS_PATH=TRAIN_LOSS_SF_PATH,
-                       WEIGHTS_PATH=WEIGHTS_PATH, include_flip=False)
+                       WEIGHTS_PATH=WEIGHTS_PATH,
+                       include_flip=included_flipped)
 
 layer_formats = winsol.layer_formats
 layer_names = layer_formats.keys()
@@ -184,13 +190,16 @@ if debug:
     winsol.print_summary()
 
 if not DONT_LOAD_WEIGHTS:
-    print "Load model weights"
-    winsol.load_weights(path=WEIGHTS_PATH)
-    winsol.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
+    if get_winsol_weights:
+        print "Import weights from run with original kaggle winner solution"
+        if not winsol.getWinSolWeights(debug=True, path=WEIGHTS_PATH):
+            raise UserWarning('Importing of the winsol weights did not work')
 
-if get_winsol_weights:
-    print "import weights from run with original kaggle winner solution"
-    winsol.load_weights()
+    else:
+        print "Load model weights"
+        winsol.load_weights(path=WEIGHTS_PATH)
+        winsol.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
+
 
 print "Set up data loading"
 
@@ -624,7 +633,7 @@ def print_filters(image_nr=0, norm=False):
             plt.savefig('output_fig_%s_%s.jpg' %
                         (image_nr, n))
             plt.close()
-    os.chdir('../../..')
+    os.chdir('../..')
 
 
 def print_weights(norm=False):
@@ -668,4 +677,13 @@ def print_weights(norm=False):
         plt.savefig('weight_layer_%s_bias.jpg' % (name))
         plt.close()
 
-    os.chdir('../../..')
+    os.chdir('../..')
+
+
+# print_weights(norm=True)
+print_weights(norm=True)
+valid_scatter()
+print_filters(2, norm=True)
+#print_filters(3, norm=True)
+
+save_exit()
