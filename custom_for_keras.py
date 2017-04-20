@@ -1,7 +1,7 @@
 import numpy as np
 import keras.backend as T
 from keras.metrics import categorical_accuracy, mean_squared_error
-from ellipse_fit import get_ellipse_kaggle_par
+#from ellipse_fit import get_ellipse_kaggle_par
 
 
 def lr_function(e, lrs):
@@ -307,8 +307,10 @@ def input_generator(train_gen):
         yield ([l0_input_var, l0_45_input_var], l6_target_var)
 
 
+'''
 def ellipse_par_gen(train_gen):
     for img, target in input_generator(train_gen):
         yield (np.array(map(lambda x: x, get_ellipse_kaggle_par(img[0])) if len(
             np.shape(img[0])) >= 4 else get_ellipse_kaggle_par(img[0])),
             target)
+'''
