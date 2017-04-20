@@ -34,14 +34,14 @@ NUM_INPUT_FEATURES = 3
 
 included_flipped = True
 
-TRAIN_LOSS_SF_PATH = 'best_withOrigCode_loss.txt'
+TRAIN_LOSS_SF_PATH = 'best_withOrigCode_loss_test.txt'
 # TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_convnet_Christmas2.pkl"
-TXT_OUTPUT_PATH = 'best_withOrigCode_precisions.txt'
-IMAGE_OUTPUT_PATH = "images_best_withOrigCode"
+WEIGHTS_PATH = "analysis/final/try_convnet_Christmas2_test.pkl"
+TXT_OUTPUT_PATH = 'best_withOrigCode_precisions_test.txt'
+IMAGE_OUTPUT_PATH = "images_best_withOrigCode_test"
 
-DONT_LOAD_WEIGHTS = False
+DONT_LOAD_WEIGHTS = True
 
 input_sizes = [(69, 69), (69, 69)]
 PART_SIZE = 45

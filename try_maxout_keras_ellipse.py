@@ -36,9 +36,9 @@ VALIDATE_EVERY = 20  # 20 # 12 # 6 # 6 # 6 # 5 #
 NUM_EPOCHS_NONORM = 0.1
 # this should be only a few, just .1 hopefully suffices.
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_ellipseOnly.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_ellipseOnly_3param.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_ellipseOnly.h5"
+WEIGHTS_PATH = "analysis/final/try_ellipseOnly_3param.h5"
 
 LEARNING_RATE_SCHEDULE = {
     0: 0.4,

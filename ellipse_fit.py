@@ -76,9 +76,9 @@ def fitEllipse(x, y):
     try:
         E, V = eig(np.dot(inv(S), C))
     except LinAlgError, e:
-        if np.shape(x)[0] and e != 'Singular matrix\n':
+        if np.shape(x)[0] and str(e) != 'Singular matrix':
             print '\n'
-            print repr(e)
+            print repr(str(e))
             print '\n'
             raise LinAlgError(e)
         else:
@@ -154,7 +154,7 @@ def _get_ellipse_kaggle_par(input_):
     ax_frac = ax_len[0] / (ax_len[1] + Epsilon)
     ax_frac_sqr = ax_frac**2
     quad_distance = get_quad_distance(get_ellipse_par_from_a(a), x, y)
-    return_ = list(a) + [ax_frac, ax_frac_sqr, quad_distance]
+    return_ = [ax_frac, ax_frac_sqr, quad_distance]
     return np.array(return_)
 
 

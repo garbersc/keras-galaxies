@@ -253,7 +253,7 @@ class kaggle_winsol:
 
         return self.models
 
-    def init_models_ellipse(self, input_shape=9):
+    def init_models_ellipse(self, input_shape=3):
         print "init model"
         input_tensor = Input(batch_shape=(self.BATCH_SIZE,
                                           input_shape),

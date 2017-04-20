@@ -7,12 +7,12 @@ import sys
 import os
 import glob
 
-import theano 
-import theano.tensor as T
+# import keras.backend as T
 
-import numpy as np 
+import numpy as np
 
 import scipy
+import scipy.optimize
 
 import load_data
 
@@ -27,13 +27,13 @@ predictions_test_dir = "predictions/final/augmented/test"
 
 y_train = np.load("data/solutions_train.npy")
 train_ids = load_data.train_ids
-test_ids = load_data.test_ids
+# test_ids = load_data.test_ids
 
 # split training data into training + a small validation set
 num_train = len(train_ids)
-num_test = len(test_ids)
+# num_test = len(test_ids)
 
-num_valid = num_train // 10 # integer division
+num_valid = num_train // 10  # integer division
 num_train -= num_valid
 
 y_valid = y_train[num_train:]
@@ -44,73 +44,92 @@ train_ids = train_ids[:num_train]
 
 train_indices = np.arange(num_train)
 valid_indices = np.arange(num_train, num_train + num_valid)
-test_indices = np.arange(num_test)
-
+# test_indices = np.arange(num_test)
 
 
 # paths of all the files to blend.
-predictions_test_paths = glob.glob(os.path.join(predictions_test_dir, "*.npy.gz"))
-predictions_valid_paths = [os.path.join(predictions_valid_dir, os.path.basename(path)) for path in predictions_test_paths]
+predictions_test_paths = glob.glob(
+    os.path.join(predictions_test_dir, "*.npy.gz"))
+# predictions_valid_paths = [os.path.join(
+#     predictions_valid_dir, os.path.basename(path)) for path
+#     in predictions_test_paths]
+predictions_valid_paths = glob.glob(
+    os.path.join(predictions_valid_dir, "*.npy.gz"))
+
+predictions_valid_paths.remove(
+    'predictions/final/augmented/valid/try_convent_edgeTime1p5.npy.gz')
+print 'using following %s predictions' % len(predictions_valid_paths)
+for path in predictions_valid_paths:
+    print path
 
 print "Loading validation set predictions"
-predictions_list = [load_data.load_gz(path) for path in predictions_valid_paths]
-predictions_stack = np.array(predictions_list).astype(theano.config.floatX) # num_sources x num_datapoints x 37
+predictions_list = [load_data.load_gz(path)
+                    for path in predictions_valid_paths]
+predictions_stack = np.array(predictions_list, dtype='float64')
 del predictions_list
 print
 
 print "Compute individual prediction errors"
-individual_prediction_errors = np.sqrt(((predictions_stack - y_valid[None])**2).reshape(predictions_stack.shape[0], -1).mean(1))
+individual_prediction_errors = np.sqrt(
+    ((predictions_stack - y_valid[None])**2).reshape(
+        predictions_stack.shape[0], -1).mean(1))
 print
 
 print "Compiling Theano functions"
-X = theano.shared(predictions_stack) # source predictions
-t = theano.shared(y_valid) # targets
+X = predictions_stack  # source predictions
+t = y_valid  # targets
 
-W = T.vector('W')
-
-
-# shared weights for all answers
-s = T.nnet.softmax(W).reshape((W.shape[0], 1, 1))
-
-weighted_avg_predictions = T.sum(X * s, axis=0) #  T.tensordot(X, s, [[0], [0]])
-
-error = T.mean((weighted_avg_predictions - t) ** 2)
-grad = T.grad(error, W)
-
-f = theano.function([W], error)
-g = theano.function([W], grad)
+W = np.empty(np.shape(predictions_valid_paths), 'float64')
 
 
-# separate weights for all answers
-s2 = T.nnet.softmax(W.reshape((37, predictions_stack.shape[0]))).dimshuffle(1, 'x', 0) # (num_prediction_sets, 1, num_answers)
+def softmax(x):
+    """Compute softmax values for each sets of scores in x."""
+    e_x = np.exp(x - np.max(x))
+    return e_x / e_x.sum()
 
-weighted_avg_predictions2 = T.sum(X * s2, axis=0) #  T.tensordot(X, s, [[0], [0]])
 
-error2 = T.mean((weighted_avg_predictions2 - t) ** 2)
-grad2 = T.grad(error2, W)
+def f(W):
+    # shared weights for all answers
+    s = softmax(W).reshape((W.shape[0], 1, 1))
+    # T.tensordot(X, s, [[0], [0]])
+    weighted_avg_predictions = np.sum(X * s, axis=0)
+    error = np.mean((weighted_avg_predictions - t)**2)
+    return error
 
-f2 = theano.function([W], error2)
-g2 = theano.function([W], grad2)
 
-print
+def f2(W):
+    # separate weights for all answers
+    s2 = softmax(W.reshape((37, predictions_stack.shape[0]))).T.reshape(
+        predictions_stack.shape[0], 1, 37)
+    # T.tensordot(X, s, [[0], [0]])
+    weighted_avg_predictions = np.sum(X * s2, axis=0)
+    error = np.mean((weighted_avg_predictions - t)**2)
+    return error
+
 
 print "Optimizing blending weights: shared"
-w_init = np.random.randn(predictions_stack.shape[0]).astype(theano.config.floatX) * 0.01
-w_zero = np.zeros(predictions_stack.shape[0], dtype=theano.config.floatX)
-out, res, _ = scipy.optimize.fmin_l_bfgs_b(f, w_init, fprime=g, pgtol=1e-09, epsilon=1e-08, maxfun=10000)
+w_init = np.random.randn(predictions_stack.shape[0]) * 0.01
+w_zero = np.zeros(predictions_stack.shape[0], dtype='float64')
+fmin = scipy.optimize.minimize(
+    fun=f, x0=w_init, options={'maxiter':
+                               10000})
 
-rmse = np.sqrt(res)
-out_s = np.exp(out)
+rmse = np.sqrt(fmin.fun)
+out_s = np.exp(fmin.x)
 out_s /= out_s.sum()
 rmse_uniform = np.sqrt(f(w_zero))
 print
 
 print "Optimizing blending weights: separate"
-w_init2 = np.random.randn(predictions_stack.shape[0] * 37).astype(theano.config.floatX) * 0.01
-out2, res2, _ = scipy.optimize.fmin_l_bfgs_b(f2, w_init2, fprime=g2, pgtol=1e-09, epsilon=1e-08, maxfun=10000)
+w_init2 = np.random.randn(
+    predictions_stack.shape[0] * 37).astype('float64') * 0.01
 
-rmse2 = np.sqrt(res2)
-out_s2 = np.exp(out2).reshape(37, predictions_stack.shape[0]).T
+f2min = scipy.optimize.minimize(
+    fun=f2, x0=w_init2, options={'maxiter':
+                                 10000})
+
+rmse2 = np.sqrt(f2min.fun)
+out_s2 = np.exp(f2min.x).reshape(37, predictions_stack.shape[0]).T
 out_s2 /= out_s2.sum(0)[None, :]
 print
 
@@ -136,12 +155,13 @@ blended_predictions = None
 blended_predictions_separate = None
 blended_predictions_uniform = None
 
-for path, weight, weights_separate in zip(predictions_test_paths, out_s, out_s2):
+for path, weight, weights_separate in zip(predictions_test_paths, out_s,
+                                          out_s2):
     # print "  %s" % os.path.basename(path)
     predictions = load_data.load_gz(path)
     predictions_uniform = predictions * (1.0 / len(predictions_test_paths))
     predictions_separate = predictions * weights_separate[None, :]
-    predictions *= weight # inplace scaling
+    predictions *= weight  # inplace scaling
 
     if blended_predictions is None:
         blended_predictions = predictions
@@ -165,6 +185,6 @@ print
 print "Storing uniformly blended predictions in %s" % TARGET_PATH_UNIFORM
 load_data.save_gz(TARGET_PATH_UNIFORM, blended_predictions_uniform)
 
-    
+
 print
 print "Done!"
