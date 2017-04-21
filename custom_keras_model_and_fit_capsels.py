@@ -7,7 +7,7 @@ import functools
 
 from keras import backend as T
 from keras.models import Sequential, Model
-from keras.layers import Dense, Dropout, Input,  MaxoutDense
+from keras.layers import Dense, Dropout, Input
 from keras.layers.core import Lambda
 from keras.optimizers import SGD, Adam
 # TODO will be removed from keras2, can this be achieved with a lambda
@@ -18,15 +18,13 @@ from keras.callbacks import LearningRateScheduler
 from keras.engine.topology import InputLayer
 from keras import initializers
 
-from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute, kerasCudaConvnetConv2DLayer
+from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute, kerasCudaConvnetConv2DLayer, MaxoutDense
 from custom_for_keras import kaggle_MultiRotMergeLayer_output, OptimisedDivGalaxyOutput, kaggle_input, sliced_accuracy_mean, sliced_accuracy_std, dense_weight_init_values, rmse, lr_function
 from lsuv_init import LSUVinit
 
 
 '''
 This class contains the winning solution model of the kaggle galaxies contest transferred to keras and function to fit it.
-
-TODO: a prediction function
 
 '''
 

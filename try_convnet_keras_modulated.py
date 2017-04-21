@@ -23,6 +23,8 @@ get_winsol_weights = False
 
 # only relevant if not continued and not gets winsol weights, see http://arxiv.org/abs/1511.06422 for
 # describtion
+# for this to work, the batch size has to be something like 128, 256, 512,
+# ... reason not found
 DO_LSUV_INIT = True
 
 BATCH_SIZE = 256  # keep in mind
@@ -36,9 +38,11 @@ VALIDATE_EVERY = 2  # 20 # 12 # 6 # 6 # 6 # 5 #
 NUM_EPOCHS_NONORM = 0.1
 # this should be only a few, just .1 hopefully suffices.
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
+INCLUDE_FLIP = False
+
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_test.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_goodWeights.h5"
+WEIGHTS_PATH = "analysis/final/try_test.h5"
 
 LEARNING_RATE_SCHEDULE = {
     0: 0.4,
@@ -159,7 +163,7 @@ winsol = kaggle_winsol(BATCH_SIZE=BATCH_SIZE,
                        LEARNING_RATE_SCHEDULE=LEARNING_RATE_SCHEDULE,
                        MOMENTUM=MOMENTUM,
                        LOSS_PATH=TRAIN_LOSS_SF_PATH,
-                       WEIGHTS_PATH=WEIGHTS_PATH, include_flip=False)
+                       WEIGHTS_PATH=WEIGHTS_PATH, include_flip=INCLUDE_FLIP)
 
 print "Build model"
 
