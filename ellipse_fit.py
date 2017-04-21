@@ -5,6 +5,7 @@ import math
 from numpy.linalg import eig, inv
 from skimage.feature import canny
 from numpy.linalg.linalg import LinAlgError
+import functools
 
 # TODO better split into two functions like belowx
 # oder einfach nur die lezte fuktion 'mehrdimensional' machen
@@ -154,7 +155,7 @@ def _get_ellipse_kaggle_par(input_, num_par=3):
     ax_frac = ax_len[0] / (ax_len[1] + Epsilon)
     ax_frac_sqr = ax_frac**2
     quad_distance = get_quad_distance(get_ellipse_par_from_a(a), x, y)
-    return_ = [quad_distance, ax_frac, ax_frac_sqr] + a
+    return_ = [quad_distance, ax_frac, ax_frac_sqr] + list(a)
     return np.array(return_[0:num_par])
 
 
@@ -162,4 +163,5 @@ def get_ellipse_kaggle_par(input_, num_par=3):
     if len(np.shape(input_)) <= 3:
         return _get_ellipse_kaggle_par(input_, num_par=num_par)
     else:
-        return map(_get_ellipse_kaggle_par, input_, num_par=num_par)
+        return map(functools.partial(_get_ellipse_kaggle_par, num_par=num_par),
+                   input_)

@@ -259,10 +259,6 @@ class kaggle_winsol:
                                           input_shape),
                              dtype='float32', name='input_tensor')
 
-        input_lay_0 = InputLayer(batch_input_shape=(
-            self.BATCH_SIZE, input_shape),
-            name='input_lay_seq_0')
-
         model = Sequential(name='main_seq')
 
         model.add(Dropout(0.5, input_shape=(input_shape,)))
