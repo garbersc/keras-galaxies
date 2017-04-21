@@ -36,9 +36,13 @@ VALIDATE_EVERY = 20  # 20 # 12 # 6 # 6 # 6 # 5 #
 NUM_EPOCHS_NONORM = 0.1
 # this should be only a few, just .1 hopefully suffices.
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_ellipseOnly_3param.txt"
+NUM_ELLIPSE_PARAMS = 2
+
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_ellipseOnly_" + \
+    str(NUM_ELLIPSE_PARAMS) + "param.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_ellipseOnly_3param.h5"
+WEIGHTS_PATH = "analysis/final/try_ellipseOnly_" + \
+    str(NUM_ELLIPSE_PARAMS) + "param.h5"
 
 LEARNING_RATE_SCHEDULE = {
     0: 0.4,
@@ -170,7 +174,7 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models_ellipse()
+winsol.init_models_ellipse(input_shape=NUM_ELLIPSE_PARAMS)
 
 if debug:
     winsol.print_summary(modelname='model_norm_ellipse')
@@ -209,7 +213,7 @@ def create_data_gen():
     train_gen = load_data.buffered_gen_mp(
         post_augmented_data_gen, buffer_size=GEN_BUFFER_SIZE)
 
-    input_gen = ellipse_par_gen(train_gen)
+    input_gen = ellipse_par_gen(train_gen, num_par=NUM_ELLIPSE_PARAMS)
 
     return input_gen
 
@@ -253,7 +257,7 @@ c = 0
 for x in xs_valid[0]:
     try:
         validation_data[0].append(
-            get_ellipse_kaggle_par(x))
+            get_ellipse_kaggle_par(x, num_par=NUM_ELLIPSE_PARAMS))
     except LinAlgError, e:
         print 'try_conv'
         print c

@@ -137,7 +137,7 @@ def get_ellipse_par(input_, pointskip=1):
     return get_ellipse_par_from_a(a)
 
 
-def _get_ellipse_kaggle_par(input_):
+def _get_ellipse_kaggle_par(input_, num_par=3):
     # print np.shape(input_)
     x, y = points_from_input(get_contour_from_img(input_), threshhold=1.)
     try:
@@ -154,12 +154,12 @@ def _get_ellipse_kaggle_par(input_):
     ax_frac = ax_len[0] / (ax_len[1] + Epsilon)
     ax_frac_sqr = ax_frac**2
     quad_distance = get_quad_distance(get_ellipse_par_from_a(a), x, y)
-    return_ = [ax_frac, ax_frac_sqr, quad_distance]
-    return np.array(return_)
+    return_ = [quad_distance, ax_frac, ax_frac_sqr] + a
+    return np.array(return_[0:num_par])
 
 
-def get_ellipse_kaggle_par(input_):
+def get_ellipse_kaggle_par(input_, num_par=3):
     if len(np.shape(input_)) <= 3:
-        return _get_ellipse_kaggle_par(input_)
+        return _get_ellipse_kaggle_par(input_, num_par=num_par)
     else:
-        return map(_get_ellipse_kaggle_par, input_)
+        return map(_get_ellipse_kaggle_par, input_, num_par=num_par)
