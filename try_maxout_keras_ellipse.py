@@ -21,7 +21,11 @@ saveAtEveryValidation = True
 
 get_winsol_weights = False
 
-BATCH_SIZE = 8  # 256  # keep in mind
+# only relevant if not continued and not gets winsol weights, see http://arxiv.org/abs/1511.06422 for
+# describtion
+DO_LSUV_INIT = True
+
+BATCH_SIZE = 512  # 256  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
@@ -171,15 +175,6 @@ winsol.init_models_ellipse()
 if debug:
     winsol.print_summary(modelname='model_norm_ellipse')
 
-if continueAnalysis:
-    print "Load model weights"
-    winsol.load_weights(path=WEIGHTS_PATH)
-    winsol.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
-
-if get_winsol_weights:
-    print "import weights from run with original kaggle winner solution"
-    winsol.load_weights()
-
 print "Set up data loading"
 
 ds_transforms = [
@@ -272,12 +267,32 @@ t_val = (time.time() - start_time)
 print "  took %.2f seconds" % (t_val)
 
 
+if continueAnalysis:
+    print "Load model weights"
+    winsol.load_weights(path=WEIGHTS_PATH)
+    winsol.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
+elif get_winsol_weights:
+    print "import weights from run with original kaggle winner solution"
+    winsol.load_weights()
+elif DO_LSUV_INIT:
+    start_time_lsuv = time.time()
+    print 'Starting LSUV initialisation'
+    # TODO check influence on the first epoch of the data generation of this
+    # .next()
+    train_batch = input_gen.next()[0]
+    if debug:
+        print type(train_batch)
+        print np.shape(train_batch)
+    winsol.LSUV_init(train_batch, postfix='_ellipse')
+    print "  took %.2f seconds" % (time.time() - start_time_lsuv)
+
+
 if debug:
     print("Free GPU Mem before first step %s MiB " %
           (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0] / 1024. / 1024.))
 
 
-def save_exit(postfix='_ellipse'):
+def save_exit(postfix):
     print "\nsaving..."
     winsol.save(postfix=postfix)
     print "Done!"
@@ -335,6 +350,6 @@ except KeyboardInterrupt:
 except ValueError, e:
     print "\ngot value error, could be the end of the generator in the fit"
     print e
-    save_exit()
+    save_exit(postfix='_ellipse')
 
 save_exit()

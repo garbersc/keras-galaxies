@@ -108,18 +108,18 @@ class kaggle_winsol:
                                                     optimizer=SGD(
                                                         lr=self.LEARNING_RATE_SCHEDULE[0],
                                                         momentum=self.MOMENTUM,
-                                                        nesterov=True))
+                                                        nesterov=bool(self.MOMENTUM)))
         self.models['model_noNorm' + postfix].compile(loss='mean_squared_error',
                                                       optimizer=SGD(
                                                           lr=self.LEARNING_RATE_SCHEDULE[0],
                                                           momentum=self.MOMENTUM,
-                                                          nesterov=True))
+                                                          nesterov=bool(self.MOMENTUM)))
 
         self.models['model_norm_metrics' + postfix].compile(loss='mean_squared_error',
                                                             optimizer=SGD(
                                                                 lr=self.LEARNING_RATE_SCHEDULE[0],
                                                                 momentum=self.MOMENTUM,
-                                                                nesterov=True),
+                                                                nesterov=bool(self.MOMENTUM)),
                                                             metrics=[rmse,
                                                                      'categorical_accuracy',
                                                                      sliced_accuracy_mean,
@@ -327,7 +327,8 @@ class kaggle_winsol:
     modelname: name of the model for which the weights are loaded, in default the models use all the same weight
     '''
 
-    def load_weights(self, path, modelname='model_norm'):
+    def load_weights(self, path, modelname='model_norm', postfix=''):
+        modelname = modelname + postfix
         self.models[modelname].load_weights(path)
         with open(path, 'a')as f:
             f.write('#loaded weights from ' + path +
@@ -358,14 +359,18 @@ class kaggle_winsol:
         w_load_worked = False
 
         if debug:
+            print 'imported:'
             print len(w_kSorted)
+            print np.shape(w_kSorted)
 
         def _load_direct():
             for l in self.models[modelname].layers:
                 if debug:
                     print '---'
                 if debug:
+                    print 'found place'
                     print len(l.get_weights())
+                    print np.shape(l.get_weights())
                 l_weights = l.get_weights()
                 if len(l_weights) == len(w_kSorted):
                     if debug:
@@ -377,8 +382,8 @@ class kaggle_winsol:
                         l.set_weights(w_kSorted)
                         return True
                     except ValueError:
-                        print "found matching layer length but no mathing weights in direct try"
-            return False
+                        print "found matching layer length but no matching weights in direct try"
+                        return False
 
         def _load_maxout():
             for l in self.models[modelname].layers:
@@ -402,7 +407,36 @@ class kaggle_winsol:
                         return True
                     except ValueError:
                         print "found matching length and tried to reshape weights for maxout layers: did not work"
-            return False
+                        return False
+                elif len(l_weights) == len(w_kSorted) + 4:  # import for keras 2
+                    j = 0
+                    for i, lay_in in enumerate(l.layers):
+                        if len(lay_in.get_weights()) == 0:
+                            continue
+                        if len(lay_in.get_weights()) == 2:
+                            w_kern = w_kSorted[j]
+                            j += 1
+                            w_bias = w_kSorted[j]
+                            j += 1
+                            if type(lay_in) == MaxoutDense:
+                                if debug:
+                                    print np.shape(w_kern)
+                                    print np.shape(w_bias)
+                                w_kern = np.reshape(w_kern, (2, np.shape(w_kern)[
+                                    0], np.shape(w_kern)[1] / 2))
+                                w_bias = np.reshape(
+                                    w_bias, (2, np.shape(w_bias)[0] / 2))
+                            try:
+                                lay_in.set_weights([w_kern, w_bias])
+                            except ValueError, e:
+                                print 'WARNING: Setting weights did not work in keras 2 style!'
+                                print " tried to load shapes  %s,%s into %s,%s" % (
+                                    np.shape(w_kern), np.shape(w_bias),
+                                    np.shape(lay_in.get_weights([0])),
+                                    np.shape(lay_in.get_weights()[1]))
+                                print e
+                                return False
+                    return bool(j)
 
         w_load_worked = _load_direct()
         if not w_load_worked:
@@ -682,7 +716,7 @@ class kaggle_winsol:
                     warnings.warn(
                         'Value Error in the main fit. Generator will be reinitialised.')
                     print 'saving'
-                    self.save()
+                    self.save(postfix=postfix)
                     if data_gen_creator:
                         _main_fit(self, data_gen=data_gen_creator())
                     else:
@@ -712,12 +746,15 @@ class kaggle_winsol:
                             * epoch_togo / validate_every)))
 
             if save_at_every_validation:
-                self.save()
+                self.save(postfix=postfix)
 
-    def LSUV_init(self, train_batch, modelname='model_norm', postfix='',
+    def LSUV_init(self, train_batch, batch_size=None, modelname='model_norm', postfix='',
                   sub_modelname='main_seq'):
         modelname = modelname + postfix
-        LSUVinit(self.models[modelname].get_layer(sub_modelname), train_batch)
+        if not batch_size:
+            batch_size = self.BATCH_SIZE
+        LSUVinit(self.models[modelname].get_layer(sub_modelname),
+                 train_batch, batch_size=batch_size)
 
     def reinit(self, WEIGHTS_PATH=None, LOSS_PATH=None):
         self.reinit_counter += 1
