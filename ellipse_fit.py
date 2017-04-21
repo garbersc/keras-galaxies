@@ -1,10 +1,11 @@
 # main code from http://nicky.vanforeest.com/misc/fitEllipse/fitEllipse.html
-
+import warnings
 import numpy as np
 import math
 from numpy.linalg import eig, inv
 from skimage.feature import canny
 from numpy.linalg.linalg import LinAlgError
+import functools
 
 # TODO better split into two functions like belowx
 # oder einfach nur die lezte fuktion 'mehrdimensional' machen
@@ -76,16 +77,16 @@ def fitEllipse(x, y):
     try:
         E, V = eig(np.dot(inv(S), C))
     except LinAlgError, e:
-        if np.shape(x)[0] and e != 'Singular matrix':
+        if np.shape(x)[0] and str(e) != 'Singular matrix':
             print '\n'
-            print e
+            print repr(str(e))
             print '\n'
             raise LinAlgError(e)
         else:
-            # raise Warning(
-            # 'No entries in fitEllipse inputs, a is gonne be set to zeros')
+            warnings.warn(
+                'No entries in fitEllipse inputs, a is gonne be set to zeros')
             E = 0
-            V = np.zeros((10, 1))
+            V = np.zeros((6, 1))
     n = np.argmax(np.abs(E))
     a = V[:, n]
     # print a
@@ -137,23 +138,30 @@ def get_ellipse_par(input_, pointskip=1):
     return get_ellipse_par_from_a(a)
 
 
-def _get_ellipse_kaggle_par(input_):
+def _get_ellipse_kaggle_par(input_, num_par=3):
     # print np.shape(input_)
     x, y = points_from_input(get_contour_from_img(input_), threshhold=1.)
     try:
         a = fitEllipse(x, y)
+        if len(a) > 9:
+            warnings.warn(
+                'from ellipse a was cut: %s, this warning shpuld not be raised anymore' % a[6:-1])
+            a = a[0:6]
     except LinAlgError, e:
         print 'get_ellipse_kaggle_par'
         print np.shape(input_)
         raise LinAlgError(e)
     ax_len = ellipse_axis_length(a)
+    ax_frac = ax_len[0] / (ax_len[1] + Epsilon)
+    ax_frac_sqr = ax_frac**2
     quad_distance = get_quad_distance(get_ellipse_par_from_a(a), x, y)
-    return {'axis_fraction': (ax_len[0] / (ax_len[1] + Epsilon)),
-            'quad_distance': quad_distance}
+    return_ = [quad_distance, ax_frac, ax_frac_sqr] + list(a)
+    return np.array(return_[0:num_par])
 
 
-def get_ellipse_kaggle_par(input_):
+def get_ellipse_kaggle_par(input_, num_par=3):
     if len(np.shape(input_)) <= 3:
-        return _get_ellipse_kaggle_par(input_)
+        return _get_ellipse_kaggle_par(input_, num_par=num_par)
     else:
-        return map(_get_ellipse_kaggle_par, input_)
+        return map(functools.partial(_get_ellipse_kaggle_par, num_par=num_par),
+                   input_)

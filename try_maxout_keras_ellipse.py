@@ -23,7 +23,7 @@ get_winsol_weights = False
 
 # only relevant if not continued and not gets winsol weights, see http://arxiv.org/abs/1511.06422 for
 # describtion
-DO_LSUV_INIT = True
+DO_LSUV_INIT = False
 
 BATCH_SIZE = 512  # 256  # keep in mind
 
@@ -36,9 +36,13 @@ VALIDATE_EVERY = 20  # 20 # 12 # 6 # 6 # 6 # 5 #
 NUM_EPOCHS_NONORM = 0.1
 # this should be only a few, just .1 hopefully suffices.
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_ellipseOnly.txt"
+NUM_ELLIPSE_PARAMS = 2
+
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_ellipseOnly_" + \
+    str(NUM_ELLIPSE_PARAMS) + "param.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_ellipseOnly.h5"
+WEIGHTS_PATH = "analysis/final/try_ellipseOnly_" + \
+    str(NUM_ELLIPSE_PARAMS) + "param.h5"
 
 LEARNING_RATE_SCHEDULE = {
     0: 0.4,
@@ -170,7 +174,7 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models_ellipse()
+winsol.init_models_ellipse(input_shape=NUM_ELLIPSE_PARAMS)
 
 if debug:
     winsol.print_summary(modelname='model_norm_ellipse')
@@ -209,7 +213,7 @@ def create_data_gen():
     train_gen = load_data.buffered_gen_mp(
         post_augmented_data_gen, buffer_size=GEN_BUFFER_SIZE)
 
-    input_gen = ellipse_par_gen(train_gen)
+    input_gen = ellipse_par_gen(train_gen, num_par=NUM_ELLIPSE_PARAMS)
 
     return input_gen
 
@@ -243,25 +247,24 @@ xs_valid = [np.vstack(x_valid) for x_valid in xs_valid]
 # move the colour dimension up
 xs_valid = [x_valid.transpose(0, 3, 1, 2) for x_valid in xs_valid]
 
+if debug:
+    print np.shape(xs_valid[0])
 
 from numpy.linalg.linalg import LinAlgError
-# validation_data = ([get_ellipse_kaggle_par(
-#     x).values for x in xs_valid[0]], y_valid)
 
 validation_data = ([], y_valid)
 c = 0
 for x in xs_valid[0]:
     try:
-        validation_data[0].append(np.asarray(
-            get_ellipse_kaggle_par(x).values()))
+        validation_data[0].append(
+            get_ellipse_kaggle_par(x, num_par=NUM_ELLIPSE_PARAMS))
     except LinAlgError, e:
         print 'try_conv'
         print c
         raise LinAlgError(e)
     c += 1
-validation_data = (np.asarray(validation_data[0]), validation_data[1])
-print np.shape(validation_data[0])
 
+validation_data = (np.asarray(validation_data[0]), validation_data[1])
 
 t_val = (time.time() - start_time)
 print "  took %.2f seconds" % (t_val)

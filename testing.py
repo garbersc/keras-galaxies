@@ -149,14 +149,14 @@ if debug:
 
 winsol.init_models()
 
-print 'output cuda_0'
+# print 'output cuda_0'
 
-print np.shape(winsol.get_layer_output(layer='cuda_0'))
+# print np.shape(winsol.get_layer_output(layer='cuda_0'))
 
-print 'output maxout_2'
+# print 'output maxout_2'
 
-max_out = winsol.get_layer_output(layer='maxout_2')
-print np.shape(max_out)
+# max_out = winsol.get_layer_output(layer='maxout_2')
+# print np.shape(max_out)
 
 
 print 'end of testing.py'

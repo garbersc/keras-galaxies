@@ -253,19 +253,15 @@ class kaggle_winsol:
 
         return self.models
 
-    def init_models_ellipse(self):
+    def init_models_ellipse(self, input_shape=3):
         print "init model"
         input_tensor = Input(batch_shape=(self.BATCH_SIZE,
-                                          2),
+                                          input_shape),
                              dtype='float32', name='input_tensor')
-
-        input_lay_0 = InputLayer(batch_input_shape=(
-            self.BATCH_SIZE, 2),
-            name='input_lay_seq_0')
 
         model = Sequential(name='main_seq')
 
-        model.add(Dropout(0.5, input_shape=(2,)))
+        model.add(Dropout(0.5, input_shape=(input_shape,)))
         model.add(MaxoutDense(output_dim=2048, nb_feature=2,
                               weights=dense_weight_init_values(
                                   model.output_shape[-1], 2048, nb_feature=2), name='maxout_0'))
@@ -348,7 +344,13 @@ class kaggle_winsol:
                          path="analysis/final/try_convent_gpu1_win_sol_net_on_0p0775_validation.pkl",
                          debug=False):
         analysis = np.load(path)
-        l_weights = analysis['param_values']
+        try:
+            l_weights = analysis['param_values']
+        except KeyError, e:
+            print 'KeyError %s in the analysis loaded from %s. \n Available keys are: %s' % (
+                e, path, analysis.keys()
+            )
+            raise KeyError(e)
         # w_pairs=[]
         # for i in range(len(l_weights)/2):
         #	w_pairs.append([l_weights[2*i],l_weights[2*i+1]])
@@ -426,13 +428,22 @@ class kaggle_winsol:
                                     0], np.shape(w_kern)[1] / 2))
                                 w_bias = np.reshape(
                                     w_bias, (2, np.shape(w_bias)[0] / 2))
+                                if 2 * np.shape(w_kern)[1] == np.shape(
+                                        lay_in.get_weights()[0])[1]:
+                                    w_kern = np.concatenate(
+                                        (w_kern, w_kern), 1)
+                                    if debug:
+                                        print "concatenated the w_kern two times, imported weigths seem not to have been with maxout dense"
+                                # elif debug:
+                                #     print 'it did not come to the doubling of the maxout weights'
+                                # print '%s != %s' % (2 * np.shape(w_kern[1]))
                             try:
                                 lay_in.set_weights([w_kern, w_bias])
                             except ValueError, e:
                                 print 'WARNING: Setting weights did not work in keras 2 style!'
                                 print " tried to load shapes  %s,%s into %s,%s" % (
                                     np.shape(w_kern), np.shape(w_bias),
-                                    np.shape(lay_in.get_weights([0])),
+                                    np.shape(lay_in.get_weights()[0]),
                                     np.shape(lay_in.get_weights()[1]))
                                 print e
                                 return False
