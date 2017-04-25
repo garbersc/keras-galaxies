@@ -9,11 +9,8 @@ import realtime_augmentation as ra
 import time
 import sys
 import json
-from custom_for_keras import input_generator
-from datetime import datetime, timedelta
-import csv
+from datetime import timedelta
 import os
-import cPickle as pickle
 import matplotlib.pyplot as plt
 from termcolor import colored
 import functools

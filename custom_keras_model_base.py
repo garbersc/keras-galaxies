@@ -78,28 +78,41 @@ class kaggle_base(object):
     initilises loss histories
     '''
 
-    def _compile_models(self, postfix=''):
-        self.models['model_norm' + postfix].compile(loss='mean_squared_error',
-                                                    optimizer=SGD(
-                                                        lr=self.LEARNING_RATE_SCHEDULE[0],
-                                                        momentum=self.MOMENTUM,
-                                                        nesterov=bool(self.MOMENTUM)))
-        self.models['model_noNorm' + postfix].compile(loss='mean_squared_error',
-                                                      optimizer=SGD(
-                                                          lr=self.LEARNING_RATE_SCHEDULE[0],
-                                                          momentum=self.MOMENTUM,
-                                                          nesterov=bool(self.MOMENTUM)))
+    def _compile_models(self,
+                        optimizer=None,
+                        loss='mean_squared_error',
+                        postfix=''):
+        if not self.models:
+            raise ValueError('Did not find any models to compile')
 
-        self.models['model_norm_metrics' + postfix].compile(loss='mean_squared_error',
-                                                            optimizer=SGD(
-                                                                lr=self.LEARNING_RATE_SCHEDULE[0],
-                                                                momentum=self.MOMENTUM,
-                                                                nesterov=bool(self.MOMENTUM)),
-                                                            metrics=[rmse,
-                                                                     'categorical_accuracy',
-                                                                     sliced_accuracy_mean,
-                                                                     sliced_accuracy_std])
+        if not optimizer:
+            optimizer = SGD(
+                lr=self.LEARNING_RATE_SCHEDULE[0],
+                momentum=self.MOMENTUM,
+                nesterov=bool(self.MOMENTUM))
+        try:
+            self.models['model_norm' + postfix].compile(
+                loss=loss,
+                optimizer=optimizer)
+        except KeyError:
+            pass
+        try:
+            self.models['model_noNorm' + postfix].compile(
+                loss=loss,
+                optimizer=optimizer)
+        except KeyError:
+            pass
+        try:
+            self.models['model_norm_metrics' + postfix].compile(
+                loss=loss,
+                optimizer=optimizer,
+                metrics=[rmse,
+                         'categorical_accuracy',
+                         sliced_accuracy_mean,
+                         sliced_accuracy_std])
 
+        except KeyError:
+            pass
         self._init_hist_dics(self.models)
 
         return True
