@@ -7,7 +7,7 @@ from ellipse_fit import get_ellipse_kaggle_par
 def lr_function(e, lrs):
     for i in xrange(e, -1, -1):
         if i in lrs:
-            return lrs[i]
+            return float(lrs[i])
 
 
 def kaggle_MultiRotMergeLayer_output(x, num_views=2):

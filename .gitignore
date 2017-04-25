@@ -64,6 +64,7 @@ predictions/
 *.gz
 *.npy
 trainingNmbrs*.txt
+try_*.txt
 dummy.txt
 init_pred/
 img_example/

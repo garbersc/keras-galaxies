@@ -25,9 +25,9 @@ get_winsol_weights = False
 # describtion
 # for this to work, the batch size has to be something like 128, 256, 512,
 # ... reason not found
-DO_LSUV_INIT = True
+DO_LSUV_INIT = False
 
-BATCH_SIZE = 256  # keep in mind
+BATCH_SIZE = 16  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 

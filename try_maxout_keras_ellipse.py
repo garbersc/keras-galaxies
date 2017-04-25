@@ -8,7 +8,7 @@ import json
 from custom_for_keras import ellipse_par_gen
 from datetime import datetime, timedelta
 from ellipse_fit import get_ellipse_kaggle_par
-from custom_keras_model_and_fit_capsels import kaggle_winsol
+from custom_keras_model_ellipse import kaggle_ellipse_fit as kaggle_winsol
 
 starting_time = time.time()
 
@@ -25,7 +25,7 @@ get_winsol_weights = False
 # describtion
 DO_LSUV_INIT = False
 
-BATCH_SIZE = 512  # 256  # keep in mind
+BATCH_SIZE = 16  # 256  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
@@ -39,10 +39,10 @@ NUM_EPOCHS_NONORM = 0.1
 NUM_ELLIPSE_PARAMS = 2
 
 TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_ellipseOnly_" + \
-    str(NUM_ELLIPSE_PARAMS) + "param.txt"
+    str(NUM_ELLIPSE_PARAMS) + "param_test.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
 WEIGHTS_PATH = "analysis/final/try_ellipseOnly_" + \
-    str(NUM_ELLIPSE_PARAMS) + "param.h5"
+    str(NUM_ELLIPSE_PARAMS) + "param_test.h5"
 
 LEARNING_RATE_SCHEDULE = {
     0: 0.4,
@@ -174,10 +174,10 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models_ellipse(input_shape=NUM_ELLIPSE_PARAMS)
+winsol.init_models(input_shape=NUM_ELLIPSE_PARAMS)
 
 if debug:
-    winsol.print_summary(modelname='model_norm_ellipse')
+    winsol.print_summary(modelname='model_norm_ellipse', postfix='')
 
 print "Set up data loading"
 
