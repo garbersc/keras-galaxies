@@ -7,6 +7,7 @@ from keras import backend as K
 from keras.engine.topology import Layer, InputSpec
 import numpy as np
 import copy
+import warnings
 
 from keras import initializers
 from keras import activations
@@ -160,7 +161,9 @@ class kerasCudaConvnetConv2DLayer(Layer):
 
     def build(self, input_shape):
         if K.image_data_format() != 'channels_first':
-            print "maybe wrong dim ordering in custom conv layer, ordering is %s, data format is" % (K.image_dim_ordering(), K.image_data_format())
+            warnings.warn(
+                "maybe wrong dim ordering in custom conv layer, ordering is %s, data format is" % (
+                    K.image_dim_ordering(), K.image_data_format()))
 
         self.filter_shape = (
             input_shape[0], self.filter_size, self.filter_size, self.n_filters)

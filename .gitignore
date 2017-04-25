@@ -69,6 +69,7 @@ dummy.txt
 init_pred/
 img_example/
 best*.txt
+bla*
 
 # emacs autosave files and hidden files
 \#*

@@ -1,6 +1,5 @@
 from custom_keras_model_and_fit_capsels import kaggle_winsol
 
-import numpy as np
 from keras.models import Sequential, Model
 from keras.layers import Dense, Dropout, Input
 from keras.layers.core import Lambda
@@ -12,8 +11,10 @@ from keras.engine.topology import InputLayer
 from keras import initializers
 
 from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute, kerasCudaConvnetConv2DLayer, MaxoutDense
-from custom_for_keras import kaggle_MultiRotMergeLayer_output, OptimisedDivGalaxyOutput, kaggle_input, dense_weight_init_values
+from custom_for_keras import kaggle_MultiRotMergeLayer_output,  kaggle_input, dense_weight_init_values
 
+from keras.optimizers import SGD
+from custom_for_keras import rmse
 
 '''
 This class contains the winning solution model of the kaggle galaxies contest transferred to keras and function to fit it.
@@ -40,6 +41,49 @@ class kaggle_x_cat(kaggle_winsol):
         super(kaggle_x_cat, self).__init__(
             *args,
             **kwargs)
+
+    '''
+    compliles all available models
+    initilises loss histories
+    '''
+
+    def _compile_models(self,
+                        optimizer=None,
+                        loss='mean_squared_error',
+                        postfix=''):
+        if not self.models:
+            raise ValueError('Did not find any models to compile')
+
+        if not optimizer:
+            optimizer = SGD(
+                lr=self.LEARNING_RATE_SCHEDULE[0],
+                momentum=self.MOMENTUM,
+                nesterov=bool(self.MOMENTUM))
+        try:
+            self.models['model_norm' + postfix].compile(
+                loss=loss,
+                optimizer=optimizer)
+        except KeyError:
+            pass
+        try:
+            self.models['model_noNorm' + postfix].compile(
+                loss=loss,
+                optimizer=optimizer)
+        except KeyError:
+            pass
+        try:
+            self.models['model_norm_metrics' + postfix].compile(
+                loss=loss,
+                optimizer=optimizer,
+                metrics=[rmse,
+                         'categorical_accuracy',
+                         ])
+
+        except KeyError:
+            pass
+        self._init_hist_dics(self.models)
+
+        return True
 
     def init_models(self, final_units=3):
         print "init model"
@@ -74,7 +118,8 @@ class kaggle_x_cat(kaggle_winsol):
 
         model.add(Merge([input_lay_0, input_lay_1], mode=kaggle_input,
                         output_shape=lambda x: ((input_lay_0.output_shape[0]
-                                                 + input_lay_1.output_shape[0]) * 2
+                                                 + input_lay_1.output_shape[0])
+                                                * 2
                                                 * N_INPUT_VARIATION,
                                                 self.NUM_INPUT_FEATURES,
                                                 self.PART_SIZE,
@@ -142,6 +187,6 @@ class kaggle_x_cat(kaggle_winsol):
         self.models = {'model_norm': model_norm,
                        'model_norm_metrics': model_norm_metrics}
 
-        self._compile_models(loss='categorical_accuracy')
+        self._compile_models(loss='categorical_crossentropy')
 
         return self.models

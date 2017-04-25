@@ -23,7 +23,7 @@ saveAtEveryValidation = True
 # describtion
 # for this to work, the batch size has to be something like 128, 256, 512,
 # ... reason not found
-DO_LSUV_INIT = True
+DO_LSUV_INIT = False
 
 BATCH_SIZE = 256  # keep in mind
 
@@ -86,6 +86,9 @@ if copy_to_ram_beforehand:
     import copy_data_to_shm
 
 y_train = np.load("data/solutions_train_spiral_ellipse_other.npy")
+# y_train = np.concatenate((y_train, np.zeros((np.shape(y_train)[0], 30 - 3))),
+#                          axis=1)
+
 ra.y_train = y_train
 
 # split training data into training + a small validation set
@@ -129,7 +132,10 @@ test_indices = np.arange(num_test)
 N_TRAIN = num_train
 N_VALID = num_valid
 
-
+if debug:
+    print np.shape(y_valid)
+    print y_valid[0]
+    print np.shape(y_train)
 print("The training sample contains %s , the validation sample contains %s images. \n" %
       (ra.num_train,  ra.num_valid))
 # train without normalisation for this fraction of the traininng sample, to get the weights in
@@ -168,6 +174,9 @@ if debug:
            BATCH_SIZE))
 
 winsol.init_models()
+
+if debug:
+    print winsol.models['model_norm'].get_output_shape_at(0)
 
 if debug:
     winsol.print_summary()
@@ -282,6 +291,9 @@ def save_exit():
 try:
     print ''
     print "losses without training on validation sample up front"
+    if debug:
+        print np.shape(y_valid)
+        print winsol.models.keys()
 
     evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
 
@@ -313,8 +325,16 @@ try:
 except KeyboardInterrupt:
     print "\ngot keyboard interuption"
     save_exit()
-except ValueError:
-    print "\ngot value error, could be the end of the generator in the fit"
+except ValueError, e:
+    print "\ngot value error"
+    if debug:
+        print '\t valid shape: %s' % str(np.shape(y_valid))
+        print '\t shape valid data: %s ' % str((np.shape(xs_valid[0]), np.shape(xs_valid[1])))
+        print '\t first valid result: %s' % y_valid[0]
+        print '\t first image row: %s' % xs_valid[0][0, 0, 0]
+    print ''
+    print e
+
     save_exit()
 
 save_exit()
