@@ -8,7 +8,7 @@ from keras_extra_layers import kerasCudaConvnetConv2DLayer
 # Orthonorm init code is taked from Lasagne
 # https://github.com/Lasagne/Lasagne/blob/master/lasagne/init.py
 
-# this code is taken from https://github.com/garbersc/LSUV-kerasx
+# this code is
 # to be cited as
 '''
 @ARTICLE{LSUVInit2015,

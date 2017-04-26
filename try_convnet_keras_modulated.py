@@ -25,7 +25,7 @@ get_winsol_weights = False
 # describtion
 DO_LSUV_INIT = True
 
-BATCH_SIZE = 256  # keep in mind
+BATCH_SIZE = 128  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
@@ -36,9 +36,9 @@ VALIDATE_EVERY = 2  # 20 # 12 # 6 # 6 # 6 # 5 #
 NUM_EPOCHS_NONORM = 0.1
 # this should be only a few, just .1 hopefully suffices.
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_tesr.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_goodWeights.h5"
+WEIGHTS_PATH = "analysis/final/try_test.h5"
 
 LEARNING_RATE_SCHEDULE = {
     0: 0.4,
@@ -78,10 +78,6 @@ N_INPUT_VARIATION = 2
 
 
 GEN_BUFFER_SIZE = 2
-
-if copy_to_ram_beforehand:
-    ra.myLoadFrom_RAM = True
-    import copy_data_to_shm
 
 y_train = np.load("data/solutions_train.npy")
 ra.y_train = y_train
@@ -330,8 +326,9 @@ try:
 except KeyboardInterrupt:
     print "\ngot keyboard interuption"
     save_exit()
-except ValueError:
+except ValueError, e:
     print "\ngot value error, could be the end of the generator in the fit"
+    print e
     save_exit()
 
 save_exit()

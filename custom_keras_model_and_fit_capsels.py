@@ -1,37 +1,27 @@
-import numpy as np
-import json
-import warnings
-import time
-from datetime import datetime, timedelta
-import functools
+from custom_keras_model_base import kaggle_base
 
-from keras import backend as T
+import numpy as np
 from keras.models import Sequential, Model
-from keras.layers import Dense, Dropout, Input,  MaxoutDense
+from keras.layers import Dense, Dropout, Input
 from keras.layers.core import Lambda
-from keras.optimizers import SGD, Adam
 # TODO will be removed from keras2, can this be achieved with a lambda
 # layer now? looks like it:
 # https://stackoverflow.com/questions/43160181/keras-merge-layer-warning
 from keras.layers import Merge
-from keras.callbacks import LearningRateScheduler
 from keras.engine.topology import InputLayer
 from keras import initializers
 
-from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute, kerasCudaConvnetConv2DLayer
-from custom_for_keras import kaggle_MultiRotMergeLayer_output, OptimisedDivGalaxyOutput, kaggle_input, sliced_accuracy_mean, sliced_accuracy_std, dense_weight_init_values, rmse, lr_function
-from lsuv_init import LSUVinit
+from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute, kerasCudaConvnetConv2DLayer, MaxoutDense
+from custom_for_keras import kaggle_MultiRotMergeLayer_output, OptimisedDivGalaxyOutput, kaggle_input, dense_weight_init_values
 
 
 '''
 This class contains the winning solution model of the kaggle galaxies contest transferred to keras and function to fit it.
 
-TODO: a prediction function
-
 '''
 
 
-class kaggle_winsol:
+class kaggle_winsol(kaggle_base):
     '''
    Arguments:
     BATCH_SIZE: image fitted at the same time
@@ -47,21 +37,12 @@ class kaggle_winsol:
     def __init__(self, BATCH_SIZE, NUM_INPUT_FEATURES, PART_SIZE, input_sizes,
                  include_flip=True,
                  LEARNING_RATE_SCHEDULE=None, MOMENTUM=None, LOSS_PATH='./',
-                 WEIGHTS_PATH='./'):
-        self.BATCH_SIZE = BATCH_SIZE
+                 WEIGHTS_PATH='./',
+                 **kwargs):
+
         self.NUM_INPUT_FEATURES = NUM_INPUT_FEATURES
         self.input_sizes = input_sizes
         self.PART_SIZE = PART_SIZE
-        self.LEARNING_RATE_SCHEDULE = LEARNING_RATE_SCHEDULE if LEARNING_RATE_SCHEDULE else [
-            0.1]
-        self.current_lr = self.LEARNING_RATE_SCHEDULE[0]
-        self.MOMENTUM = MOMENTUM
-        self.WEIGHTS_PATH = WEIGHTS_PATH
-        self.LOSS_PATH = LOSS_PATH
-        self.hists = {}
-        self.first_loss_save = True
-        self.models = {}
-        self.reinit_counter = 0
         self.include_flip = include_flip
 
         self.layer_formats = {'conv_0': 1, 'conv_1': 1, 'conv_2': 1,
@@ -70,71 +51,13 @@ class kaggle_winsol:
                               'maxout_0': 0, 'maxout_1': 0,
                               'dense_output': 0}
 
-    '''
-    initialize loss and validation histories
-
-    Arguments:
-        model_in: collection of models, if None takes all models in the class
-
-    Returns:
-        empty dictionary of empty history dictionaries
-    '''
-
-    def _init_hist_dics(self, model_in=None):
-        if model_in:
-            _model_in = model_in
-        else:
-            _model_in = self.models
-
-        self.hists = {}
-
-        for n in _model_in:
-            self.hists[n] = {}
-            try:
-                for o in _model_in[n].metrics_names:
-                    self.hists[n][o] = []
-            except AttributeError:
-                pass
-
-        return self.hists
-
-    '''
-    compliles all available models
-    initilises loss histories
-    '''
-
-    def _compile_models(self, postfix=''):
-        self.models['model_norm' + postfix].compile(loss='mean_squared_error',
-                                                    optimizer=SGD(
-                                                        lr=self.LEARNING_RATE_SCHEDULE[0],
-                                                        momentum=self.MOMENTUM,
-                                                        nesterov=bool(self.MOMENTUM)))
-        self.models['model_noNorm' + postfix].compile(loss='mean_squared_error',
-                                                      optimizer=SGD(
-                                                          lr=self.LEARNING_RATE_SCHEDULE[0],
-                                                          momentum=self.MOMENTUM,
-                                                          nesterov=bool(self.MOMENTUM)))
-
-        self.models['model_norm_metrics' + postfix].compile(loss='mean_squared_error',
-                                                            optimizer=SGD(
-                                                                lr=self.LEARNING_RATE_SCHEDULE[0],
-                                                                momentum=self.MOMENTUM,
-                                                                nesterov=bool(self.MOMENTUM)),
-                                                            metrics=[rmse,
-                                                                     'categorical_accuracy',
-                                                                     sliced_accuracy_mean,
-                                                                     sliced_accuracy_std])
-
-        self._init_hist_dics(self.models)
-
-        return True
-
-    '''
-    initiates models according to the kaggle galaxies winning solution
-
-    Returns:
-    dictinary with the model without normalisation, with normalisation and with normalisation and extra metrics for validation
-    '''
+        super(kaggle_winsol, self).__init__(self,
+                                            BATCH_SIZE,
+                                            LEARNING_RATE_SCHEDULE,
+                                            MOMENTUM,
+                                            LOSS_PATH,
+                                            WEIGHTS_PATH,
+                                            **kwargs)
 
     def init_models(self):
         print "init model"
@@ -252,84 +175,6 @@ class kaggle_winsol:
         self._compile_models()
 
         return self.models
-
-    def init_models_ellipse(self, input_shape=3):
-        print "init model"
-        input_tensor = Input(batch_shape=(self.BATCH_SIZE,
-                                          input_shape),
-                             dtype='float32', name='input_tensor')
-
-        model = Sequential(name='main_seq')
-
-        model.add(Dropout(0.5, input_shape=(input_shape,)))
-        model.add(MaxoutDense(output_dim=2048, nb_feature=2,
-                              weights=dense_weight_init_values(
-                                  model.output_shape[-1], 2048, nb_feature=2), name='maxout_0'))
-
-        model.add(Dropout(0.5))
-        model.add(MaxoutDense(output_dim=2048, nb_feature=2,
-                              weights=dense_weight_init_values(
-                                  model.output_shape[-1], 2048, nb_feature=2), name='maxout_1'))
-
-        model.add(Dropout(0.5))
-        model.add(Dense(units=37, activation='relu',
-                        kernel_initializer=initializers.RandomNormal(
-                            stddev=0.01),
-                        bias_initializer=initializers.Constant(value=0.1),
-                        name='dense_output'))
-
-        model_seq = model([input_tensor])
-
-        CATEGORISED = False  # FXME has to be implemented
-
-        output_layer_norm = Lambda(function=OptimisedDivGalaxyOutput,
-                                   output_shape=lambda x: x,
-                                   arguments={'normalised': True,
-                                              'categorised': CATEGORISED})(model_seq)
-        output_layer_noNorm = Lambda(function=OptimisedDivGalaxyOutput,
-                                     output_shape=lambda x: x,
-                                     arguments={'normalised': False,
-                                                'categorised': CATEGORISED})(model_seq)
-
-        model_norm = Model(
-            inputs=[input_tensor], outputs=output_layer_norm, name='full_model_norm_ellipse')
-        model_norm_metrics = Model(
-            inputs=[input_tensor], outputs=output_layer_norm, name='full_model_metrics_ellipse')
-        model_noNorm = Model(
-            inputs=[input_tensor], outputs=output_layer_noNorm, name='full_model_noNorm_ellipse')
-
-        self.models = {'model_norm_ellipse': model_norm,
-                       'model_norm_metrics_ellipse': model_norm_metrics,
-                       'model_noNorm_ellipse': model_noNorm}
-
-        self._compile_models(postfix='_ellipse')
-
-        return self.models
-
-    '''
-    Arguments:
-    modelname: name of the model to be printed
-    '''
-
-    def print_summary(self, modelname='model_norm'):
-        self.models[modelname].summary()
-        return True
-
-    '''
-    loads previously saved weights
-
-    Arguments:
-    path: path to savefile
-    modelname: name of the model for which the weights are loaded, in default the models use all the same weight
-    '''
-
-    def load_weights(self, path, modelname='model_norm', postfix=''):
-        modelname = modelname + postfix
-        self.models[modelname].load_weights(path)
-        with open(path, 'a')as f:
-            f.write('#loaded weights from ' + path +
-                    ' into  model ' + modelname + '\n')
-        return True
 
     '''
     load weights from the winning solution
@@ -458,373 +303,3 @@ class kaggle_winsol:
                 print "reshaped weights from maxout via dense and dropout to real maxout"
 
         return w_load_worked
-
-    '''
-    prints the loss and metric information of a model
-
-    '''
-
-    def print_last_hist(self, modelname='model_norm_metrics', postfix=''):
-        modelname += postfix
-        print ''
-        for n in self.hists[modelname]:
-            print "   %s : %.3f" % (
-                n, self.hists[modelname][n][-1])
-        return True
-
-    '''
-    evaluates a model according to true answeres, saves the information in the history
-    Arguments:
-    x: input sample
-    y_valid: true answeres
-    batch_size: inputs evaluated at the same time, default uses batch size from class initialisation
-    verbose: interger, set to 0 to minimize oputput
-    '''
-
-    def evaluate(self, x, y_valid, batch_size=None,
-                 modelname='model_norm_metrics', verbose=1, postfix=''):
-        modelname = modelname + postfix
-        if not batch_size:
-            batch_size = self.BATCH_SIZE
-        evalHist = self.models[modelname].evaluate(
-            x=x, y=y_valid, batch_size=batch_size,
-            verbose=verbose)
-
-        for i in range(len(self.models[modelname].metrics_names)):
-            self.hists[modelname][self.models[modelname].metrics_names[i]].append(
-                evalHist[i])
-
-        if verbose:
-            self.print_last_hist(postfix=postfix)
-
-        return evalHist
-
-    def predict(self, x, batch_size=None,
-                modelname='model_norm_metrics', verbose=1, postfix=''):
-        modelname += postfix
-        if not batch_size:
-            batch_size = self.BATCH_SIZE
-        predictions = self.models[modelname].predict(
-            x=x, batch_size=batch_size,
-            verbose=verbose)
-
-        return predictions
-
-    def _make_lrs_fct(self):
-        return functools.partial(lr_function,
-                                 lrs=self.LEARNING_RATE_SCHEDULE)
-
-    def _save_hist(self, history, modelname='model_norm', postfix=''):
-        modelname += postfix
-        if not self.hists:
-            self._init_hist_dics(self.models)
-        for k in self.hists[modelname]:
-            self.hists[modelname][k] += history[k]
-
-        return True
-
-    '''
-    performs the fit
-
-    Arguments:
-    modelname: string name of the model to be fittet
-    data_generator: generator that yields the input data
-    validation: validation set as tuple of validation data and solution
-    samples_per_epoch: integer number of input samples per epoch, use this also to not run over the whole set
-    callbacks: list of callbacks to be excecuted, default uses learning rate schedule. more information at www.keras.io
-    nb_epoch: number of epochs to be fitted
-    '''
-
-    def fit_gen(self, modelname, data_generator, validation, samples_per_epoch,
-                callbacks='default', nb_epoch=1):  # think about making nb_worker>1 work, problem: generator needs multiple instances
-        if callbacks == 'default':
-            _callbacks = [LearningRateScheduler(self._make_lrs_fct())]
-        else:
-            _callbacks = callbacks
-
-        # FIXME think about how to handle the missing samples%batch_size
-        # samples
-        steps_per_epoch = samples_per_epoch // self.BATCH_SIZE
-
-        hist = self.models[modelname].fit_generator(data_generator,
-                                                    validation_data=validation,
-                                                    steps_per_epoch=steps_per_epoch,
-                                                    epochs=nb_epoch,
-                                                    verbose=1,
-                                                    callbacks=_callbacks)
-
-        self._save_hist(hist.history, modelname=modelname)
-
-        return hist
-
-    '''
-    saves the modelweights as hdf5 file
-    Arguments:
-    path: the path were the weights are to be saved, if default the WEIGHTS_PATH with which the class was initialised is used
-    modelname: name of the model, default allmodels have the same weights
-    '''
-
-    def save_weights(self, path='', modelname='model_norm', postfix=''):
-        modelname += postfix
-        if not path:
-            path = self.WEIGHTS_PATH
-        self.models[modelname].save_weights(path)
-        return path
-
-    '''
-    saves the loss and validation metric histories as json strings in a text file
-    Arguments:
-    path: default uses LOSS_PATH from initialisation
-    modelname: default saves history of all models
-    '''
-
-    def save_loss(self, path='', modelname='', postfix=''):
-        if not path:
-            path = self.LOSS_PATH
-        if self.first_loss_save:
-            with open(path, 'a')as f:
-                f.write("#eval losses and metrics:\n")
-                if modelname:
-                    f.write("#history of model: " + modelname + '\n')
-                    json.dump(self.hists[modelname], f)
-                else:
-                    f.write("#histories of all models:\n")
-                    for k in self.models:
-                        f.write("#history of model: " + k + '\n')
-                        json.dump(self.hists[k], f)
-                f.write("\n")
-            self.first_loss_save = False
-        else:
-            if modelname:
-                with open(path, "r+") as f:
-                    d = f.readlines()
-                    f.seek(0)
-                    rewrite_next_json = False
-                    model_found = False
-                    for i in d:
-                        if i != "#history of model: " + modelname + '\n':
-                            if rewrite_next_json:
-                                if i.find("{", 0, 1) != -1:
-                                    json.dump(self.hists[modelname], f)
-                                    rewrite_next_json = False
-                                else:
-                                    print 'WARNING: loss history save file is not in the expected stats'
-                                    json.dump(self.hists[modelname], f)
-                                    rewrite_next_json = False
-                                    f.write(i)
-                            else:
-                                f.write(i)
-                        else:
-                            f.write(i)
-                            model_found = True
-                            rewrite_next_json = True
-                    if not model_found:
-                        f.write("#history of model: " + modelname + '\n')
-                        json.dump(self.hists[modelname], f)
-                    f.write('\n')
-            else:
-                for k in self.models:
-                    self.save_loss(path=path, modelname=k)
-
-        return True
-
-    def _load_one_loss(self, path, modelname):
-        loss_hist = {}
-        with open(path, 'r') as f:
-            d = (i for i in f.readlines()[::-1])
-            for line in d:
-                if line.find("{", 0, 1) != -1:
-                    loss_hist = json.loads(line)
-                if d.next() == "#history of model: " + modelname + '\n':
-                    break
-            if not loss_hist:
-                raise Warning('No model %s was found in %s' %
-                              (modelname, path))
-        return loss_hist
-
-    def load_loss(self, path='', modelname=''):
-        if not path:
-            path = self.LOSS_PATH
-        if modelname:
-            return self._load_one_loss(path, modelname)
-        else:
-            return [self._load_one_loss(path, name)for name in self.models]
-
-    '''
-    performs all saving task
-    '''
-
-    def save(self, option_string=None, postfix=''):
-        if not option_string:
-            self.save_weights(postfix=postfix)
-            self.save_loss(modelname='model_norm_metrics' + postfix)
-            self.save_loss(modelname='model_norm' + postfix)
-        elif option_string == 'interrupt':
-            self.save_weights(path=self.WEIGHTS_PATH +
-                              '_interrupted.h5', postfix=postfix)
-            self.save_loss(path=self.LOSS_PATH + '_interrupted.txt',
-                           modelname='model_norm_metrics' + postfix)
-            self.save_loss(path=self.LOSS_PATH + '_interrupted.txt',
-                           modelname='model_norm' + postfix)
-        else:
-            print 'WARNING: unknown saving opotion *' + option_string + '*'
-            self.save(postfix=postfix)
-        return True
-
-    '''
-    main fitting function that calls a metrics model in addition to the validation after every epoch
-
-    Arguments:
-    data_gen: generator that yields the input samples
-    validation: tuple of validation data and solution
-    samples_per_epoch: number of samples in the fit data set
-    validate_every: number of epochs after which the extra metrics are calculated on the validation sample
-    nb_epochs: number of epochs to be fitted
-    verbose: set to 0 to minimize output
-    save_every_validation: save the losses and metrics after every 'validate_every' epochs, weights are overwritten
-    '''
-
-    def full_fit(self, data_gen, validation, samples_per_epoch,
-                 validate_every,
-                 nb_epochs, verbose=1, save_at_every_validation=True,
-                 data_gen_creator=None, postfix=''):
-        if verbose:
-            timedeltas = []
-        epochs_run = 0
-        epoch_togo = nb_epochs
-
-        # FIXME think about how to handle the missing samples%batch_size
-        # samples
-        steps_per_epoch = samples_per_epoch // self.BATCH_SIZE
-
-        for i in range(nb_epochs / validate_every if not nb_epochs
-                       % validate_every else nb_epochs / validate_every + 1):
-            if verbose:
-                time1 = time.time()
-                print ''
-                print "epochs run: %s - epochs to go: %s " % (
-                    epochs_run, epoch_togo)
-
-            # main fit
-            def _main_fit(
-                    self,
-                    data_gen, validation_data=validation,
-                    samples_per_epoch=samples_per_epoch,
-                    nb_epoch=np.min([
-                        epoch_togo, validate_every]) + epochs_run,
-                    initial_epoch=epochs_run, verbose=1,
-                    callbacks=[LearningRateScheduler(self._make_lrs_fct())],
-                    data_gen_creator=data_gen_creator, postfix=postfix):
-                try:
-                    hist = self.models['model_norm' + postfix].fit_generator(
-                        data_gen, validation_data=validation_data,
-                        steps_per_epoch=steps_per_epoch,
-                        epochs=nb_epoch,
-                        initial_epoch=initial_epoch, verbose=verbose,
-                        callbacks=callbacks)
-                    self._save_hist(hist.history, postfix=postfix)
-                except ValueError:
-                    warnings.warn(
-                        'Value Error in the main fit. Generator will be reinitialised.')
-                    print 'saving'
-                    self.save(postfix=postfix)
-                    if data_gen_creator:
-                        _main_fit(self, data_gen=data_gen_creator())
-                    else:
-                        raise ValueError(
-                            'no reinitilizer of the data generator defined')
-
-            _main_fit(self, data_gen)
-
-            epoch_togo -= np.min([epoch_togo, validate_every])
-            epochs_run += np.min([epoch_togo, validate_every])
-
-            if verbose:
-                print ''
-                print 'validate:'
-
-            self.evaluate(
-                validation[0], y_valid=validation[1], verbose=verbose, postfix=postfix)
-
-            if verbose:
-                timedeltas.append(time.time() - time1)
-                if len(timedeltas) > 10:
-                    timedeltas = timedeltas[-10:]
-                print '\nestimated finish: %s \n' % (
-                    datetime.now() + timedelta(
-                        seconds=(
-                            np.mean(timedeltas)
-                            * epoch_togo / validate_every)))
-
-            if save_at_every_validation:
-                self.save(postfix=postfix)
-
-    def LSUV_init(self, train_batch, batch_size=None, modelname='model_norm', postfix='',
-                  sub_modelname='main_seq'):
-        modelname = modelname + postfix
-        if not batch_size:
-            batch_size = self.BATCH_SIZE
-        LSUVinit(self.models[modelname].get_layer(sub_modelname),
-                 train_batch, batch_size=batch_size)
-
-    def reinit(self, WEIGHTS_PATH=None, LOSS_PATH=None):
-        self.reinit_counter += 1
-        if WEIGHTS_PATH:
-            self.WEIGHTS_PATH = WEIGHTS_PATH
-        else:
-            self.WEIGHTS_PATH = ((self.WEIGHTS_PATH.split(
-                '.', 1)[0] + '_' + str(self.reinit_counter) + '.h5'))
-
-        if LOSS_PATH:
-            self.LOSS_PATH = LOSS_PATH
-        else:
-            self.LOSS_PATH = ((self.LOSS_PATH.split(
-                '.', 1)[0] + '_' + str(self.reinit_counter) + '.h5'))
-
-        self.first_loss_save = True
-
-        self.init_models()
-
-        return True
-
-    def get_layer_output(self, layer, input_=None, modelname='model_norm',
-                         main_layer='main_seq', prediction_batch_size=1):
-        _layer = self.models[modelname].get_layer(main_layer).get_layer(
-            layer)
-
-        if not input_:
-            input_ = [np.ones(shape=(prediction_batch_size,) + i[1:])
-                      for i in self.models[modelname].get_layer(main_layer).input_shape]
-
-        if self.layer_formats[layer] > 0:
-            output_layer = fPermute((3, 0, 1, 2))(_layer.output)
-            output_layer = Lambda(lambda x: T.reshape(x[0], (
-                prediction_batch_size,) + tuple(T.shape(output_layer)[1:])),
-                output_shape=lambda input_shape: (
-                prediction_batch_size,) + input_shape[1:])(output_layer)
-        else:
-            try:
-                output_layer = _layer.output
-            except AttributeError:
-                print 'debug infos after Attribute error'
-                print layer
-                print _layer
-                raise AttributeError
-
-        intermediate_layer_model = Model(inputs=self.models[modelname]
-                                         .get_layer(main_layer).get_input_at(0),
-                                         outputs=output_layer)
-        return intermediate_layer_model.predict(input_,
-                                                batch_size=prediction_batch_size)
-
-    def get_layer_weights(self, layer,  modelname='model_norm',
-                          main_layer='main_seq'):
-        if type(layer) == int:
-            ret_weights = self.models[modelname].get_layer(
-                main_layer).layers[layer].get_weights()
-        elif type(layer) == str:
-            ret_weights = self.models[modelname].get_layer(main_layer).get_layer(
-                layer).get_weights()
-        else:
-            raise ValueError('layer must be specified as int or string')
-        return ret_weights
