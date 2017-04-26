@@ -51,13 +51,13 @@ class kaggle_winsol(kaggle_base):
                               'maxout_0': 0, 'maxout_1': 0,
                               'dense_output': 0}
 
-        super(kaggle_winsol, self).__init__(self,
-                                            BATCH_SIZE,
-                                            LEARNING_RATE_SCHEDULE,
-                                            MOMENTUM,
-                                            LOSS_PATH,
-                                            WEIGHTS_PATH,
-                                            **kwargs)
+        super(kaggle_winsol, self).__init__(
+            BATCH_SIZE=BATCH_SIZE,
+            LEARNING_RATE_SCHEDULE=LEARNING_RATE_SCHEDULE,
+            MOMENTUM=MOMENTUM,
+            LOSS_PATH=LOSS_PATH,
+            WEIGHTS_PATH=WEIGHTS_PATH,
+            **kwargs)
 
     def init_models(self):
         print "init model"

@@ -1,12 +1,13 @@
 '''
 Author: Christoph Garbers
 keras layers that are needed if no CuDNN speed up is available
+and layer that fell out of faver in keras2
 '''
 from keras import backend as K
 from keras.engine.topology import Layer, InputSpec
 import numpy as np
-import functools
 import copy
+import warnings
 
 from keras import initializers
 from keras import activations
@@ -157,22 +158,12 @@ class kerasCudaConvnetConv2DLayer(Layer):
         self.filter_acts_op = FilterActs(
             stride=self.stride, partial_sum=self.partial_sum, pad=self.pad)
         super(kerasCudaConvnetConv2DLayer, self).__init__(**kwargs)
-    '''
-    def reset_params(self):
-        self.W.set_value(np.random.randn(
-            *self.filter_shape).astype(np.float32) * self.weights_std)
-
-        if self.untie_biases:
-            self.b.set_value(np.ones(self.get_output_shape()[:3]).astype(
-                np.float32) * self.init_bias_value)
-        else:
-            self.b.set_value(np.ones(self.n_filters).astype(
-                np.float32) * self.init_bias_value)
-    '''
 
     def build(self, input_shape):
         if K.image_data_format() != 'channels_first':
-            print "maybe wrong dim ordering in custom conv layer, ordering is %s, data format is" % (K.image_dim_ordering(), K.image_data_format())
+            warnings.warn(
+                "maybe wrong dim ordering in custom conv layer, ordering is %s, data format is" % (
+                    K.image_dim_ordering(), K.image_data_format()))
 
         self.filter_shape = (
             input_shape[0], self.filter_size, self.filter_size, self.n_filters)

@@ -64,10 +64,12 @@ predictions/
 *.gz
 *.npy
 trainingNmbrs*.txt
+try_*.txt
 dummy.txt
 init_pred/
 img_example/
 best*.txt
+bla*
 
 # emacs autosave files and hidden files
 \#*

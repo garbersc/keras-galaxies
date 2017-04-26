@@ -33,7 +33,7 @@ def svd_orthonormal(shape):
 
 
 def get_activations(model, layer, X_batch, batch_size):
-    if type(layer) is kerasCudaConvnetConv2DLayer:
+    if (type(layer) is kerasCudaConvnetConv2DLayer):
         batch_size = layer.output_shape[0]
     intermediate_layer_model = Model(
         inputs=model.get_input_at(0), outputs=layer.get_output_at(0))

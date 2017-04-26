@@ -24,6 +24,9 @@ TARGET_PATH_UNIFORM = "predictions/final/blended/blended_predictions_uniform.npy
 predictions_valid_dir = "predictions/final/augmented/valid"
 predictions_test_dir = "predictions/final/augmented/test"
 
+USE_SELECTED_VAL_PRED = True
+predicton_valid_selected = ['predictions/final/augmented/valid/try_ellipseOnly_2param.npy.gz',
+                            'predictions/final/augmented/valid/best_keras_only_weights.npy.gz']
 
 y_train = np.load("data/solutions_train.npy")
 train_ids = load_data.train_ids
@@ -56,8 +59,10 @@ predictions_test_paths = glob.glob(
 predictions_valid_paths = glob.glob(
     os.path.join(predictions_valid_dir, "*.npy.gz"))
 
-predictions_valid_paths.remove(
-    'predictions/final/augmented/valid/try_convent_edgeTime1p5.npy.gz')
+# predictions_valid_paths.remove(
+#    'predictions/final/augmented/valid/try_convent_edgeTime1p5.npy.gz')
+if USE_SELECTED_VAL_PRED:
+    predictions_valid_paths = predicton_valid_selected
 print 'using following %s predictions' % len(predictions_valid_paths)
 for path in predictions_valid_paths:
     print path
@@ -155,11 +160,11 @@ blended_predictions = None
 blended_predictions_separate = None
 blended_predictions_uniform = None
 
-for path, weight, weights_separate in zip(predictions_test_paths, out_s,
+for path, weight, weights_separate in zip(predictions_valid_paths, out_s,
                                           out_s2):
     # print "  %s" % os.path.basename(path)
     predictions = load_data.load_gz(path)
-    predictions_uniform = predictions * (1.0 / len(predictions_test_paths))
+    predictions_uniform = predictions * (1.0 / len(predictions_valid_paths))
     predictions_separate = predictions * weights_separate[None, :]
     predictions *= weight  # inplace scaling
 
@@ -184,7 +189,6 @@ load_data.save_gz(TARGET_PATH_SEPARATE, blended_predictions_separate)
 print
 print "Storing uniformly blended predictions in %s" % TARGET_PATH_UNIFORM
 load_data.save_gz(TARGET_PATH_UNIFORM, blended_predictions_uniform)
-
 
 print
 print "Done!"

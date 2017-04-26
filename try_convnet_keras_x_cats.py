@@ -5,12 +5,12 @@ import realtime_augmentation as ra
 import time
 import sys
 import json
-from custom_for_keras import ellipse_par_gen
+from custom_for_keras import input_generator
 from datetime import datetime, timedelta
-from ellipse_fit import get_ellipse_kaggle_par
-from custom_keras_model_ellipse import kaggle_ellipse_fit as kaggle_winsol
 
-starting_time = time.time()
+from custom_keras_model_x_cat import kaggle_x_cat
+
+start_time = time.time()
 
 copy_to_ram_beforehand = False
 
@@ -19,30 +19,28 @@ predict = False  # not implemented
 continueAnalysis = False
 saveAtEveryValidation = True
 
-get_winsol_weights = False
-
 # only relevant if not continued and not gets winsol weights, see http://arxiv.org/abs/1511.06422 for
 # describtion
+# for this to work, the batch size has to be something like 128, 256, 512,
+# ... reason not found
 DO_LSUV_INIT = False
 
-BATCH_SIZE = 16  # 256  # keep in mind
+BATCH_SIZE = 256  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-EPOCHS = 150
-VALIDATE_EVERY = 20  # 20 # 12 # 6 # 6 # 6 # 5 #
+EPOCHS = 4
+VALIDATE_EVERY = 2  # 20 # 12 # 6 # 6 # 6 # 5 #
 NUM_EPOCHS_NONORM = 0.1
 # this should be only a few, just .1 hopefully suffices.
 
-NUM_ELLIPSE_PARAMS = 2
+INCLUDE_FLIP = True
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_ellipseOnly_" + \
-    str(NUM_ELLIPSE_PARAMS) + "param_test.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_3cat.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_ellipseOnly_" + \
-    str(NUM_ELLIPSE_PARAMS) + "param_test.h5"
+WEIGHTS_PATH = "analysis/final/try_3cat_spiral_ellipse_other.h5"
 
 LEARNING_RATE_SCHEDULE = {
     0: 0.4,
@@ -61,7 +59,7 @@ LEARNING_RATE_SCHEDULE = {
     # 3200: 0.0008,
     # 4600: 0.0004,
 }
-if continueAnalysis or get_winsol_weights:
+if continueAnalysis:
     LEARNING_RATE_SCHEDULE = {
         0: 0.1,
         20: 0.05,
@@ -83,7 +81,14 @@ N_INPUT_VARIATION = 2
 
 GEN_BUFFER_SIZE = 2
 
-y_train = np.load("data/solutions_train.npy")
+if copy_to_ram_beforehand:
+    ra.myLoadFrom_RAM = True
+    import copy_data_to_shm
+
+y_train = np.load("data/solutions_train_spiral_ellipse_other.npy")
+# y_train = np.concatenate((y_train, np.zeros((np.shape(y_train)[0], 30 - 3))),
+#                          axis=1)
+
 ra.y_train = y_train
 
 # split training data into training + a small validation set
@@ -92,11 +97,6 @@ ra.num_train = y_train.shape[0]
 # integer division, is defining validation size
 ra.num_valid = ra.num_train // 10
 ra.num_train -= ra.num_valid
-
-
-# training num check for EV usage
-if ra.num_train != 55420:
-    print "num_train = %s not %s" % (ra.num_train, 55420)
 
 ra.y_valid = ra.y_train[ra.num_train:]
 ra.y_train = ra.y_train[:ra.num_train]
@@ -132,7 +132,10 @@ test_indices = np.arange(num_test)
 N_TRAIN = num_train
 N_VALID = num_valid
 
-
+if debug:
+    print np.shape(y_valid)
+    print y_valid[0]
+    print np.shape(y_train)
 print("The training sample contains %s , the validation sample contains %s images. \n" %
       (ra.num_train,  ra.num_valid))
 # train without normalisation for this fraction of the traininng sample, to get the weights in
@@ -152,14 +155,14 @@ with open(TRAIN_LOSS_SF_PATH, 'a')as f:
     f.write('\n')
 
 print 'initiate winsol class'
-winsol = kaggle_winsol(BATCH_SIZE=BATCH_SIZE,
-                       NUM_INPUT_FEATURES=NUM_INPUT_FEATURES,
-                       PART_SIZE=PART_SIZE,
-                       input_sizes=input_sizes,
-                       LEARNING_RATE_SCHEDULE=LEARNING_RATE_SCHEDULE,
-                       MOMENTUM=MOMENTUM,
-                       LOSS_PATH=TRAIN_LOSS_SF_PATH,
-                       WEIGHTS_PATH=WEIGHTS_PATH, include_flip=False)
+winsol = kaggle_x_cat(BATCH_SIZE=BATCH_SIZE,
+                      NUM_INPUT_FEATURES=NUM_INPUT_FEATURES,
+                      PART_SIZE=PART_SIZE,
+                      input_sizes=input_sizes,
+                      LEARNING_RATE_SCHEDULE=LEARNING_RATE_SCHEDULE,
+                      MOMENTUM=MOMENTUM,
+                      LOSS_PATH=TRAIN_LOSS_SF_PATH,
+                      WEIGHTS_PATH=WEIGHTS_PATH, include_flip=INCLUDE_FLIP)
 
 print "Build model"
 
@@ -170,10 +173,14 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models(input_shape=NUM_ELLIPSE_PARAMS)
+winsol.init_models()
 
 if debug:
-    winsol.print_summary(modelname='model_norm_ellipse', postfix='')
+    print winsol.models['model_norm'].get_output_shape_at(0)
+
+if debug:
+    winsol.print_summary()
+
 
 print "Set up data loading"
 
@@ -209,7 +216,7 @@ def create_data_gen():
     train_gen = load_data.buffered_gen_mp(
         post_augmented_data_gen, buffer_size=GEN_BUFFER_SIZE)
 
-    input_gen = ellipse_par_gen(train_gen, num_par=NUM_ELLIPSE_PARAMS)
+    input_gen = input_generator(train_gen)
 
     return input_gen
 
@@ -231,7 +238,7 @@ def create_valid_gen():
 
 
 print "Preprocess validation data upfront"
-start_time = time.time()
+start_time_val1 = time.time()
 
 xs_valid = [[] for _ in xrange(num_input_representations)]
 
@@ -243,26 +250,10 @@ xs_valid = [np.vstack(x_valid) for x_valid in xs_valid]
 # move the colour dimension up
 xs_valid = [x_valid.transpose(0, 3, 1, 2) for x_valid in xs_valid]
 
-if debug:
-    print np.shape(xs_valid[0])
+validation_data = (
+    [xs_valid[0], xs_valid[1]], y_valid)
 
-from numpy.linalg.linalg import LinAlgError
-
-validation_data = ([], y_valid)
-c = 0
-for x in xs_valid[0]:
-    try:
-        validation_data[0].append(
-            get_ellipse_kaggle_par(x, num_par=NUM_ELLIPSE_PARAMS))
-    except LinAlgError, e:
-        print 'try_conv'
-        print c
-        raise LinAlgError(e)
-    c += 1
-
-validation_data = (np.asarray(validation_data[0]), validation_data[1])
-
-t_val = (time.time() - start_time)
+t_val = (time.time() - start_time_val1)
 print "  took %.2f seconds" % (t_val)
 
 
@@ -270,9 +261,6 @@ if continueAnalysis:
     print "Load model weights"
     winsol.load_weights(path=WEIGHTS_PATH)
     winsol.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
-elif get_winsol_weights:
-    print "import weights from run with original kaggle winner solution"
-    winsol.load_weights()
 elif DO_LSUV_INIT:
     start_time_lsuv = time.time()
     print 'Starting LSUV initialisation'
@@ -282,7 +270,7 @@ elif DO_LSUV_INIT:
     if debug:
         print type(train_batch)
         print np.shape(train_batch)
-    winsol.LSUV_init(train_batch, postfix='_ellipse')
+    winsol.LSUV_init(train_batch)
     print "  took %.2f seconds" % (time.time() - start_time_lsuv)
 
 
@@ -291,9 +279,9 @@ if debug:
           (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0] / 1024. / 1024.))
 
 
-def save_exit(postfix):
+def save_exit():
     print "\nsaving..."
-    winsol.save(postfix=postfix)
+    winsol.save()
     print "Done!"
     print ' run for %s' % timedelta(seconds=(time.time() - start_time))
     exit()
@@ -303,9 +291,11 @@ def save_exit(postfix):
 try:
     print ''
     print "losses without training on validation sample up front"
+    if debug:
+        print np.shape(y_valid)
+        print winsol.models.keys()
 
-    evalHist = winsol.evaluate(
-        validation_data[0], y_valid=y_valid, postfix='_ellipse')
+    evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
 
     if debug:
         print("Free GPU Mem after validation check %s MiB " %
@@ -319,12 +309,6 @@ try:
 
     no_norm_events = int(NUM_EPOCHS_NONORM * N_TRAIN)
 
-    if no_norm_events:
-        hist = winsol.fit_gen(modelname='model_noNorm_ellipse',
-                              data_generator=input_gen,
-                              validation=validation_data,
-                              samples_per_epoch=no_norm_events)
-
     if debug:
         print("\nFree GPU Mem before train loop %s MiB " %
               (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0]
@@ -332,23 +316,25 @@ try:
 
     print 'starting main training'
 
-    if no_norm_events:
-        eta = (time.time() - time1) / NUM_EPOCHS_NONORM * EPOCHS
-        print 'rough ETA %s sec. -> finishes at %s' % (
-            int(eta), datetime.now() + timedelta(seconds=eta))
-
     winsol.full_fit(data_gen=input_gen,
                     validation=validation_data,
                     samples_per_epoch=N_TRAIN,
                     validate_every=VALIDATE_EVERY,
-                    nb_epochs=EPOCHS, postfix='_ellipse')
+                    nb_epochs=EPOCHS)
 
 except KeyboardInterrupt:
     print "\ngot keyboard interuption"
-    save_exit(postfix='_ellipse')
+    save_exit()
 except ValueError, e:
-    print "\ngot value error, could be the end of the generator in the fit"
+    print "\ngot value error"
+    if debug:
+        print '\t valid shape: %s' % str(np.shape(y_valid))
+        print '\t shape valid data: %s ' % str((np.shape(xs_valid[0]), np.shape(xs_valid[1])))
+        print '\t first valid result: %s' % y_valid[0]
+        print '\t first image row: %s' % xs_valid[0][0, 0, 0]
+    print ''
     print e
-    save_exit(postfix='_ellipse')
+
+    save_exit()
 
 save_exit()
