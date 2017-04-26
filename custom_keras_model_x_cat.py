@@ -1,5 +1,6 @@
 from custom_keras_model_and_fit_capsels import kaggle_winsol
 
+import keras.backend as T
 from keras.models import Sequential, Model
 from keras.layers import Dense, Dropout, Input
 from keras.layers.core import Lambda
@@ -177,15 +178,24 @@ class kaggle_x_cat(kaggle_winsol):
 
         model_seq = model([input_tensor, input_tensor_45])
 
+        output_layer_norm = Lambda(function=lambda x: (x - T.min(x)) / (T.max(x) - T.min(x)),
+                                   output_shape=lambda x: x,
+                                   )(model_seq)
+
+        output_layer_noNorm = Lambda(function=lambda x: x,
+                                     output_shape=lambda x: x,
+                                     )(model_seq)
+
         model_norm = Model(
-            inputs=[input_tensor, input_tensor_45], outputs=model_seq,
-            name='full_model_norm')
+            inputs=[input_tensor, input_tensor_45], outputs=output_layer_norm, name='full_model_norm')
         model_norm_metrics = Model(
-            inputs=[input_tensor, input_tensor_45], outputs=model_seq,
-            name='full_model_metrics')
+            inputs=[input_tensor, input_tensor_45], outputs=output_layer_norm, name='full_model_metrics')
+        model_noNorm = Model(
+            inputs=[input_tensor, input_tensor_45], outputs=output_layer_noNorm, name='full_model_noNorm')
 
         self.models = {'model_norm': model_norm,
-                       'model_norm_metrics': model_norm_metrics}
+                       'model_norm_metrics': model_norm_metrics,
+                       'model_noNorm': model_noNorm}
 
         self._compile_models(loss='categorical_crossentropy')
 
