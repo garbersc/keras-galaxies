@@ -16,7 +16,7 @@ copy_to_ram_beforehand = False
 
 debug = True
 predict = False  # not implemented
-continueAnalysis = False
+continueAnalysis = True
 saveAtEveryValidation = True
 
 # only relevant if not continued and not gets winsol weights, see http://arxiv.org/abs/1511.06422 for
@@ -31,24 +31,24 @@ NUM_INPUT_FEATURES = 3
 
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-EPOCHS = 4
-VALIDATE_EVERY = 2  # 20 # 12 # 6 # 6 # 6 # 5 #
+EPOCHS = 150
+VALIDATE_EVERY = 10  # 20 # 12 # 6 # 6 # 6 # 5 #
 NUM_EPOCHS_NONORM = 0.1
 # this should be only a few, just .1 hopefully suffices.
 
 INCLUDE_FLIP = True
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_3cat.txt"
-# TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_3cat_spiral_ellipse_other.h5"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_3cat_mseLoss_hig0herLR.txt"
+# TARGET_PATH = "predictions/final/try_convnet.csv"0
+WEIGHTS_PATH = "analysis/final/try_3cat_spiral_ellipse_other_mseLoss_higherLR.h5"
 
 LEARNING_RATE_SCHEDULE = {
     0: 0.4,
-    2: 0.1,
-    10: 0.05,
-    40: 0.01,
-    80: 0.005,
-    120: 0.0005
+    30: 0.1,
+    #10: 0.05,
+    #40: 0.01,
+    #80: 0.005,
+    #120: 0.0005
     # 500: 0.04,
     # 0: 0.01,
     # 1800: 0.004,
@@ -62,9 +62,9 @@ LEARNING_RATE_SCHEDULE = {
 if continueAnalysis:
     LEARNING_RATE_SCHEDULE = {
         0: 0.1,
-        20: 0.05,
-        40: 0.01,
-        80: 0.005
+        100: 0.05,
+        #40: 0.01,
+        #80: 0.005
         # 0: 0.0001,
         # 500: 0.002,
         # 800: 0.0004,
@@ -173,7 +173,7 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models()
+winsol.init_models(loss='mean_squared_error')
 
 if debug:
     print winsol.models['model_norm'].get_output_shape_at(0)

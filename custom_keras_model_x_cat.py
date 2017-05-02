@@ -78,6 +78,8 @@ class kaggle_x_cat(kaggle_winsol):
                 optimizer=optimizer,
                 metrics=[rmse,
                          'categorical_accuracy',
+                         'mean_squared_error',
+                         'categorical_crossentropy'
                          ])
 
         except KeyError:
@@ -86,7 +88,7 @@ class kaggle_x_cat(kaggle_winsol):
 
         return True
 
-    def init_models(self, final_units=3):
+    def init_models(self, final_units=3, loss='categorical_crossentropy'):
         print "init model"
         input_tensor = Input(batch_shape=(self.BATCH_SIZE,
                                           self.NUM_INPUT_FEATURES,
@@ -197,6 +199,6 @@ class kaggle_x_cat(kaggle_winsol):
                        'model_norm_metrics': model_norm_metrics,
                        'model_noNorm': model_noNorm}
 
-        self._compile_models(loss='categorical_crossentropy')
+        self._compile_models(loss=loss)
 
         return self.models
