@@ -21,12 +21,18 @@ num_test = 79975  # 79971
 train_ids = np.load("data/train_ids.npy")
 test_ids = np.load("data/test_ids.npy")
 
+img_path = None
+
 
 def load_images_from_jpg(subset="train", downsample_factor=None, normalise=True, from_ram=False):
     if from_ram:
-        pattern = "/dev/shm/images_%s_rev1/*.jpg"
+        if not img_path:
+            if img_path.find('/dev/shm') < 0:
+                raise TypeError(
+                    "Loading from ram is only implemented for the kaggle galaxies images")
+        pattern = img_path % '*' if img_path else "/dev/shm/images_%s_rev1/*.jpg"
     else:
-        pattern = "data/raw/images_%s_rev1/*.jpg"
+        pattern = img_path % 's' if img_path else "data/raw/images_%s_rev1/*.jpg"
     paths = glob.glob(pattern % subset)
     paths.sort()  # alphabetic ordering is used everywhere.
     for path in paths:
@@ -54,9 +60,17 @@ def images_gen(id_gen, *args, **kwargs):
 
 def load_image(img_id, subset='train', normalise=True, from_ram=False):
     if from_ram:
-        path = "/dev/shm/images_%s_rev1/%d.jpg" % (subset, img_id)
+        if not img_path:
+            if img_path.find('/dev/shm') < 0:
+                raise TypeError(
+                    'Loading from ram is only implemented for the kaggle galaxies imaged'
+                )
+
+        path = img_path % img_id if img_path else "/dev/shm/images_%s_rev1/%d.jpg" % (
+            subset, img_id)
     else:
-        path = "data/raw/images_%s_rev1/%d.jpg" % (subset, img_id)
+        path = img_path % img_id if img_path else "data/raw/images_%s_rev1/%d.jpg" % (
+            subset, img_id)
     # print "loading %s" % path # TODO DEBUG
     img = skimage.io.imread(path)
     if normalise:
