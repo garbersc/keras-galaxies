@@ -16,7 +16,7 @@ copy_to_ram_beforehand = False
 
 debug = True
 predict = False  # not implemented
-continueAnalysis = False
+continueAnalysis = True
 saveAtEveryValidation = True
 
 get_winsol_weights = False

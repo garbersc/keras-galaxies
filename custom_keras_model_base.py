@@ -76,6 +76,10 @@ class kaggle_base(object):
             except AttributeError:
                 pass
 
+        self.first_loss_save = {'allsave': self.first_loss_save}
+        for k in self.models.keys():
+            self.first_loss_save[k] = True
+
         return self.hists
 
     '''
@@ -334,47 +338,69 @@ class kaggle_base(object):
         modelname += postfix
         if not path:
             path = self.LOSS_PATH
-        if self.first_loss_save:
+        if self.first_loss_save['allsave'] and\
+           (not modelname or self.first_loss_save[modelname]):
             with open(path, 'a')as f:
                 f.write("#eval losses and metrics:\n")
                 if modelname:
                     f.write("#history of model: " + modelname + '\n')
                     json.dump(self.hists[modelname], f)
+                    self.first_loss_save[modelname] = False
                 else:
                     f.write("#histories of all models:\n")
                     for k in self.models:
                         f.write("#history of model: " + k + '\n')
                         json.dump(self.hists[k], f)
+                        print '\n'
+                        self.first_loss_save['allsave'] = False
                 f.write("\n")
-            self.first_loss_save = False
         else:
             if modelname:
                 with open(path, "r+") as f:
-                    d = f.readlines()
+                    d = f.readlines()[::-1]
                     f.seek(0)
-                    rewrite_next_json = False
+                    # rewrite_next_json = False
                     model_found = False
-                    for i in d:
-                        if i != "#history of model: " + modelname + '\n':
-                            if rewrite_next_json:
-                                if i.find("{", 0, 1) != -1:
-                                    json.dump(self.hists[modelname], f)
-                                    rewrite_next_json = False
-                                else:
-                                    print 'WARNING: loss history save file is not in the expected stats'
-                                    json.dump(self.hists[modelname], f)
-                                    rewrite_next_json = False
-                                    f.write(i)
-                            else:
-                                f.write(i)
-                        else:
-                            f.write(i)
+
+                    for j, i in enumerate(d):
+                        if i == "#history of model: " + modelname + '\n':
                             model_found = True
-                            rewrite_next_json = True
+                            if d[(j - 1)].find("{", 0, 1) != -1:
+                                d[(j - 1)] = json.dumps(self.hists[modelname]) + '\n'
+                            else:
+                                print 'WARNING: loss history save file is not in the expected stats'
+                                d = [json.dumps(
+                                    self.hists[modelname]) + '\n', i] + d
+                            break
                     if not model_found:
-                        f.write("#history of model: " + modelname + '\n')
-                        json.dump(self.hists[modelname], f)
-                    f.write('\n')
+                        d = [json.dumps(self.hists[modelname]) + '\n',
+                             "#history of model: " + modelname + '\n'] + d
+                    d = d[::-1]
+                    for i in d:
+                        f.write(i)
+
+                    # for i in d:
+                    #     if i != "#history of model: " + modelname + '\n':
+                    #         if rewrite_next_json:
+                    #             if i.find("{", 0, 1) != -1:
+                    #                 json.dump(self.hists[modelname], f)
+                    #                 rewrite_next_json = False
+                    #                 f.write('\n')
+                    #             else:
+                    #                 print 'WARNING: loss history save file is not in the expected stats'
+                    #                 json.dump(self.hists[modelname], f)
+                    #                 rewrite_next_json = False
+                    #                 f.write(i)
+                    #         else:
+                    #             f.write(i)
+                    #     else:
+                    #         f.write(i)
+                    #         model_found = True
+                    #         rewrite_next_json = True
+                    # if not model_found:
+                    #     f.write("#history of model: " + modelname + '\n')
+                    #     json.dump(self.hists[modelname], f)
+                    # f.write('\n')
             else:
                 for k in self.models:
                     self.save_loss(path=path, modelname=k)
