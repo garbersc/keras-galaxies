@@ -35,7 +35,8 @@ class kaggle_base(object):
                  MOMENTUM=None,
                  LOSS_PATH='./',
                  WEIGHTS_PATH='./',
-                 **kwargs):
+                 debug=False,
+                 ** kwargs):
         self.BATCH_SIZE = BATCH_SIZE
         self.LEARNING_RATE_SCHEDULE = LEARNING_RATE_SCHEDULE if LEARNING_RATE_SCHEDULE else [
             0.1]
@@ -47,6 +48,7 @@ class kaggle_base(object):
         self.first_loss_save = True
         self.models = {}
         self.reinit_counter = 0
+        self.debug = debug
 
     '''
     initialize loss and validation histories
@@ -141,7 +143,8 @@ class kaggle_base(object):
         return True
 
     def load_one_layers_weight(self, path, layername_source, layername_this='',
-                               modelname='model_norm', sub_modelname='model_seq',
+                               modelname='model_norm',
+                               sub_modelname='main_seq',
                                postfix=''):
         modelname = modelname + postfix
 
@@ -150,19 +153,47 @@ class kaggle_base(object):
         if not layername_this:
             layername_this = layername_source
 
-        file = h5py.File(path, 'r')
+        file_ = h5py.File(path, 'r')
 
         for ls, lt in zip(layername_source, layername_this):
-            weight = file[modelname][sub_modelname][ls]
+            if self.debug:
+                print
+                print 'loading weights from layer %s to layer %s' % (ls, lt)
+            try:
+                weight = file_[sub_modelname][ls]
+            except KeyError, e:
+                print
+                print 'KeyError'
+                print '\ttried key %s' % sub_modelname
+                print '\tpossible keys are: %s' % file_.keys()
+                print
+                raise KeyError(e)
+
+            if self.debug:
+                print 'keys in source weight object %s' % weight.keys()
+                print '\t shapes: %s' % [np.shape(weight[n]) for n
+                                         in weight.keys()]
+
+            weight = [np.array(weight[n]) for n in weight.keys()]
+
+            # if self.debug:
+            #     print '\t %s' % repr(np.shape(weight[0]))
+            #     # if ls == 'conv_3':
+            #     for w in weight:
+            #         print np.shape(w)
+            #         print np.shape(w[0])
+
             self.models[modelname].get_layer(
-                sub_modelname).get_layer(lt).load_weights(weight)
+                sub_modelname).get_layer(lt).set_weights(weight)
 
-        file.Close()
-
+        file_.close()
+        if self.debug:
+            print
         with open(self.LOSS_PATH, 'a')as f:
-            f.write('#loaded weights of layer ' + layername_source + '  from '
-                    + path + ' into  model ' + modelname + ' into the layer '
-                    + layername_this + '\n')
+            f.write('#loaded weights of layer(s) ' + str(layername_source) + '  from '
+                    + str(path) + ' into  model ' +
+                    str(modelname) + ' into the layer(s) '
+                    + str(layername_this) + '\n')
         return True
 
     '''
@@ -530,11 +561,11 @@ class kaggle_base(object):
         else:
             try:
                 output_layer = _layer.output
-            except AttributeError:
+            except AttributeError, e:
                 print 'debug infos after Attribute error'
                 print layer
                 print _layer
-                raise AttributeError
+                raise AttributeError(e)
 
         intermediate_layer_model = Model(inputs=self.models[modelname]
                                          .get_layer(main_layer).get_input_at(0),
@@ -549,8 +580,8 @@ class kaggle_base(object):
             ret_weights = self.models[modelname].get_layer(
                 main_layer).layers[layer].get_weights()
         elif type(layer) == str:
-            ret_weights = self.models[modelname].get_layer(main_layer).get_layer(
-                layer).get_weights()
+            ret_weights = self.models[modelname].get_layer(main_layer)\
+                                                .get_layer(layer).get_weights()
         else:
             raise ValueError('layer must be specified as int or string')
         return ret_weights

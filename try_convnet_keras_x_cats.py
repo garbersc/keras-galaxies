@@ -163,7 +163,8 @@ winsol = kaggle_x_cat(BATCH_SIZE=BATCH_SIZE,
                       LEARNING_RATE_SCHEDULE=LEARNING_RATE_SCHEDULE,
                       MOMENTUM=MOMENTUM,
                       LOSS_PATH=TRAIN_LOSS_SF_PATH,
-                      WEIGHTS_PATH=WEIGHTS_PATH, include_flip=INCLUDE_FLIP)
+                      WEIGHTS_PATH=WEIGHTS_PATH, include_flip=INCLUDE_FLIP,
+                      debug=debug)
 
 print "Build model"
 
