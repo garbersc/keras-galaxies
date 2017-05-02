@@ -8,7 +8,8 @@ import json
 from custom_for_keras import input_generator
 from datetime import datetime, timedelta
 
-from custom_keras_model_x_cat import kaggle_x_cat
+from custom_keras_model_x_cat_x_maxout import kaggle_x_cat_x_maxout \
+    as kaggle_x_cat
 
 start_time = time.time()
 
@@ -16,10 +17,8 @@ copy_to_ram_beforehand = False
 
 debug = True
 predict = False  # not implemented
-continueAnalysis = True
+continueAnalysis = False
 saveAtEveryValidation = True
-
-import_conv_weights = True
 
 # only relevant if not continued and not gets winsol weights, see http://arxiv.org/abs/1511.06422 for
 # describtion
@@ -27,7 +26,7 @@ import_conv_weights = True
 # ... reason not found
 DO_LSUV_INIT = False
 
-BATCH_SIZE = 256  # keep in mind
+BATCH_SIZE = 32  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
@@ -38,20 +37,18 @@ VALIDATE_EVERY = 5  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 INCLUDE_FLIP = True
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_3cat_started_with_geometry.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_3cat_geometry.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_3cat_spiral_ellipse_other_started_with_geometry.h5"
+WEIGHTS_PATH = "analysis/final/try_3cat_geometry.h5"
 
-CONV_WEIGHT_PATH = 'analysis/final/try_3cat_geometry_corr_geopics_next.h5'
-
+load_data.img_path = 'geometry_examples/%s.jpg'
 
 LEARNING_RATE_SCHEDULE = {
-    0: 0.4,
-    30: 0.1,
-    #10: 0.05,
-    #40: 0.01,
-    #80: 0.005,
-    #120: 0.0005
+    # 0: 0.1,
+    # 0: 0.05,
+    0: 0.001,
+    # 80: 0.005,
+    # 120: 0.0005
     # 500: 0.04,
     # 0: 0.01,
     # 1800: 0.004,
@@ -65,9 +62,9 @@ LEARNING_RATE_SCHEDULE = {
 if continueAnalysis:
     LEARNING_RATE_SCHEDULE = {
         0: 0.1,
-        100: 0.05,
-        #40: 0.01,
-        #80: 0.005
+        20: 0.05,
+        40: 0.01,
+        80: 0.005
         # 0: 0.0001,
         # 500: 0.002,
         # 800: 0.0004,
@@ -88,9 +85,7 @@ if copy_to_ram_beforehand:
     ra.myLoadFrom_RAM = True
     import copy_data_to_shm
 
-y_train = np.load("data/solutions_train_spiral_ellipse_other.npy")
-# y_train = np.concatenate((y_train, np.zeros((np.shape(y_train)[0], 30 - 3))),
-#                          axis=1)
+y_train = np.load("geometry_examples/solutions.npy")
 
 ra.y_train = y_train
 
@@ -105,7 +100,7 @@ ra.y_valid = ra.y_train[ra.num_train:]
 ra.y_train = ra.y_train[:ra.num_train]
 
 load_data.num_train = y_train.shape[0]
-load_data.train_ids = np.load("data/train_ids.npy")
+load_data.train_ids = np.load("geometry_examples/ids.npy")
 
 ra.load_data.num_train = load_data.num_train
 ra.load_data.train_ids = load_data.train_ids
@@ -174,7 +169,7 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models(loss='mean_squared_error')
+winsol.init_models()
 
 if debug:
     print winsol.models['model_norm'].get_output_shape_at(0)
@@ -197,7 +192,7 @@ num_input_representations = len(ds_transforms)
 augmentation_params = {
     'zoom_range': (1.0 / 1.3, 1.3),
     'rotation_range': (0, 360),
-    'shear_range': (0, 0),
+    'shear_range': (0, 5),
     'translation_range': (-4, 4),
     'do_flip': True,
 }
@@ -262,9 +257,6 @@ if continueAnalysis:
     print "Load model weights"
     winsol.load_weights(path=WEIGHTS_PATH)
     winsol.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
-elif import_conv_weights:
-    print 'Import convnet weights from training with geometric forms'
-    winsol.load_conv_layers(path=CONV_WEIGHT_PATH)
 elif DO_LSUV_INIT:
     start_time_lsuv = time.time()
     print 'Starting LSUV initialisation'
@@ -320,7 +312,8 @@ try:
                     validation=validation_data,
                     samples_per_epoch=N_TRAIN,
                     validate_every=VALIDATE_EVERY,
-                    nb_epochs=EPOCHS)
+                    nb_epochs=EPOCHS,
+                    data_gen_creator=create_data_gen)
 
 except KeyboardInterrupt:
     print "\ngot keyboard interuption"

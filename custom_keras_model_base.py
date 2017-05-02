@@ -5,6 +5,8 @@ import time
 from datetime import datetime, timedelta
 import functools
 
+import h5py
+
 from keras import backend as T
 from keras.models import Model
 from keras.layers.core import Lambda
@@ -12,7 +14,8 @@ from keras.optimizers import SGD, Adam
 from keras.callbacks import LearningRateScheduler
 
 from keras_extra_layers import fPermute
-from custom_for_keras import sliced_accuracy_mean, sliced_accuracy_std, rmse, lr_function
+from custom_for_keras import sliced_accuracy_mean, sliced_accuracy_std, rmse,\
+    lr_function
 from lsuv_init import LSUVinit
 
 
@@ -137,6 +140,31 @@ class kaggle_base(object):
         self.models[modelname].summary()
         return True
 
+    def load_one_layers_weight(self, path, layername_source, layername_this='',
+                               modelname='model_norm', sub_modelname='model_seq',
+                               postfix=''):
+        modelname = modelname + postfix
+
+        if not type(layername_source) == list:
+            layername_source = [layername_source]
+        if not layername_this:
+            layername_this = layername_source
+
+        file = h5py.File(path, 'r')
+
+        for ls, lt in zip(layername_source, layername_this):
+            weight = file[modelname][sub_modelname][ls]
+            self.models[modelname].get_layer(
+                sub_modelname).get_layer(lt).load_weights(weight)
+
+        file.Close()
+
+        with open(self.LOSS_PATH, 'a')as f:
+            f.write('#loaded weights of layer ' + layername_source + '  from '
+                    + path + ' into  model ' + modelname + ' into the layer '
+                    + layername_this + '\n')
+        return True
+
     '''
     loads previously saved weights
 
@@ -148,7 +176,7 @@ class kaggle_base(object):
     def load_weights(self, path, modelname='model_norm', postfix=''):
         modelname = modelname + postfix
         self.models[modelname].load_weights(path)
-        with open(path, 'a')as f:
+        with open(self.LOSS_PATH, 'a')as f:
             f.write('#loaded weights from ' + path +
                     ' into  model ' + modelname + '\n')
         return True
