@@ -12,8 +12,13 @@ import functools
 
 from custom_for_keras import input_generator
 from datetime import datetime, timedelta
+<<<<<<< HEAD:try_convnet_keras_modulated_lsuv_comp.py
 
 from custom_keras_model_and_fit_capsels import kaggle_winsol
+=======
+from ellipse_fit import get_ellipse_kaggle_par
+from custom_keras_model_ellipse import kaggle_ellipse_fit as kaggle_winsol
+>>>>>>> bb89644b58f555c756cf77b6c7e440a0c0e5dfc6:try_maxout_keras_ellipse.py
 
 start_time = time.time()
 
@@ -31,7 +36,11 @@ get_winsol_weights = False
 DO_LSUV_INIT = False
 DO_LSUV_COMPARISON = True
 
+<<<<<<< HEAD:try_convnet_keras_modulated_lsuv_comp.py
 BATCH_SIZE = 256  # keep in mind
+=======
+BATCH_SIZE = 16  # 256  # keep in mind
+>>>>>>> bb89644b58f555c756cf77b6c7e440a0c0e5dfc6:try_maxout_keras_ellipse.py
 
 NUM_INPUT_FEATURES = 3
 
@@ -42,10 +51,20 @@ VALIDATE_EVERY = 2  # 20 # 12 # 6 # 6 # 6 # 5 #
 NUM_EPOCHS_NONORM = 0.1
 # this should be only a few, just .1 hopefully suffices.
 
+<<<<<<< HEAD:try_convnet_keras_modulated_lsuv_comp.py
 TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
 WEIGHTS_PATH = "analysis/final/try_goodWeights.h5"
 IMAGE_OUTPUT_PATH = "images_keras_modulated"
+=======
+NUM_ELLIPSE_PARAMS = 2
+
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_ellipseOnly_" + \
+    str(NUM_ELLIPSE_PARAMS) + "param_test.txt"
+# TARGET_PATH = "predictions/final/try_convnet.csv"
+WEIGHTS_PATH = "analysis/final/try_ellipseOnly_" + \
+    str(NUM_ELLIPSE_PARAMS) + "param_test.h5"
+>>>>>>> bb89644b58f555c756cf77b6c7e440a0c0e5dfc6:try_maxout_keras_ellipse.py
 
 LEARNING_RATE_SCHEDULE = {
     0: 0.4,
@@ -85,10 +104,6 @@ N_INPUT_VARIATION = 2
 
 
 GEN_BUFFER_SIZE = 2
-
-if copy_to_ram_beforehand:
-    ra.myLoadFrom_RAM = True
-    import copy_data_to_shm
 
 y_train = np.load("data/solutions_train.npy")
 ra.y_train = y_train
@@ -177,11 +192,18 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
+<<<<<<< HEAD:try_convnet_keras_modulated_lsuv_comp.py
 winsol.init_models()
 
 if debug:
     winsol.print_summary()
 
+=======
+winsol.init_models(input_shape=NUM_ELLIPSE_PARAMS)
+
+if debug:
+    winsol.print_summary(modelname='model_norm_ellipse', postfix='')
+>>>>>>> bb89644b58f555c756cf77b6c7e440a0c0e5dfc6:try_maxout_keras_ellipse.py
 
 print "Set up data loading"
 
@@ -217,7 +239,11 @@ def create_data_gen():
     train_gen = load_data.buffered_gen_mp(
         post_augmented_data_gen, buffer_size=GEN_BUFFER_SIZE)
 
+<<<<<<< HEAD:try_convnet_keras_modulated_lsuv_comp.py
     input_gen = input_generator(train_gen)
+=======
+    input_gen = ellipse_par_gen(train_gen, num_par=NUM_ELLIPSE_PARAMS)
+>>>>>>> bb89644b58f555c756cf77b6c7e440a0c0e5dfc6:try_maxout_keras_ellipse.py
 
     return input_gen
 
@@ -251,8 +277,29 @@ xs_valid = [np.vstack(x_valid) for x_valid in xs_valid]
 # move the colour dimension up
 xs_valid = [x_valid.transpose(0, 3, 1, 2) for x_valid in xs_valid]
 
+<<<<<<< HEAD:try_convnet_keras_modulated_lsuv_comp.py
 validation_data = (
     [xs_valid[0], xs_valid[1]], y_valid)
+=======
+if debug:
+    print np.shape(xs_valid[0])
+
+from numpy.linalg.linalg import LinAlgError
+
+validation_data = ([], y_valid)
+c = 0
+for x in xs_valid[0]:
+    try:
+        validation_data[0].append(
+            get_ellipse_kaggle_par(x, num_par=NUM_ELLIPSE_PARAMS))
+    except LinAlgError, e:
+        print 'try_conv'
+        print c
+        raise LinAlgError(e)
+    c += 1
+
+validation_data = (np.asarray(validation_data[0]), validation_data[1])
+>>>>>>> bb89644b58f555c756cf77b6c7e440a0c0e5dfc6:try_maxout_keras_ellipse.py
 
 t_val = (time.time() - start_time_val1)
 print "  took %.2f seconds" % (t_val)

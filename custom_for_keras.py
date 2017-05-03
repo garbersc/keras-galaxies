@@ -7,7 +7,7 @@ from keras.metrics import categorical_accuracy, mean_squared_error
 def lr_function(e, lrs):
     for i in xrange(e, -1, -1):
         if i in lrs:
-            return lrs[i]
+            return float(lrs[i])
 
 
 def kaggle_MultiRotMergeLayer_output(x, num_views=2):
@@ -307,10 +307,16 @@ def input_generator(train_gen):
         yield ([l0_input_var, l0_45_input_var], l6_target_var)
 
 
+<<<<<<< HEAD
 '''
 def ellipse_par_gen(train_gen):
+=======
+def ellipse_par_gen(train_gen, num_par=3):
+>>>>>>> bb89644b58f555c756cf77b6c7e440a0c0e5dfc6
     for img, target in input_generator(train_gen):
-        yield (np.array(map(lambda x: x, get_ellipse_kaggle_par(img[0])) if len(
-            np.shape(img[0])) >= 4 else get_ellipse_kaggle_par(img[0])),
+        yield (np.array(map(lambda x: x, get_ellipse_kaggle_par(input_=img[0],
+                                                                num_par=num_par)) if len(
+            np.shape(img[0])) >= 4 else get_ellipse_kaggle_par(input_=img[0],
+                                                               num_par=num_par)),
             target)
 '''

@@ -9,15 +9,12 @@ import realtime_augmentation as ra
 import time
 import sys
 import json
-from custom_for_keras import input_generator
-from datetime import datetime, timedelta
-import csv
+from datetime import timedelta
 import os
-import cPickle as pickle
 import matplotlib.pyplot as plt
 from termcolor import colored
 import functools
-
+from ellipse_fit import get_ellipse_kaggle_par
 from custom_keras_model_and_fit_capsels import kaggle_winsol
 
 starting_time = time.time()
@@ -32,11 +29,34 @@ BATCH_SIZE = 256  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
+<<<<<<< HEAD
 TRAIN_LOSS_SF_PATH = 'dummy.txt'
 # TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
 WEIGHTS_PATH = "analysis/final/try_dummy.h5"
 TXT_OUTPUT_PATH = "init_pred/init_prediction_output_0.txt"
+=======
+included_flipped = True
+
+USE_BLENDED_PREDICTIONS = True
+PRED_BLENDED_PATH = 'predictions/final/blended/blended_predictions.npy.gz'
+if debug:
+    print os.path.isfile(PRED_BLENDED_PATH)
+
+
+TRAIN_LOSS_SF_PATH = 'try_ellipseOnly_2param.txt'
+# TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
+# TARGET_PATH = "predictions/final/try_convnet.csv"
+WEIGHTS_PATH = "analysis/final/try_ellipseOnly_2param.h5"
+TXT_OUTPUT_PATH = 'try_ellipseOnly_2param_out.txt'
+IMAGE_OUTPUT_PATH = "img_ellipse_fit"
+
+NUM_ELLIPSE_PARAMS = 2
+ELLIPSE_FIT = WEIGHTS_PATH.find('ellipse') >= 0
+if ELLIPSE_FIT:
+    postfix = '_ellipse'
+
+>>>>>>> bb89644b58f555c756cf77b6c7e440a0c0e5dfc6
 
 DONT_LOAD_WEIGHTS = True
 
@@ -47,7 +67,7 @@ N_INPUT_VARIATION = 2
 
 # set to True if the prediction and evaluation should be done when the
 # prediction file already exists
-REPREDICT_EVERYTIME = True
+REPREDICT_EVERYTIME = False
 
 # TODO built this as functions, not with the if's
 DO_VALID = True  # disable this to not bother with the validation set evaluation
@@ -94,6 +114,11 @@ question_requierement[10] = question_slices[4].start
 
 print 'Question requirements: %s' % question_requierement
 
+<<<<<<< HEAD
+=======
+spiral_or_ellipse_cat = [[(0, 1), (1, 1), (3, 0)], [(0, 1), (1, 0)]]
+
+>>>>>>> bb89644b58f555c756cf77b6c7e440a0c0e5dfc6
 target_filename = os.path.basename(WEIGHTS_PATH).replace(".h5", ".npy.gz")
 target_path_valid = os.path.join(
     "predictions/final/augmented/valid", target_filename)
@@ -178,15 +203,30 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models()
+if ELLIPSE_FIT:
+    winsol.init_models_ellipse(input_shape=NUM_ELLIPSE_PARAMS)
+else:
+    winsol.init_models()
 
 if debug:
-    winsol.print_summary()
+    winsol.print_summary(postfix=postfix)
 
 if not DONT_LOAD_WEIGHTS:
+<<<<<<< HEAD
     print "Load model weights"
     winsol.load_weights(path=WEIGHTS_PATH)
     winsol.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
+=======
+    if get_winsol_weights:
+        print "Import weights from run with original kaggle winner solution"
+        if not winsol.getWinSolWeights(debug=True, path=WEIGHTS_PATH):
+            raise UserWarning('Importing of the winsol weights did not work')
+
+    else:
+        print "Load model weights"
+        winsol.load_weights(path=WEIGHTS_PATH, postfix=postfix)
+        winsol.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
+>>>>>>> bb89644b58f555c756cf77b6c7e440a0c0e5dfc6
 
 if get_winsol_weights:
     print "import weights from run with original kaggle winner solution"
@@ -235,8 +275,19 @@ xs_valid = [np.vstack(x_valid) for x_valid in xs_valid]
 # move the colour dimension up
 xs_valid = [x_valid.transpose(0, 3, 1, 2) for x_valid in xs_valid]
 
-validation_data = (
-    [xs_valid[0], xs_valid[1]], y_valid)
+
+if ELLIPSE_FIT:
+    validation_data = ([], y_valid)
+    for x in xs_valid[0]:
+        validation_data[0].append(
+            get_ellipse_kaggle_par(x, num_par=NUM_ELLIPSE_PARAMS)
+        )
+    validation_data = (np.asarray(validation_data[0]), validation_data[1])
+else:
+    validation_data = (
+        [xs_valid[0], xs_valid[1]], y_valid)
+    validation_data = (
+        [np.asarray(xs_valid[0]), np.asarray(xs_valid[1])], validation_data[1])
 
 t_val = (time.time() - start_time)
 print "  took %.2f seconds" % (t_val)
@@ -255,7 +306,15 @@ def save_exit():
     sys.exit(0)
 
 
-if not REPREDICT_EVERYTIME and os.path.isfile(
+if USE_BLENDED_PREDICTIONS:
+    predictions = load_data.load_gz(PRED_BLENDED_PATH)
+    if debug:
+        print os.path.isfile(PRED_BLENDED_PATH)
+        print type(predictions)
+        print predictions
+        # print len(predictions)
+        print np.shape(predictions)
+elif not REPREDICT_EVERYTIME and os.path.isfile(
         target_path_valid) and os.path.isfile(TRAIN_LOSS_SF_PATH):
     print 'Loading validation predictions from %s and loss from %s ' % (
         target_path_valid, TRAIN_LOSS_SF_PATH)
@@ -267,13 +326,14 @@ else:
 
         if DO_VALID:
             evalHist = winsol.evaluate(
-                [xs_valid[0], xs_valid[1]], y_valid=y_valid)
-            winsol.save_loss(modelname='model_norm_metrics')
-            evalHist = winsol.load_loss(modelname='model_norm_metrics')
+                validation_data[0], y_valid=y_valid, postfix=postfix)
+            winsol.save_loss(modelname='model_norm_metrics', postfix=postfix)
+            evalHist = winsol.load_loss(
+                modelname='model_norm_metrics', postfix=postfix)
 
             print ''
             predictions = winsol.predict(
-                [xs_valid[0], xs_valid[1]])
+                validation_data[0], postfix=postfix)
 
             print "Write predictions to %s" % target_path_valid
             load_data.save_gz(target_path_valid, predictions)
@@ -281,11 +341,12 @@ else:
     except KeyboardInterrupt:
         print "\ngot keyboard interuption"
         save_exit()
-    except ValueError:
+    except ValueError, e:
         print "\ngot value error, could be the end of the generator in the fit"
+        print e
         save_exit()
 
-evalHist = winsol.load_loss(modelname='model_norm_metrics')
+evalHist = winsol.load_loss(modelname='model_norm_metrics', postfix=postfix)
 
 if np.shape(predictions) != np.shape(y_valid):
     raise ValueError('prediction and validation set have different shapes, %s to %s ' % (
@@ -379,19 +440,20 @@ def R_wreq(i):
 output_dic = {}
 output_dic_short_hand_names = {'rmse': 'rmse',
                                'rmse/mean': 'rmse/mean',
-                               'global categorized prediction': 'pred',
-                               'global categorized valid': 'val',
-                               'global categorized agree': 'agree',
+                               # 'global categorized prediction': 'pred',
+                               # 'global categorized valid': 'val',
+                               # 'global categorized agree': 'agree',
                                'slice categorized prediction': 'qPred',
                                'slice categorized valid': 'qVal',
                                'slice categorized agree': 'qAgree',
                                'precision': 'P',
                                'recall': 'R',
-                               'slice categorized prediction including tree requierement': 'qPred_req',
-                               'slice categorized valid including tree requieremnet': 'qVal_req',
-                               'slice categorized agree including tree requirement': 'qAgree_req',
-                               'precision including tree requierement': 'P_req',
-                               'recall including tree requierement': 'R_req'}
+                               # 'slice categorized prediction including tree requierement': 'qPred_req',
+                               # 'slice categorized valid including tree requieremnet': 'qVal_req',
+                               # 'slice categorized agree including tree requirement': 'qAgree_req',
+                               # 'precision including tree requierement': 'P_req',
+                               # 'recall including tree requierement': 'R_req'
+                               }
 
 rmse_valid = evalHist['rmse'][-1]
 rmse_augmented = np.sqrt(np.mean((y_valid - predictions)**2))
@@ -401,7 +463,11 @@ print '  categorical acc. (last iteration):\t%.4f' % evalHist['categorical_accur
 print "  MSE (augmented):\t%.6f  RMSE/mean: %.2f " % (rmse_augmented,
                                                       rmse_augmented / np.mean(
                                                           y_valid))
+print " mean P (augmented):\t%.3f  mean R (augmented):\t%.3f " % (
+    np.mean([P(i) for i in range(VALID_CORR_OUTPUT_FILTER.shape[0])]),
+    np.mean([R(i) for i in range(VALID_CORR_OUTPUT_FILTER.shape[0])]))
 print "  MSE output wise (augmented): P(recision), R(ecall)"
+
 qsc = 0
 for i in xrange(0, VALID_CORR_OUTPUT_FILTER.shape[0]):
     oneMSE = np.sqrt(np.mean((y_valid.T[i] - predictions.T[i])**2))
@@ -409,55 +475,63 @@ for i in xrange(0, VALID_CORR_OUTPUT_FILTER.shape[0]):
         output_dic[str(qsc)] = {}
     output_dic[str(qsc)][output_names[i]] = {'rmse': float(oneMSE),
                                              'rmse/mean': float(oneMSE / np.mean(y_valid.T[i])),
-                                             'global categorized prediction': n_global_cat_pred[i],
-                                             'global categorized valid': n_global_cat_valid[i],
-                                             'global categorized agree': n_global_cat_agrement[i],
+                                             # 'global categorized prediction': n_global_cat_pred[i],
+                                             # 'global categorized valid': n_global_cat_valid[i],
+                                             # 'global categorized agree': n_global_cat_agrement[i],
                                              'slice categorized prediction': n_sliced_cat_pred[i],
                                              'slice categorized valid': n_sliced_cat_valid[i],
                                              'slice categorized agree': n_sliced_cat_agrement[i],
                                              'precision': P(i),
                                              'recall': R(i),
-                                             'slice categorized prediction including tree requierement': n_sliced_cat_pred_wreq[i],
-                                             'slice categorized valid including tree requieremnet': n_sliced_cat_valid_wreq[i],
-                                             'slice categorized agree including tree requirement': n_sliced_cat_agrement_wreq[i],
-                                             'precision including tree requierement': P_wreq(i),
-                                             'recall including tree requierement': R_wreq(i)}
+                                             # 'slice categorized prediction including tree requierement': n_sliced_cat_pred_wreq[i],
+                                             # 'slice categorized valid including tree requieremnet': n_sliced_cat_valid_wreq[i],
+                                             # 'slice categorized agree including tree requirement': n_sliced_cat_agrement_wreq[i],
+                                             # 'precision including tree requierement': P_wreq(i),
+                                             # 'recall including tree requierement': R_wreq(i)
+                                             }
     if i in [slice.start for slice in question_slices]:
         print '----------------------------------------------------'
         qsc += 1
     if P(i) < 0.5:  # oneMSE / np.mean(y_valid.T[i]) > 1.2 * rmse_augmented / np.mean(
            # y_valid):
-        print colored("    output %s (%s): \t%.6f  RMSE/mean: %.2f \t N global pred.,valid,agree %i,%i,%i \t N sliced pred.,valid,agree %i,%i,%i, P %.3f, R %.3f \t w_req N sliced pred.,valid,agree %i,%i,%i, P %.3f, R %.3f " % (
-            output_names[i], i, oneMSE, oneMSE / np.mean(y_valid.T[i]),
-            n_global_cat_pred[i], n_global_cat_valid[i], n_global_cat_agrement[i],
+        print colored("    output % s ( % s): \t%.6f  RMSE/mean: % .2f \t  N sliced pred., valid, agree % i, % i, % i, P % .3f, R % .3f" % (
+            output_names[i], i, oneMSE, oneMSE /
+            np.mean(y_valid.T[i]),
+            # n_global_cat_pred[i], n_global_cat_valid[i],
+            # n_global_cat_agrement[i],
             n_sliced_cat_pred[i], n_sliced_cat_valid[i], n_sliced_cat_agrement[i],
             P(i), R(i),
-            n_sliced_cat_pred_wreq[i], n_sliced_cat_valid_wreq[i],
-            n_sliced_cat_agrement_wreq[i],
-            P_wreq(i), R_wreq(i)),
+            # n_sliced_cat_pred_wreq[i], n_sliced_cat_valid_wreq[i],
+            # n_sliced_cat_agrement_wreq[i],
+            # P_wreq(i), R_wreq(i)
+        ),
             'red')
     elif P(i) > 0.9:  # oneMSE / np.mean(y_valid.T[i]) < 0.8 * rmse_augmented / np.mean(
             # y_valid):
-        print colored("    output %s (%s): \t%.6f  RMSE/mean: %.2f \t N global pred.,valid,agree %i,%i,%i \t N sliced pred.,valid,agree %i,%i,%i, P %.3f, R %.3f \t w_req N sliced pred.,valid,agree %i,%i,%i, P %.3f, R %.3f " % (
+        print colored("    output % s ( % s): \t%.6f  RMSE/mean: % .2f \t N sliced pred., valid, agree % i, % i, % i, P % .3f, R % .3f " % (
             output_names[i], i, oneMSE, oneMSE / np.mean(y_valid.T[i]),
-            n_global_cat_pred[i], n_global_cat_valid[i], n_global_cat_agrement[i],
+            # n_global_cat_pred[i], n_global_cat_valid[i],
+            # n_global_cat_agrement[i],
             n_sliced_cat_pred[i], n_sliced_cat_valid[i], n_sliced_cat_agrement[i],
             P(i), R(i),
-            n_sliced_cat_pred_wreq[i], n_sliced_cat_valid_wreq[i],
-            n_sliced_cat_agrement_wreq[i],
-            P_wreq(i), R_wreq(i)),
+            # n_sliced_cat_pred_wreq[i], n_sliced_cat_valid_wreq[i],
+            # n_sliced_cat_agrement_wreq[i],
+            # P_wreq(i), R_wreq(i)
+        ),
             'green')
     else:
-        print ("    output %s (%s): \t%.6f  RMSE/mean: %.2f \t N global pred.,valid,agree %i,%i,%i \t N sliced pred.,valid,agree %i,%i,%i, P %.3f, R %.3f \t w_req N sliced pred.,valid,agree %i,%i,%i, P %.3f, R %.3f " %
+        print ("    output % s ( % s): \t%.6f  RMSE/mean: % .2f \t  N sliced pred., valid, agree % i, % i, % i, P % .3f, R % .3f " %
                (output_names[i], i, oneMSE, oneMSE / np.mean(y_valid.T[i]),
-                n_global_cat_pred[i], n_global_cat_valid[i],
-                n_global_cat_agrement[i],
+                # n_global_cat_pred[i], n_global_cat_valid[i],
+                # n_global_cat_agrement[i],
                 n_sliced_cat_pred[i], n_sliced_cat_valid[i],
                 n_sliced_cat_agrement[i],
                 P(i), R(i),
-                n_sliced_cat_pred_wreq[i], n_sliced_cat_valid_wreq[i],
-                n_sliced_cat_agrement_wreq[i],
-                P_wreq(i), R_wreq(i)))
+                # n_sliced_cat_pred_wreq[i], n_sliced_cat_valid_wreq[i],
+                # n_sliced_cat_agrement_wreq[i],
+                # P_wreq(i), R_wreq(i)
+                )
+               )
 
 with open(TXT_OUTPUT_PATH, 'a+') as f:
     json.dump(output_dic_short_hand_names, f)
@@ -469,6 +543,57 @@ imshow_c = functools.partial(
     plt.imshow, interpolation='none')  # , vmin=0.0, vmax=1.0)
 imshow_g = functools.partial(
     plt.imshow, interpolation='none', cmap=plt.get_cmap('gray'))  # , vmin=0.0, vmax=1.0)
+
+
+def x_category_precision(predictions=predictions, y_valid=y_valid,
+                         conditions=spiral_or_ellipse_cat):
+    counts = [[0, 0, 0]]
+    for _ in conditions:
+        counts += [[0, 0, 0]]
+    # if debug:
+    #     print np.shape(counts)
+    for i, p in enumerate(predictions):
+        predicted = [True] * (len(conditions) + 1)
+        valid = [True] * (len(conditions) + 1)
+        for j, cond in enumerate(conditions):
+            for sup_cond in cond:
+                predicted[j] *= (np.argmax(
+                    p[question_slices[sup_cond[0]]]) == sup_cond[1])
+                valid[j] *= (np.argmax(
+                    y_valid[i][question_slices[sup_cond[0]]]) == sup_cond[1])
+            if predicted[j]:
+                counts[j][0] += 1
+            if valid[j]:
+                counts[j][1] += 1
+            if predicted[j] and valid[j]:
+                counts[j][2] += 1
+        predicted[-1] = (np.sum(predicted[0:-1]) == 0)
+        valid[-1] = (np.sum(valid[0:-1]) == 0)
+        if predicted[-1]:
+            counts[-1][0] += 1
+        if valid[-1]:
+            counts[-1][1] += 1
+        if predicted[-1] and valid[-1]:
+            counts[-1][2] += 1
+        if np.sum(predicted) != 1 or np.sum(valid) != 1:
+            raise UserWarning(
+                'conditions in x_category_precision were not exclusive for image %s') % i
+        # if debug and not i % 1000:
+        #     print predicted
+        #     print valid
+        #     print counts
+
+    # if debug:
+    #     print counts
+    P_s = [(float(c[2]) / c[0]) for c in counts]
+    R_s = [(float(c[2]) / (2 * c[2] + sum(
+        [d[0] - d[2] for d in counts]) - c[0]))for c in counts]
+    print
+    print 'mean P:\t %.3f' % np.mean(P_s)
+    print 'mean R:\t %.3f' % np.mean(R_s)
+    for i, c in enumerate(counts):
+        print 'condition %s: \t pred,val,agree: %.3f \t P: %.3f R: %.3f' % (
+            i, c, P_s[i], R_s[i])
 
 
 def valid_scatter():
@@ -668,4 +793,18 @@ def print_weights(norm=False):
         plt.savefig('weight_layer_%s_bias.jpg' % (name))
         plt.close()
 
+<<<<<<< HEAD
     os.chdir('../../..')
+=======
+    os.chdir('../..')
+
+
+x_category_precision(predictions=predictions, y_valid=y_valid)
+# # print_weights(norm=True)
+# print_weights(norm=True)
+# valid_scatter()
+# print_filters(2, norm=True)
+# #print_filters(3, norm=True)
+
+save_exit()
+>>>>>>> bb89644b58f555c756cf77b6c7e440a0c0e5dfc6
