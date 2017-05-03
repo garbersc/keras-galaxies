@@ -191,9 +191,9 @@ class deconvnet(kaggle_winsol):
 
         output_layer_deconv = Lambda(function=deconv_fun,
                                      output_shape=deconv_fun_output_shape,
-                                     arguments={'weights': model_seq.get_layer('conv_0').
+                                     arguments={'weights': model.get_layer('conv_0').
                                                 get_weights()}
-                                     )(model_seq.get_layer('conv_0').get_output_at(0))
+                                     )(model.get_layer('conv_0').get_output_at(0))
 
         model_norm = Model(
             inputs=[input_tensor, input_tensor_45], outputs=output_layer_norm, name='full_model_norm')
@@ -201,13 +201,14 @@ class deconvnet(kaggle_winsol):
             inputs=[input_tensor, input_tensor_45], outputs=output_layer_norm, name='full_model_metrics')
         model_noNorm = Model(
             inputs=[input_tensor, input_tensor_45], outputs=output_layer_noNorm, name='full_model_noNorm')
-        model_deconv = Model(inputs=[
-                             input_tensor, input_tensor_45], outputs=output_layer_deconv, name='deconv_1')
+        model_deconv = Model(inputs=model.get_input_at(0), outputs=output_layer_deconv,
+                             name='deconv_1')
 
         self.models = {'model_norm': model_norm,
                        'model_norm_metrics': model_norm_metrics,
                        'model_noNorm': model_noNorm,
-                       'model_deconv': model_deconv}
+                       'model_deconv': model_deconv
+                       }
 
         self._compile_models(loss='categorical_crossentropy')
 
