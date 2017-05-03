@@ -78,6 +78,10 @@ def sliced_accuracy_std(y_true, y_pred, slice_weights=[1.] * 11):
     return kaggle_sliced_accuracy(y_true, y_pred, slice_weights)['sliced_accuracy_std']
 
 
+def mse(y_true, y_pred):
+    return mean_squared_error(y_true, y_pred)
+
+
 def rmse(y_true, y_pred):
     return T.sqrt(mean_squared_error(y_true, y_pred))
 

@@ -303,3 +303,15 @@ class kaggle_winsol(kaggle_base):
                 print "reshaped weights from maxout via dense and dropout to real maxout"
 
         return w_load_worked
+
+    def load_conv_layers(self, path, layername_source=['conv_0', 'conv_1',
+                                                       'conv_2', 'conv_3'],
+                         layername_this='', modelname='model_norm',
+                         sub_modelname='main_seq', postfix=''):
+        return super(kaggle_winsol, self).load_one_layers_weight(
+            path=path,
+            layername_source=layername_source,
+            layername_this=layername_this,
+            modelname=modelname,
+            sub_modelname=sub_modelname,
+            postfix=postfix)

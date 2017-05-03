@@ -466,12 +466,6 @@ def post_augment_gaussian_noise_gen_separate(data_gen, std=0.1):
         yield new_target_arrays, chunk_size
 
 
-# Alternative image loader and processor which does pysex centering
-
-# pysex_params_train = load_data.load_gz("data/pysex_params_extra_train.npy.gz")
-# pysex_params_test = load_data.load_gz("data/pysex_params_extra_test.npy.gz")
-
-
 pysex_params_train = load_data.load_gz("data/pysex_params_gen2_train.npy.gz")
 pysex_params_test = load_data.load_gz("data/pysex_params_gen2_test.npy.gz")
 
@@ -482,36 +476,6 @@ pysexgen1_params_test = load_data.load_gz(
 
 
 center_x, center_y = (IMAGE_WIDTH - 1) / 2.0, (IMAGE_HEIGHT - 1) / 2.0
-
-# def build_pysex_center_transform(img_index, subset='train'):
-#     if subset == 'train':
-#         x, y, a, b, theta, flux_radius, kron_radius, petro_radius, fwhm = pysex_params_train[img_index]
-#     elif subset == 'test':
-#         x, y, a, b, theta, flux_radius, kron_radius, petro_radius, fwhm = pysex_params_test[img_index]
-
-# return build_augmentation_transform(translation=(x - center_x, y -
-# center_y))
-
-
-# def build_pysex_center_rescale_transform(img_index, subset='train', target_radius=170.0): # target_radius=160.0):
-#     if subset == 'train':
-#         x, y, a, b, theta, flux_radius, kron_radius, petro_radius, fwhm = pysex_params_train[img_index]
-#     elif subset == 'test':
-#         x, y, a, b, theta, flux_radius, kron_radius, petro_radius, fwhm = pysex_params_test[img_index]
-
-#     scale_factor_limit = 1.5 # scale up / down by this fraction at most
-
-# scale_factor = target_radius / (petro_radius * a) # magic constant,
-# might need some tuning
-
-#     if np.isnan(scale_factor):
-#         scale_factor = 1.0 # no info
-
-# scale_factor = max(min(scale_factor, scale_factor_limit), 1.0 /
-# scale_factor_limit) # truncate for edge cases
-
-# return build_augmentation_transform(translation=(x - center_x, y -
-# center_y), zoom=scale_factor)
 
 
 def build_pysex_center_transform(img_index, subset='train'):
@@ -573,9 +537,6 @@ def perturb_and_dscrop_with_prepro(img, ds_transforms, augmentation_params, targ
         target_sizes = [(53, 53) for _ in xrange(len(ds_transforms))]
 
     tform_augment = random_perturbation_transform(**augmentation_params)
-    # return [skimage.transform.warp(img, tform_ds + tform_augment,
-    # output_shape=target_size, mode='reflect').astype('float32') for tform_ds
-    # in ds_transforms]
 
     result = []
     for tform_ds, target_size in zip(ds_transforms, target_sizes):
@@ -586,17 +547,12 @@ def perturb_and_dscrop_with_prepro(img, ds_transforms, augmentation_params, targ
 
 
 def load_and_process_image_pysex_centering(img_index, ds_transforms, augmentation_params, target_sizes=None):
-    # start_time = time.time()
     img_id = load_data.train_ids[img_index]
     img = load_data.load_image(img_id, from_ram=myLoadFrom_RAM)
-    # load_time = (time.time() - start_time) * 1000
-    # start_time = time.time()
     tf_center = build_pysex_center_transform(img_index)
 
     img_a = perturb_and_dscrop_with_prepro(
         img, ds_transforms, augmentation_params, target_sizes, prepro_transform=tf_center)
-    # augment_time = (time.time() - start_time) * 1000
-    # print "load: %.2f ms\taugment: %.2f ms" % (load_time, augment_time)
     return img_a
 
 
@@ -611,17 +567,12 @@ class LoadAndProcessPysexCentering(object):
 
 
 def load_and_process_image_pysex_centering_rescaling(img_index, ds_transforms, augmentation_params, target_sizes=None):
-    # start_time = time.time()
     img_id = load_data.train_ids[img_index]
     img = load_data.load_image(img_id, from_ram=myLoadFrom_RAM)
-    # load_time = (time.time() - start_time) * 1000
-    # start_time = time.time()
     tf_center_rescale = build_pysex_center_rescale_transform(img_index)
 
     img_a = perturb_and_dscrop_with_prepro(
         img, ds_transforms, augmentation_params, target_sizes, prepro_transform=tf_center_rescale)
-    # augment_time = (time.time() - start_time) * 1000
-    # print "load: %.2f ms\taugment: %.2f ms" % (load_time, augment_time)
     return img_a
 
 
@@ -636,17 +587,12 @@ class LoadAndProcessPysexCenteringRescaling(object):
 
 
 def load_and_process_image_pysexgen1_centering_rescaling(img_index, ds_transforms, augmentation_params, target_sizes=None):
-    # start_time = time.time()
     img_id = load_data.train_ids[img_index]
     img = load_data.load_image(img_id, from_ram=myLoadFrom_RAM)
-    # load_time = (time.time() - start_time) * 1000
-    # start_time = time.time()
     tf_center_rescale = build_pysexgen1_center_rescale_transform(img_index)
 
     img_a = perturb_and_dscrop_with_prepro(
         img, ds_transforms, augmentation_params, target_sizes, prepro_transform=tf_center_rescale)
-    # augment_time = (time.time() - start_time) * 1000
-    # print "load: %.2f ms\taugment: %.2f ms" % (load_time, augment_time)
     return img_a
 
 

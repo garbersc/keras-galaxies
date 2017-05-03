@@ -5,6 +5,8 @@ import time
 from datetime import datetime, timedelta
 import functools
 
+import h5py
+
 from keras import backend as T
 from keras.models import Model
 from keras.layers.core import Lambda
@@ -12,7 +14,8 @@ from keras.optimizers import SGD, Adam
 from keras.callbacks import LearningRateScheduler
 
 from keras_extra_layers import fPermute
-from custom_for_keras import sliced_accuracy_mean, sliced_accuracy_std, rmse, lr_function
+from custom_for_keras import sliced_accuracy_mean, sliced_accuracy_std, rmse,\
+    lr_function
 from lsuv_init import LSUVinit
 
 
@@ -32,7 +35,8 @@ class kaggle_base(object):
                  MOMENTUM=None,
                  LOSS_PATH='./',
                  WEIGHTS_PATH='./',
-                 **kwargs):
+                 debug=False,
+                 ** kwargs):
         self.BATCH_SIZE = BATCH_SIZE
         self.LEARNING_RATE_SCHEDULE = LEARNING_RATE_SCHEDULE if LEARNING_RATE_SCHEDULE else [
             0.1]
@@ -44,6 +48,7 @@ class kaggle_base(object):
         self.first_loss_save = True
         self.models = {}
         self.reinit_counter = 0
+        self.debug = debug
 
     '''
     initialize loss and validation histories
@@ -70,6 +75,10 @@ class kaggle_base(object):
                     self.hists[n][o] = []
             except AttributeError:
                 pass
+
+        self.first_loss_save = {'allsave': self.first_loss_save}
+        for k in self.models.keys():
+            self.first_loss_save[k] = True
 
         return self.hists
 
@@ -137,6 +146,60 @@ class kaggle_base(object):
         self.models[modelname].summary()
         return True
 
+    def load_one_layers_weight(self, path, layername_source, layername_this='',
+                               modelname='model_norm',
+                               sub_modelname='main_seq',
+                               postfix=''):
+        modelname = modelname + postfix
+
+        if not type(layername_source) == list:
+            layername_source = [layername_source]
+        if not layername_this:
+            layername_this = layername_source
+
+        file_ = h5py.File(path, 'r')
+
+        for ls, lt in zip(layername_source, layername_this):
+            if self.debug:
+                print
+                print 'loading weights from layer %s to layer %s' % (ls, lt)
+            try:
+                weight = file_[sub_modelname][ls]
+            except KeyError, e:
+                print
+                print 'KeyError'
+                print '\ttried key %s' % sub_modelname
+                print '\tpossible keys are: %s' % file_.keys()
+                print
+                raise KeyError(e)
+
+            if self.debug:
+                print 'keys in source weight object %s' % weight.keys()
+                print '\t shapes: %s' % [np.shape(weight[n]) for n
+                                         in weight.keys()]
+
+            weight = [np.array(weight[n]) for n in weight.keys()]
+
+            # if self.debug:
+            #     print '\t %s' % repr(np.shape(weight[0]))
+            #     # if ls == 'conv_3':
+            #     for w in weight:
+            #         print np.shape(w)
+            #         print np.shape(w[0])
+
+            self.models[modelname].get_layer(
+                sub_modelname).get_layer(lt).set_weights(weight)
+
+        file_.close()
+        if self.debug:
+            print
+        with open(self.LOSS_PATH, 'a')as f:
+            f.write('#loaded weights of layer(s) ' + str(layername_source) + '  from '
+                    + str(path) + ' into  model ' +
+                    str(modelname) + ' into the layer(s) '
+                    + str(layername_this) + '\n')
+        return True
+
     '''
     loads previously saved weights
 
@@ -148,7 +211,7 @@ class kaggle_base(object):
     def load_weights(self, path, modelname='model_norm', postfix=''):
         modelname = modelname + postfix
         self.models[modelname].load_weights(path)
-        with open(path, 'a')as f:
+        with open(self.LOSS_PATH, 'a')as f:
             f.write('#loaded weights from ' + path +
                     ' into  model ' + modelname + '\n')
         return True
@@ -275,47 +338,69 @@ class kaggle_base(object):
         modelname += postfix
         if not path:
             path = self.LOSS_PATH
-        if self.first_loss_save:
+        if self.first_loss_save['allsave'] and\
+           (not modelname or self.first_loss_save[modelname]):
             with open(path, 'a')as f:
                 f.write("#eval losses and metrics:\n")
                 if modelname:
                     f.write("#history of model: " + modelname + '\n')
                     json.dump(self.hists[modelname], f)
+                    self.first_loss_save[modelname] = False
                 else:
                     f.write("#histories of all models:\n")
                     for k in self.models:
                         f.write("#history of model: " + k + '\n')
                         json.dump(self.hists[k], f)
+                        print '\n'
+                        self.first_loss_save['allsave'] = False
                 f.write("\n")
-            self.first_loss_save = False
         else:
             if modelname:
                 with open(path, "r+") as f:
-                    d = f.readlines()
+                    d = f.readlines()[::-1]
                     f.seek(0)
-                    rewrite_next_json = False
+                    # rewrite_next_json = False
                     model_found = False
-                    for i in d:
-                        if i != "#history of model: " + modelname + '\n':
-                            if rewrite_next_json:
-                                if i.find("{", 0, 1) != -1:
-                                    json.dump(self.hists[modelname], f)
-                                    rewrite_next_json = False
-                                else:
-                                    print 'WARNING: loss history save file is not in the expected stats'
-                                    json.dump(self.hists[modelname], f)
-                                    rewrite_next_json = False
-                                    f.write(i)
-                            else:
-                                f.write(i)
-                        else:
-                            f.write(i)
+
+                    for j, i in enumerate(d):
+                        if i == "#history of model: " + modelname + '\n':
                             model_found = True
-                            rewrite_next_json = True
+                            if d[(j - 1)].find("{", 0, 1) != -1:
+                                d[(j - 1)] = json.dumps(self.hists[modelname]) + '\n'
+                            else:
+                                print 'WARNING: loss history save file is not in the expected stats'
+                                d = [json.dumps(
+                                    self.hists[modelname]) + '\n', i] + d
+                            break
                     if not model_found:
-                        f.write("#history of model: " + modelname + '\n')
-                        json.dump(self.hists[modelname], f)
-                    f.write('\n')
+                        d = [json.dumps(self.hists[modelname]) + '\n',
+                             "#history of model: " + modelname + '\n'] + d
+                    d = d[::-1]
+                    for i in d:
+                        f.write(i)
+
+                    # for i in d:
+                    #     if i != "#history of model: " + modelname + '\n':
+                    #         if rewrite_next_json:
+                    #             if i.find("{", 0, 1) != -1:
+                    #                 json.dump(self.hists[modelname], f)
+                    #                 rewrite_next_json = False
+                    #                 f.write('\n')
+                    #             else:
+                    #                 print 'WARNING: loss history save file is not in the expected stats'
+                    #                 json.dump(self.hists[modelname], f)
+                    #                 rewrite_next_json = False
+                    #                 f.write(i)
+                    #         else:
+                    #             f.write(i)
+                    #     else:
+                    #         f.write(i)
+                    #         model_found = True
+                    #         rewrite_next_json = True
+                    # if not model_found:
+                    #     f.write("#history of model: " + modelname + '\n')
+                    #     json.dump(self.hists[modelname], f)
+                    # f.write('\n')
             else:
                 for k in self.models:
                     self.save_loss(path=path, modelname=k)
@@ -502,11 +587,11 @@ class kaggle_base(object):
         else:
             try:
                 output_layer = _layer.output
-            except AttributeError:
+            except AttributeError, e:
                 print 'debug infos after Attribute error'
                 print layer
                 print _layer
-                raise AttributeError
+                raise AttributeError(e)
 
         intermediate_layer_model = Model(inputs=self.models[modelname]
                                          .get_layer(main_layer).get_input_at(0),
@@ -521,8 +606,8 @@ class kaggle_base(object):
             ret_weights = self.models[modelname].get_layer(
                 main_layer).layers[layer].get_weights()
         elif type(layer) == str:
-            ret_weights = self.models[modelname].get_layer(main_layer).get_layer(
-                layer).get_weights()
+            ret_weights = self.models[modelname].get_layer(main_layer)\
+                                                .get_layer(layer).get_weights()
         else:
             raise ValueError('layer must be specified as int or string')
         return ret_weights
