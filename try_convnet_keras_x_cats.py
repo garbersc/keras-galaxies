@@ -19,7 +19,7 @@ predict = False  # not implemented
 continueAnalysis = True
 saveAtEveryValidation = True
 
-import_conv_weights = True
+import_conv_weights = False
 
 # only relevant if not continued and not gets winsol weights, see http://arxiv.org/abs/1511.06422 for
 # describtion
@@ -33,21 +33,21 @@ NUM_INPUT_FEATURES = 3
 
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-EPOCHS = 50
+EPOCHS = 100
 VALIDATE_EVERY = 5  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 INCLUDE_FLIP = True
 
 TRAIN_LOSS_SF_PATH = "trainingNmbrs_3cat_started_with_geometry.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_3cat_spiral_ellipse_other_started_with_geometry.h5"
+WEIGHTS_PATH = "analysis/final/try_3cat_spiral_ellipse_other_started_with_geometry_next.h5"
 
 CONV_WEIGHT_PATH = 'analysis/final/try_3cat_geometry_corr_geopics_next.h5'
 
 
 LEARNING_RATE_SCHEDULE = {
-    0: 0.4,
-    30: 0.1,
+    0: 0.005,
+    40: 0.001,
     #10: 0.05,
     #40: 0.01,
     #80: 0.005,
@@ -64,8 +64,8 @@ LEARNING_RATE_SCHEDULE = {
 }
 if continueAnalysis:
     LEARNING_RATE_SCHEDULE = {
-        0: 0.1,
-        100: 0.05,
+        0: 0.0001,
+        #60: 0.0005,
         #40: 0.01,
         #80: 0.005
         # 0: 0.0001,
@@ -163,7 +163,8 @@ winsol = kaggle_x_cat(BATCH_SIZE=BATCH_SIZE,
                       LEARNING_RATE_SCHEDULE=LEARNING_RATE_SCHEDULE,
                       MOMENTUM=MOMENTUM,
                       LOSS_PATH=TRAIN_LOSS_SF_PATH,
-                      WEIGHTS_PATH=WEIGHTS_PATH, include_flip=INCLUDE_FLIP)
+                      WEIGHTS_PATH=WEIGHTS_PATH, include_flip=INCLUDE_FLIP,
+                      debug=debug)
 
 print "Build model"
 
@@ -174,7 +175,7 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models(loss='mean_squared_error')
+winsol.init_models(loss='categorical_crossentropy')
 
 if debug:
     print winsol.models['model_norm'].get_output_shape_at(0)
