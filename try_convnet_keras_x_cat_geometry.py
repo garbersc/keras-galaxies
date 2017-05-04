@@ -26,20 +26,20 @@ saveAtEveryValidation = True
 # ... reason not found
 DO_LSUV_INIT = False
 
-BATCH_SIZE = 32  # keep in mind
+BATCH_SIZE = 8  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-EPOCHS = 50
-VALIDATE_EVERY = 5  # 20 # 12 # 6 # 6 # 6 # 5 #
+EPOCHS = 2
+VALIDATE_EVERY = 1  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 INCLUDE_FLIP = True
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_3cat_geometry.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_test.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_3cat_geometry.h5"
+WEIGHTS_PATH = "analysis/final/try_geometry_test.h5"
 
 load_data.img_path = 'geometry_examples/%s.jpg'
 

@@ -414,7 +414,10 @@ class kaggle_base(object):
             for line in d:
                 if line.find("{", 0, 1) != -1:
                     loss_hist = json.loads(line)
-                if d.next() == "#history of model: " + modelname + '\n':
+                try:
+                    if d.next() == "#history of model: " + modelname + '\n':
+                        break
+                except StopIteration:
                     break
             if not loss_hist:
                 raise Warning('No model %s was found in %s' %

@@ -11,8 +11,10 @@ from keras.layers import Merge
 from keras.engine.topology import InputLayer
 from keras import initializers
 
-from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute, kerasCudaConvnetConv2DLayer, MaxoutDense
-from custom_for_keras import kaggle_MultiRotMergeLayer_output, OptimisedDivGalaxyOutput, kaggle_input, dense_weight_init_values
+from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute,\
+    kerasCudaConvnetConv2DLayer, MaxoutDense
+from custom_for_keras import kaggle_MultiRotMergeLayer_output,\
+    OptimisedDivGalaxyOutput, kaggle_input, dense_weight_init_values
 
 
 '''
@@ -34,7 +36,8 @@ class kaggle_winsol(kaggle_base):
     WEIGHTS_PATH: load/save path of the model weights
     '''
 
-    def __init__(self, BATCH_SIZE, NUM_INPUT_FEATURES, PART_SIZE, input_sizes,
+    def __init__(self, BATCH_SIZE=36, NUM_INPUT_FEATURES=3, PART_SIZE=45,
+                 input_sizes=[(69, 69), (69, 69)],
                  include_flip=True,
                  LEARNING_RATE_SCHEDULE=None, MOMENTUM=None, LOSS_PATH='./',
                  WEIGHTS_PATH='./',
