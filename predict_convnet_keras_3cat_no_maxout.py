@@ -329,7 +329,11 @@ for i in range(len(predictions)):
     if argval == argpred:
         n_global_cat_agrement[argval] += 1
     else:
-        wrong_categories[str(argval) + 'to' + str(argpred)] += valid_ids[i]
+        if not wrong_categories['%sto%s' % (str(argval), str(argpred))]:
+            print '%sto%s' % (str(argval), str(argpred))
+            print valid_ids[i]
+        wrong_categories['%sto%s' %
+                         (str(argval), str(argpred))] += valid_ids[i]
         # print 'picture %s' % valid_ids[i]
         # print '\t prediction %s' % argpred
         # print '\t valid %s' % argval
@@ -487,7 +491,8 @@ print 'wrong categorisations:'
 for k in wrong_categories:
     print '\t ' + str(k) + ': ' + str(len(wrong_categories[k]))
 
-json.dump(wrong_categories, WRONG_CAT_IMGS_PATH)
+with open(WRONG_CAT_IMGS_PATH, 'a') as f:
+    json.dump(wrong_categories, f)
 
 with open(TXT_OUTPUT_PATH, 'a+') as f:
     json.dump(output_dic_short_hand_names, f)
