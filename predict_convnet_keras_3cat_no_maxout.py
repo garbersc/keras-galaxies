@@ -66,7 +66,7 @@ N_INPUT_VARIATION = 2
 
 # set to True if the prediction and evaluation should be done when the
 # prediction file already exists
-REPREDICT_EVERYTIME = False
+REPREDICT_EVERYTIME = True
 
 # TODO built this as functions, not with the if's
 DO_VALID = True  # disable this to not bother with the validation set evaluation
@@ -333,7 +333,7 @@ for i in range(len(predictions)):
             print '%sto%s' % (str(argval), str(argpred))
             print valid_ids[i]
         wrong_categories['%sto%s' %
-                         (str(argval), str(argpred))] += valid_ids[i]
+                         (str(argval), str(argpred))] += [valid_ids[i]]
         # print 'picture %s' % valid_ids[i]
         # print '\t prediction %s' % argpred
         # print '\t valid %s' % argval
@@ -489,7 +489,8 @@ for i in xrange(0, VALID_CORR_OUTPUT_FILTER.shape[0]):
 
 print 'wrong categorisations:'
 for k in wrong_categories:
-    print '\t ' + str(k) + ': ' + str(len(wrong_categories[k]))
+    print '\t %s: %.3f' % (k, float(len(wrong_categories[k])) /
+                           float(len(predictions)))
 
 with open(WRONG_CAT_IMGS_PATH, 'a') as f:
     json.dump(wrong_categories, f)
@@ -568,13 +569,16 @@ def valid_scatter():
         os.mkdir("ValidScatter")
     os.chdir("ValidScatter")
 
-    for i in xrange(0, VALID_CORR_OUTPUT_FILTER.shape[0]):
+    if debug:
+        print output_names
+
+    for i in xrange(0, len(output_names)):
         y = predictions.T[i]
         x = y_valid.T[i]
         fig, ax = plt.subplots()
         fit = np.polyfit(x, y, deg=1)
         ax.plot(x, fit[0] * x + fit[1], color='red')
-        ax.scatter(x, y)
+        ax.scatter(x, y, s=0.1)
         plt.ylabel('prediction')
         plt.xlabel('target')
         plt.title("valid %s" % (output_names[i]))
@@ -758,14 +762,15 @@ def print_weights(norm=False):
 
 
 # x_category_precision(predictions=predictions, y_valid=y_valid)
-print_weights(norm=True)
-print_weights(norm=False)
-valid_scatter()
+# print_weights(norm=True)
+# print_weights(norm=False)
 print_filters(0, norm=True)
 print_filters(1, norm=True)
 print_filters(4, norm=True)
 print_filters(2, norm=True)
 print_filters(3, norm=True)
 print_filters(5, norm=True)
+
+valid_scatter()
 
 save_exit()
