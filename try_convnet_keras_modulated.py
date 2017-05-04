@@ -8,7 +8,8 @@ import json
 from custom_for_keras import input_generator
 from datetime import datetime, timedelta
 
-from custom_keras_model_and_fit_capsels import kaggle_winsol
+from custom_keras_x_cat_x_maxout import kaggle_x_cat_x_maxout\
+    as kaggle_winsol
 
 start_time = time.time()
 
@@ -42,9 +43,9 @@ NUM_EPOCHS_NONORM = 0.1
 
 INCLUDE_FLIP = False
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_started_with_3cat.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_started_with_3cat_noMaxout.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_started_with_3cat.h5"
+WEIGHTS_PATH = "analysis/final/try_started_with_3cat_noMaxout.h5"
 
 CONV_WEIGHT_PATH = 'analysis/final/try_3cat_spiral_ellipse_other_started_with_geometry_without_maxout_next_next.h5'
 
@@ -178,7 +179,7 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models()
+winsol.init_models(final_units=37, loss='mean_squared_error')
 
 if debug:
     winsol.print_summary()
