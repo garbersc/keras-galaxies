@@ -8,7 +8,7 @@ import json
 from custom_for_keras import input_generator
 from datetime import datetime, timedelta
 
-from custom_keras_x_cat_x_maxout import kaggle_x_cat_x_maxout\
+from custom_keras_model_x_cat_x_maxout import kaggle_x_cat_x_maxout\
     as kaggle_winsol
 
 start_time = time.time()

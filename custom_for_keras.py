@@ -2,6 +2,31 @@ import numpy as np
 import keras.backend as T
 from keras.metrics import categorical_accuracy, mean_squared_error
 from ellipse_fit import get_ellipse_kaggle_par
+from keras.callbacks import Callback
+import os
+
+
+class weight_history(Callback):
+    def __init__(self, layername='conv_0', submodelname='main_seq',
+                 path='weight_history', **kwargs):
+        self.layername = layername
+        self.submodelname = submodelname
+        self.path = path
+        if not os.path.isdir(self.path):
+            os.mkdir(self.path)
+        super(weight_history, self).__init__(**kwargs)
+
+    def on_train_begin(self, **kwargs):
+        self.counter = 0
+        self.on_batch_end(**kwargs)
+
+    def on_batch_end(self, **kwargs):
+        layer = self.model.get_layer(
+            self.submodelname).get_layer(self.layername)
+        weight = layer.get_weights()
+        np.save(self.path + '/weights_of_' +
+                self.layername + '_' + str(self.counter) + '.npy', weight)
+        self.counter += 1
 
 
 def lr_function(e, lrs):
