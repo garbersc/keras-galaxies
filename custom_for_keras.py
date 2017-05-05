@@ -24,6 +24,9 @@ class weight_history(Callback):
                 self.layername + '_' + str(self.counter) + '.npy', weight)
         self.counter += 1
 
+        del weight
+        del layer
+
     def on_train_begin(self, logs={}):
         self.counter = 0
         self.save()

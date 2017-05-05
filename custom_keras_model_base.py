@@ -156,6 +156,8 @@ class kaggle_base(object):
             layername_source = [layername_source]
         if not layername_this:
             layername_this = layername_source
+        elif not type(layername_this) == list:
+            layername_this == [layername_source]
 
         file_ = h5py.File(path, 'r')
 
