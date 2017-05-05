@@ -16,17 +16,20 @@ class weight_history(Callback):
             os.mkdir(self.path)
         super(weight_history, self).__init__(**kwargs)
 
-    def on_train_begin(self, **kwargs):
-        self.counter = 0
-        self.on_batch_end(**kwargs)
-
-    def on_batch_end(self, **kwargs):
+    def save(self):
         layer = self.model.get_layer(
             self.submodelname).get_layer(self.layername)
         weight = layer.get_weights()
         np.save(self.path + '/weights_of_' +
                 self.layername + '_' + str(self.counter) + '.npy', weight)
         self.counter += 1
+
+    def on_train_begin(self, logs={}):
+        self.counter = 0
+        self.save()
+
+    def on_batch_end(self, batch, logs={}):
+        self.save()
 
 
 def lr_function(e, lrs):
