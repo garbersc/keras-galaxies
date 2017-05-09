@@ -80,7 +80,7 @@ class deconvnet(kaggle_winsol):
         except KeyError:
             pass
         try:
-            self.models['model_deconvs' + postfix].compile(
+            self.models['model_deconv' + postfix].compile(
                 loss=loss,
                 optimizer=optimizer)
         except KeyError:
@@ -190,7 +190,9 @@ class deconvnet(kaggle_winsol):
                                      )(model_seq)
 
         output_layer_deconv = Conv2DTranspose(filters=128, kernel_size=3, strides=(
-            1, 1))(model.get_layer('conv_0').get_output_at(0))
+            1, 1), name='deconv_layer')(model.get_layer('conv_0').get_output_at(0))
+
+        # self.layer_formats[3] =
 
         # output_layer_deconv = Lambda(function=deconv_fun
         #                              output_shape=deconv_fun_output_shape,
