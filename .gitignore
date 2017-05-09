@@ -70,7 +70,10 @@ init_pred/
 img_example/
 best*.txt
 bla*
-loss_3cat_geometry.txt
+loss_3cat*.txt
+*.gif
+*.mp4
+img_weight_hist/
 
 # emacs autosave files and hidden files
 \#*

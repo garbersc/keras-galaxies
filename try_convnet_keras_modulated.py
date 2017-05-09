@@ -8,7 +8,8 @@ import json
 from custom_for_keras import input_generator
 from datetime import datetime, timedelta
 
-from custom_keras_model_and_fit_capsels import kaggle_winsol
+from custom_keras_model_x_cat_x_maxout import kaggle_x_cat_x_maxout\
+    as kaggle_winsol
 
 start_time = time.time()
 
@@ -16,8 +17,10 @@ copy_to_ram_beforehand = False
 
 debug = True
 predict = False  # not implemented
-continueAnalysis = True
+continueAnalysis = False
 saveAtEveryValidation = True
+
+import_conv_weights = True
 
 get_winsol_weights = False
 
@@ -27,30 +30,32 @@ get_winsol_weights = False
 # ... reason not found
 DO_LSUV_INIT = False
 
-BATCH_SIZE = 16  # keep in mind
+BATCH_SIZE = 256  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-EPOCHS = 4
-VALIDATE_EVERY = 2  # 20 # 12 # 6 # 6 # 6 # 5 #
+EPOCHS = 150
+VALIDATE_EVERY = 5  # 20 # 12 # 6 # 6 # 6 # 5 #
 NUM_EPOCHS_NONORM = 0.1
 # this should be only a few, just .1 hopefully suffices.
 
 INCLUDE_FLIP = False
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_test.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_started_with_3cat_noMaxout.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_test.h5"
+WEIGHTS_PATH = "analysis/final/try_started_with_3cat_noMaxout.h5"
+
+CONV_WEIGHT_PATH = 'analysis/final/try_3cat_spiral_ellipse_other_started_with_geometry_without_maxout_next_next.h5'
 
 LEARNING_RATE_SCHEDULE = {
-    0: 0.4,
-    2: 0.1,
-    10: 0.05,
-    40: 0.01,
-    80: 0.005,
-    120: 0.0005
+    0: 0.001,
+    # 2: 0.1,
+    # 10: 0.05,
+    # 40: 0.01,
+    # 80: 0.005,
+    # 120: 0.0005
     # 500: 0.04,
     # 0: 0.01,
     # 1800: 0.004,
@@ -174,7 +179,7 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models()
+winsol.init_models(final_units=37, loss='mean_squared_error')
 
 if debug:
     winsol.print_summary()
@@ -262,6 +267,9 @@ if continueAnalysis:
 elif get_winsol_weights:
     print "import weights from run with original kaggle winner solution"
     winsol.load_weights()
+elif import_conv_weights:
+    print 'Import convnet weights from training with geometric forms'
+    winsol.load_conv_layers(path=CONV_WEIGHT_PATH)
 elif DO_LSUV_INIT:
     start_time_lsuv = time.time()
     print 'Starting LSUV initialisation'

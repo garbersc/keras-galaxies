@@ -156,6 +156,8 @@ class kaggle_base(object):
             layername_source = [layername_source]
         if not layername_this:
             layername_this = layername_source
+        elif not type(layername_this) == list:
+            layername_this == [layername_source]
 
         file_ = h5py.File(path, 'r')
 
@@ -414,7 +416,10 @@ class kaggle_base(object):
             for line in d:
                 if line.find("{", 0, 1) != -1:
                     loss_hist = json.loads(line)
-                if d.next() == "#history of model: " + modelname + '\n':
+                try:
+                    if d.next() == "#history of model: " + modelname + '\n':
+                        break
+                except StopIteration:
                     break
             if not loss_hist:
                 raise Warning('No model %s was found in %s' %
@@ -467,7 +472,7 @@ class kaggle_base(object):
     def full_fit(self, data_gen, validation, samples_per_epoch,
                  validate_every,
                  nb_epochs, verbose=1, save_at_every_validation=True,
-                 data_gen_creator=None, postfix=''):
+                 data_gen_creator=None, postfix='', extracallbacks=None):
         if verbose:
             timedeltas = []
         epochs_run = 0
@@ -476,6 +481,10 @@ class kaggle_base(object):
         # FIXME think about how to handle the missing samples%batch_size
         # samples
         steps_per_epoch = samples_per_epoch // self.BATCH_SIZE
+
+        callbacks_ = [LearningRateScheduler(self._make_lrs_fct())]
+        if extracallbacks:
+            callbacks_ += extracallbacks
 
         for i in range(nb_epochs / validate_every if not nb_epochs
                        % validate_every else nb_epochs / validate_every + 1):
@@ -493,7 +502,7 @@ class kaggle_base(object):
                     nb_epoch=np.min([
                         epoch_togo, validate_every]) + epochs_run,
                     initial_epoch=epochs_run, verbose=1,
-                    callbacks=[LearningRateScheduler(self._make_lrs_fct())],
+                    callbacks=callbacks_,
                     data_gen_creator=data_gen_creator, postfix=postfix):
                 try:
                     hist = self.models['model_norm' + postfix].fit_generator(
@@ -539,7 +548,8 @@ class kaggle_base(object):
             if save_at_every_validation:
                 self.save(postfix=postfix)
 
-    def LSUV_init(self, train_batch, batch_size=None, modelname='model_norm', postfix='',
+    def LSUV_init(self, train_batch, batch_size=None, modelname='model_norm',
+                  postfix='',
                   sub_modelname='main_seq'):
         modelname = modelname + postfix
         if not batch_size:
@@ -594,10 +604,11 @@ class kaggle_base(object):
                 raise AttributeError(e)
 
         intermediate_layer_model = Model(inputs=self.models[modelname]
-                                         .get_layer(main_layer).get_input_at(0),
+                                         .get_layer(main_layer)
+                                         .get_input_at(0),
                                          outputs=output_layer)
-        return intermediate_layer_model.predict(input_,
-                                                batch_size=prediction_batch_size)
+        return intermediate_layer_model.predict(
+            input_, batch_size=prediction_batch_size)
 
     def get_layer_weights(self, layer,  modelname='model_norm',
                           main_layer='main_seq', postfix=''):

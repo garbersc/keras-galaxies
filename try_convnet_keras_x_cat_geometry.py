@@ -6,7 +6,9 @@ import time
 import sys
 import json
 from custom_for_keras import input_generator
-from datetime import datetime, timedelta
+from datetime import timedelta
+
+from custom_for_keras import weight_history
 
 from custom_keras_model_x_cat_x_maxout import kaggle_x_cat_x_maxout \
     as kaggle_x_cat
@@ -26,7 +28,7 @@ saveAtEveryValidation = True
 # ... reason not found
 DO_LSUV_INIT = False
 
-BATCH_SIZE = 8  # keep in mind
+BATCH_SIZE = 256  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
@@ -37,9 +39,9 @@ VALIDATE_EVERY = 1  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 INCLUDE_FLIP = True
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_test.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_geometry_2.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_geometry_test.h5"
+WEIGHTS_PATH = "analysis/final/try_geometry_2.h5"
 
 load_data.img_path = 'geometry_examples/%s.jpg'
 
@@ -308,12 +310,15 @@ try:
 
     print 'starting main training'
 
+    weight_hist_call = weight_history()
+
     winsol.full_fit(data_gen=input_gen,
                     validation=validation_data,
                     samples_per_epoch=N_TRAIN,
                     validate_every=VALIDATE_EVERY,
                     nb_epochs=EPOCHS,
-                    data_gen_creator=create_data_gen)
+                    data_gen_creator=create_data_gen,
+                    extracallbacks=[weight_hist_call])
 
 except KeyboardInterrupt:
     print "\ngot keyboard interuption"
