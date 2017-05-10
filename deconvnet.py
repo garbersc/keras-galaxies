@@ -2,7 +2,7 @@ from custom_keras_model_and_fit_capsels import kaggle_winsol
 
 import keras.backend as T
 from keras.models import Sequential, Model
-from keras.layers import Dense, Dropout, Input
+from keras.layers import Dense, Dropout, Input, Conv2DTranspose
 from keras.layers.core import Lambda
 # TODO will be removed from keras2, can this be achieved with a lambda
 # layer now? looks like it:
@@ -80,7 +80,7 @@ class deconvnet(kaggle_winsol):
         except KeyError:
             pass
         try:
-            self.models['model_deconvs' + postfix].compile(
+            self.models['model_deconv' + postfix].compile(
                 loss=loss,
                 optimizer=optimizer)
         except KeyError:
@@ -189,11 +189,34 @@ class deconvnet(kaggle_winsol):
                                      output_shape=lambda x: x,
                                      )(model_seq)
 
-        output_layer_deconv = Lambda(function=deconv_fun,
-                                     output_shape=deconv_fun_output_shape,
-                                     arguments={'weights': model.get_layer('conv_0').
-                                                get_weights()}
-                                     )(model.get_layer('conv_0').get_output_at(0))
+        deconv_perm_layer = fPermute((3, 0, 1, 2), name='deconv_out_perm')
+
+        deconv_perm_tensor = deconv_perm_layer(
+            model.get_layer('conv_0').get_output_at(0))
+
+        deconv_layer = Conv2DTranspose(filters=32, kernel_size=6,
+                                       strides=(1, 1),
+                                       name='deconv_layer',
+                                       )(deconv_perm_tensor)
+
+        def reshape_output(x, BATCH_SIZE=self.BATCH_SIZE):
+            input_shape = T.shape(x)
+            input_ = x
+            new_input_shape = (
+                BATCH_SIZE, input_shape[1], input_shape[2] * input_shape[0] / BATCH_SIZE, input_shape[3])
+            input_ = input_.reshape(new_input_shape)
+            return input_
+
+        output_layer_deconv = Lambda(function=reshape_output, output_shape=lambda input_shape: (
+            self.BATCH_SIZE, input_shape[1], input_shape[2] * input_shape[0] / self.BATCH_SIZE, input_shape[3]))(deconv_layer)
+
+        # self.layer_formats[3] =
+
+        # output_layer_deconv = Lambda(function=deconv_fun
+        #                              output_shape=deconv_fun_output_shape,
+        #                              arguments={'weights': model.get_layer('conv_0').
+        #                                         get_weights()}
+        #                              )(model.get_layer('conv_0').get_output_at(0))
 
         model_norm = Model(
             inputs=[input_tensor, input_tensor_45], outputs=output_layer_norm, name='full_model_norm')

@@ -1,17 +1,19 @@
 import theano.sandbox.cuda.basic_ops as sbcuda
 import numpy as np
-import load_data
+import matplotlib.pyplot as plt
 import realtime_augmentation as ra
+
+import load_data
+import functools
 import time
 import sys
 import json
-from datetime import timedelta
 import os
-import matplotlib.pyplot as plt
+
 from termcolor import colored
-import functools
-from ellipse_fit import get_ellipse_kaggle_par
+from datetime import datetime, timedelta
 from custom_keras_model_and_fit_capsels import kaggle_winsol
+from custom_for_keras import input_generator
 from deconvnet import deconvnet
 
 starting_time = time.time()
@@ -20,11 +22,14 @@ copy_to_ram_beforehand = False
 
 debug = True
 
-get_winsol_weights = False
+get_deconv_weights = False
 
-BATCH_SIZE = 16  # keep in mind
+BATCH_SIZE = 32  # keep in mind
 
 NUM_INPUT_FEATURES = 3
+EPOCHS = 1
+
+MAKE_PLOTS = True
 
 included_flipped = True
 
@@ -55,10 +60,12 @@ PART_SIZE = 45
 postfix = ''
 
 N_INPUT_VARIATION = 2
+GEN_BUFFER_SIZE = 2
 
 # set to True if the prediction and evaluation should be done when the
 # prediction file already exists
 REPREDICT_EVERYTIME = False
+IMAGE_OUTPUT_PATH = "images_deconv"
 
 TEST = False  # disable this to not generate predictions on the testset
 
@@ -84,7 +91,7 @@ print 'Question requirements: %s' % question_requierement
 spiral_or_ellipse_cat = [[(0, 1), (1, 1), (3, 0)], [(0, 1), (1, 0)]]
 
 target_filename = os.path.basename(WEIGHTS_PATH).replace(".h5", ".npy.gz")
-if get_winsol_weights:
+if get_deconv_weights:
     target_filename = os.path.basename(WEIGHTS_PATH).replace(".pkl", ".npy.gz")
 target_path_valid = os.path.join(
     "predictions/final/augmented/valid", target_filename)
@@ -104,6 +111,7 @@ ra.num_train = y_train.shape[0]
 
 # integer division, is defining validation size
 ra.num_valid = ra.num_train // 100
+ra.num_valid -= ra.num_valid % BATCH_SIZE
 ra.num_train -= ra.num_valid
 
 
@@ -150,7 +158,7 @@ print("validation sample contains %s images. \n" %
       (ra.num_valid))
 
 print 'initiate deconvnet class'
-winsol = deconvnet(BATCH_SIZE=BATCH_SIZE,
+deconv = deconvnet(BATCH_SIZE=BATCH_SIZE,
                    NUM_INPUT_FEATURES=NUM_INPUT_FEATURES,
                    PART_SIZE=PART_SIZE,
                    input_sizes=input_sizes,
@@ -158,7 +166,7 @@ winsol = deconvnet(BATCH_SIZE=BATCH_SIZE,
                    WEIGHTS_PATH=WEIGHTS_PATH,
                    include_flip=included_flipped)
 
-layer_formats = winsol.layer_formats
+layer_formats = deconv.layer_formats
 layer_names = layer_formats.keys()
 
 print "Build model"
@@ -170,14 +178,14 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models()
+deconv.init_models()
 
 if debug:
-    winsol.print_summary(postfix=postfix)
+    deconv.print_summary(postfix=postfix)
 
 print "Load model weights"
-winsol.load_weights(path=WEIGHTS_PATH, postfix=postfix)
-winsol.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
+deconv.load_weights(path=WEIGHTS_PATH, postfix=postfix)
+deconv.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
 
 
 print "Set up data loading"
@@ -198,6 +206,30 @@ augmentation_params = {
     'translation_range': (-4, 4),
     'do_flip': True,
 }
+
+
+def create_data_gen():
+    augmented_data_gen = ra.realtime_augmented_data_gen(
+        num_chunks=N_TRAIN / BATCH_SIZE * (EPOCHS + 1),
+        chunk_size=BATCH_SIZE,
+        augmentation_params=augmentation_params,
+        ds_transforms=ds_transforms,
+        target_sizes=input_sizes)
+
+    post_augmented_data_gen = ra.post_augment_brightness_gen(
+        augmented_data_gen, std=0.5)
+
+    train_gen = load_data.buffered_gen_mp(
+        post_augmented_data_gen, buffer_size=GEN_BUFFER_SIZE)
+
+    input_gen = input_generator(train_gen)
+
+    return input_gen
+
+
+#  # may need doubling the generator,can be done with
+# itertools.tee(iterable, n=2)
+input_gen = create_data_gen()
 
 
 def create_valid_gen():
@@ -239,11 +271,200 @@ if debug:
 
 
 def save_exit():
-    # winsol.save()
+    # deconv.save()
     print "Done!"
     print ' run for %s' % timedelta(seconds=(time.time() - start_time))
     exit()
 
+
+imshow_c = functools.partial(
+    plt.imshow, interpolation='none')  # , vmin=0.0, vmax=1.0)
+imshow_g = functools.partial(
+    plt.imshow, interpolation='none', cmap=plt.get_cmap('gray'))  # , vmin=0.0, vmax=1.0)
+
+
+def normalize_img(img):
+    min = np.amin(img)
+    max = np.amax(img)
+    return (img - min) / (max - min)
+
+
+def _img_wall(img, norm=False):
+    dim = len(np.shape(img))
+    shape = np.shape(img)
+    n_board_side = int(np.ceil(np.sqrt(shape[0])))
+    n_board_square = int(n_board_side**2)
+    if dim == 3:
+        img_w = shape[1]
+        img_h = shape[2]
+        wall = np.zeros((n_board_side * img_w + n_board_side + 1,
+                         n_board_side * img_h + n_board_side + 1))
+    elif dim == 4:
+        img_w = shape[2]
+        img_h = shape[3]
+        wall = np.zeros((shape[1], n_board_side * img_w + n_board_side + 1,
+                         n_board_side * img_h + n_board_side + 1))
+    else:
+        raise TypeError(
+            'Wrong dimension %s of the input' % dim)
+
+    pos = [0, 0]
+    for i in img:
+        if pos[0] >= n_board_side:
+            pos[0] = 0
+            pos[1] = pos[1] + 1
+        x0 = pos[0] * (img_w + 1) + 1
+        x1 = (pos[0] + 1) * img_w + pos[0] + 1
+        y0 = pos[1] * (img_h + 1) + 1
+        y1 = (pos[1] + 1) * img_h + pos[1] + 1
+        i_ = normalize_img(i) if norm else i
+        if dim == 3:
+            wall[x0:x1, y0:y1] = i_
+        else:
+            wall[:, x0:x1, y0:y1] = i_
+        pos[0] = pos[0] + 1
+    return wall
+
+
+def print_weights(norm=False, nameprefix=''):
+    if not os.path.isdir(IMAGE_OUTPUT_PATH):
+        os.mkdir(IMAGE_OUTPUT_PATH)
+
+    os.chdir(IMAGE_OUTPUT_PATH)
+    weights_out_dir = 'weights'
+    if norm:
+        weights_out_dir += '_normalized'
+    if not os.path.isdir(weights_out_dir):
+        os.mkdir(weights_out_dir)
+    os.chdir(weights_out_dir)
+
+    print 'Printing weights'
+
+    for name in layer_formats:
+        if layer_formats[name] == 1:
+            w, b = deconv.get_layer_weights(layer=name)
+            w = np.transpose(w, (3, 0, 1, 2))
+
+            w = _img_wall(w, norm)
+            b = _img_wall(b, norm)
+        elif layer_formats[name] == 0:
+            w, b = deconv.get_layer_weights(layer=name)
+            w = _img_wall(w, norm)
+            b = _img_wall(b, norm)
+        else:
+            continue
+
+    w, b = deconv.models['model_deconv'].get_layer(
+        'deconv_layer').get_weights()
+    w = np.transpose(w, (3, 0, 1, 2))
+
+    w = _img_wall(w, norm)
+    b = _img_wall(b, norm)
+
+    for i in range(len(w)):
+        imshow_g(w[i])
+        if not norm:
+            plt.colorbar()
+        plt.savefig(
+            nameprefix + 'weight_layer_%s_kernel_channel_%s.jpg' % (name, i))
+        plt.close()
+
+    imshow_g(b)
+    if not norm:
+        plt.colorbar()
+    plt.savefig(nameprefix + 'weight_layer_%s_bias.jpg' % (name))
+    plt.close()
+
+    os.chdir('../..')
+
+
+def print_output(image_nr=0, plots=True):
+    print 'Checking save directory...'
+    if not os.path.isdir(IMAGE_OUTPUT_PATH):
+        os.mkdir(IMAGE_OUTPUT_PATH)
+        print 'Creating directory %s...' % (IMAGE_OUTPUT_PATH)
+
+    os.chdir(IMAGE_OUTPUT_PATH)
+
+    print 'Collecting output from merge layer...'
+    print '  Output images will be saved at dir: %s' % (IMAGE_OUTPUT_PATH)
+
+    image_nr = image_nr
+    if type(image_nr) == int:
+        input_img = [np.asarray([validation_data[0][0][image_nr]]),
+                     np.asarray([validation_data[0][1][image_nr]])]
+    elif image_nr == 'ones':
+        input_img = [np.ones(shape=(np.asarray([validation_data[0][0][0]]).shape)), np.ones(
+            shape=(np.asarray([validation_data[0][0][0]]).shape))]
+    elif image_nr == 'zeros':
+        input_img = [np.zeros(shape=(np.asarray([validation_data[0][0][0]]).shape)), np.zeroes(
+            shape=(np.asarray([validation_data[0][0][0]]).shape))]
+
+    deconv.layer_formats['input_merge'] = 4
+    intermediate_outputs = {}
+    intermediate_outputs['input_merge'] = np.asarray(deconv.get_layer_output(
+        'input_merge', input_=input_img)[0])
+
+    print 'Collecting output from Deconvnet... this may take a while...'
+    output_deconv = deconv.predict(
+        x=validation_data[0], modelname='model_deconv')
+    if debug:
+        print 'Deconv output shape:' + str(np.shape(output_deconv))
+        print 'Ids of input images are:' + str(valid_ids[0:5])
+    if plots:
+        print 'Plotting outputs...'
+
+        for i, img in enumerate(output_deconv[0:1]):
+            for j, channel in enumerate(img):
+                canvas, (im1, im2) = plt.subplots(1, 2)
+                im1.imshow(_img_wall(
+                    intermediate_outputs['input_merge']), interpolation='none', cmap=plt.get_cmap('gray'))
+                im1.set_title('Input Image %s' % (valid_ids[0]))
+                im2.imshow(channel, interpolation='none',
+                           cmap=plt.get_cmap('gray'))
+                im2.set_title('Channel %s of input Image %s' % (j, i))
+                plt.savefig('%s_%s.jpg' % (i, j), dpi=300)
+
+        # for i, img in enumerate(output_deconv[0:5]):
+        #     for j, channel in enumerate(img):
+        #         imshow_g(channel)
+        #         plt.colorbar()
+        #         plt.savefig('%s_%s.jpg' % (i, j), dpi=300)
+        #         plt.close()
+
+        # if type(image_nr) == int:
+        #     imshow_c(np.transpose(input_img[0][0], (1, 2, 0)))
+        #     plt.savefig('input_fig_%s_rotation_0.jpg' % (image_nr))
+        #     plt.close()
+
+        #     imshow_c(np.transpose(input_img[1][0], (1, 2, 0)))
+        #     plt.savefig('input_fig_%s_rotation_45.jpg' % (image_nr))
+        #     plt.close()
+
+        #     for i in range(len(input_img[0][0])):
+        #         imshow_g(input_img[0][0][i])
+        #         plt.savefig('input_fig_%s_rotation_0_dim_%s.jpg' %
+        #                     (image_nr, i))
+        #         plt.close()
+
+        #     for i in range(len(input_img[1][0])):
+        #         imshow_g(input_img[1][0][i])
+        #         plt.savefig('input_fig_%s_rotation_45_dim_%s.jpg' %
+        #                     (image_nr, i))
+        #         plt.close()
+
+        #     imshow_g(_img_wall(intermediate_outputs['input_merge']))
+        #     plt.colorbar()
+        #     plt.savefig('output_fig_%s_%s.jpg' %
+        #                 (image_nr, 'input_merge'))
+        #     plt.close()
+
+    os.chdir('..')
+
+
+if MAKE_PLOTS:
+    print_output(plots=True)
+    save_exit()
 
 print 'Done'
 # sys.exit(0)

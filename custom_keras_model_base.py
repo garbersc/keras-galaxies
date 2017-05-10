@@ -585,6 +585,7 @@ class kaggle_base(object):
                          main_layer='main_seq', prediction_batch_size=1,
                          postfix=''):
         modelname += postfix
+        print 'Looking for layer'
         _layer = self.models[modelname].get_layer(main_layer).get_layer(
             layer)
 
@@ -592,7 +593,7 @@ class kaggle_base(object):
             input_ = [np.ones(shape=(prediction_batch_size,) + i[1:])
                       for i in self.models[modelname].get_layer(main_layer).input_shape]
 
-        if self.layer_formats[layer] > 0:
+        if self.layer_formats[layer] > 0 and self.layer_formats[layer] < 4:
             output_layer = fPermute((3, 0, 1, 2))(_layer.output)
             output_layer = Lambda(lambda x: T.reshape(x[0], (
                 prediction_batch_size,) + tuple(T.shape(output_layer)[1:])),
@@ -607,10 +608,24 @@ class kaggle_base(object):
                 print _layer
                 raise AttributeError(e)
 
+        if self.layer_formats[layer] == 4:
+            def reshape_output(x, BATCH_SIZE=self.BATCH_SIZE):
+                input_shape = T.shape(x)
+                input_ = x
+                new_input_shape = (
+                    prediction_batch_size, input_shape[1], input_shape[2] * input_shape[0] / prediction_batch_size, input_shape[3])
+                input_ = input_.reshape(new_input_shape)
+                return input_
+
+            output_lambda = Lambda(function=reshape_output, output_shape=lambda input_shape: (
+                prediction_batch_size, input_shape[1], input_shape[2] * input_shape[0] / prediction_batch_size, input_shape[3]))
+            output_layer = output_lambda(output_layer)
+
         intermediate_layer_model = Model(inputs=self.models[modelname]
                                          .get_layer(main_layer)
                                          .get_input_at(0),
                                          outputs=output_layer)
+
         return intermediate_layer_model.predict(
             input_, batch_size=prediction_batch_size)
 
