@@ -24,7 +24,7 @@ debug = True
 
 get_deconv_weights = False
 
-BATCH_SIZE = 16  # keep in mind
+BATCH_SIZE = 32  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 EPOCHS = 1
@@ -111,6 +111,7 @@ ra.num_train = y_train.shape[0]
 
 # integer division, is defining validation size
 ra.num_valid = ra.num_train // 100
+ra.num_valid -= ra.num_valid % BATCH_SIZE
 ra.num_train -= ra.num_valid
 
 
@@ -360,8 +361,6 @@ def print_weights(norm=False, nameprefix=''):
     w = _img_wall(w, norm)
     b = _img_wall(b, norm)
 
-    output = deconv.predict(x=validation_data[0], modelname='model_deconv')
-
     for i in range(len(w)):
         imshow_g(w[i])
         if not norm:
@@ -379,19 +378,93 @@ def print_weights(norm=False, nameprefix=''):
     os.chdir('../..')
 
 
-if MAKE_PLOTS:
-    print "Load deconvnet weights"
-    deconv.load_weights(path=WEIGHTS_PATH)
-    deconv.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
-    # TODO check influence on the first epoch of the data generation of this
-    # .next()
-    train_batch = input_gen.next()[0]
-    if debug:
-        print type(train_batch)
-        print np.shape(train_batch)
-    print_weights(nameprefix='deconv')
-    save_exit()
+def print_output(image_nr=0, plots=True):
+    print 'Checking save directory...'
+    if not os.path.isdir(IMAGE_OUTPUT_PATH):
+        os.mkdir(IMAGE_OUTPUT_PATH)
+        print 'Creating directory %s...' % (IMAGE_OUTPUT_PATH)
 
+    os.chdir(IMAGE_OUTPUT_PATH)
+
+    print 'Collecting output from merge layer...'
+    print '  Output images will be saved at dir: %s' % (IMAGE_OUTPUT_PATH)
+
+    image_nr = image_nr
+    if type(image_nr) == int:
+        input_img = [np.asarray([validation_data[0][0][image_nr]]),
+                     np.asarray([validation_data[0][1][image_nr]])]
+    elif image_nr == 'ones':
+        input_img = [np.ones(shape=(np.asarray([validation_data[0][0][0]]).shape)), np.ones(
+            shape=(np.asarray([validation_data[0][0][0]]).shape))]
+    elif image_nr == 'zeros':
+        input_img = [np.zeros(shape=(np.asarray([validation_data[0][0][0]]).shape)), np.zeroes(
+            shape=(np.asarray([validation_data[0][0][0]]).shape))]
+
+    deconv.layer_formats['input_merge'] = 4
+    intermediate_outputs = {}
+    intermediate_outputs['input_merge'] = np.asarray(deconv.get_layer_output(
+        'input_merge', input_=input_img)[0])
+
+    print 'Collecting output from Deconvnet... this may take a while...'
+    output_deconv = deconv.predict(
+        x=validation_data[0], modelname='model_deconv')
+    if debug:
+        print 'Deconv output shape:' + str(np.shape(output_deconv))
+        print 'Ids of input images are:' + str(valid_ids[0:5])
+    if plots:
+        print 'Plotting outputs...'
+
+        for i, img in enumerate(output_deconv[0:1]):
+            for j, channel in enumerate(img):
+                canvas, (im1, im2) = plt.subplots(1, 2)
+                im1.imshow(_img_wall(
+                    intermediate_outputs['input_merge']), interpolation='none', cmap=plt.get_cmap('gray'))
+                im1.set_title('Input Image %s' % (valid_ids[0]))
+                im2.imshow(channel, interpolation='none',
+                           cmap=plt.get_cmap('gray'))
+                im2.set_title('Channel %s of input Image %s' % (j, i))
+                plt.savefig('%s_%s.jpg' % (i, j), dpi=300)
+
+        # for i, img in enumerate(output_deconv[0:5]):
+        #     for j, channel in enumerate(img):
+        #         imshow_g(channel)
+        #         plt.colorbar()
+        #         plt.savefig('%s_%s.jpg' % (i, j), dpi=300)
+        #         plt.close()
+
+        # if type(image_nr) == int:
+        #     imshow_c(np.transpose(input_img[0][0], (1, 2, 0)))
+        #     plt.savefig('input_fig_%s_rotation_0.jpg' % (image_nr))
+        #     plt.close()
+
+        #     imshow_c(np.transpose(input_img[1][0], (1, 2, 0)))
+        #     plt.savefig('input_fig_%s_rotation_45.jpg' % (image_nr))
+        #     plt.close()
+
+        #     for i in range(len(input_img[0][0])):
+        #         imshow_g(input_img[0][0][i])
+        #         plt.savefig('input_fig_%s_rotation_0_dim_%s.jpg' %
+        #                     (image_nr, i))
+        #         plt.close()
+
+        #     for i in range(len(input_img[1][0])):
+        #         imshow_g(input_img[1][0][i])
+        #         plt.savefig('input_fig_%s_rotation_45_dim_%s.jpg' %
+        #                     (image_nr, i))
+        #         plt.close()
+
+        #     imshow_g(_img_wall(intermediate_outputs['input_merge']))
+        #     plt.colorbar()
+        #     plt.savefig('output_fig_%s_%s.jpg' %
+        #                 (image_nr, 'input_merge'))
+        #     plt.close()
+
+    os.chdir('..')
+
+
+if MAKE_PLOTS:
+    print_output(plots=True)
+    save_exit()
 
 print 'Done'
 # sys.exit(0)

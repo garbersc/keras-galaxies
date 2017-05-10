@@ -189,8 +189,26 @@ class deconvnet(kaggle_winsol):
                                      output_shape=lambda x: x,
                                      )(model_seq)
 
-        output_layer_deconv = Conv2DTranspose(filters=128, kernel_size=3, strides=(
-            1, 1), name='deconv_layer')(model.get_layer('conv_0').get_output_at(0))
+        deconv_perm_layer = fPermute((3, 0, 1, 2), name='deconv_out_perm')
+
+        deconv_perm_tensor = deconv_perm_layer(
+            model.get_layer('conv_0').get_output_at(0))
+
+        deconv_layer = Conv2DTranspose(filters=32, kernel_size=6,
+                                       strides=(1, 1),
+                                       name='deconv_layer',
+                                       )(deconv_perm_tensor)
+
+        def reshape_output(x, BATCH_SIZE=self.BATCH_SIZE):
+            input_shape = T.shape(x)
+            input_ = x
+            new_input_shape = (
+                BATCH_SIZE, input_shape[1], input_shape[2] * input_shape[0] / BATCH_SIZE, input_shape[3])
+            input_ = input_.reshape(new_input_shape)
+            return input_
+
+        output_layer_deconv = Lambda(function=reshape_output, output_shape=lambda input_shape: (
+            self.BATCH_SIZE, input_shape[1], input_shape[2] * input_shape[0] / self.BATCH_SIZE, input_shape[3]))(deconv_layer)
 
         # self.layer_formats[3] =
 
