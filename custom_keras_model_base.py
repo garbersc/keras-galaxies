@@ -484,6 +484,8 @@ class kaggle_base(object):
 
         callbacks_ = [LearningRateScheduler(self._make_lrs_fct())]
         if extracallbacks:
+            if not type(extracallbacks) == list:
+                extracallbacks = [extracallbacks]
             callbacks_ += extracallbacks
 
         for i in range(nb_epochs / validate_every if not nb_epochs
@@ -512,16 +514,18 @@ class kaggle_base(object):
                         initial_epoch=initial_epoch, verbose=verbose,
                         callbacks=callbacks)
                     self._save_hist(hist.history, postfix=postfix)
-                except ValueError:
+                except ValueError, e:
                     warnings.warn(
-                        'Value Error in the main fit. Generator will be reinitialised.')
+                        'Value Error in the main fit. Generator will be reinitialised. \n %s'
+                        % e)
                     print 'saving'
                     self.save(postfix=postfix)
                     if data_gen_creator:
                         _main_fit(self, data_gen=data_gen_creator())
                     else:
-                        raise ValueError(
-                            'no reinitilizer of the data generator defined')
+                        warnings.warn(
+                            'No reinitilizer of the data generator defined')
+                        raise ValueError(e)
 
             _main_fit(self, data_gen)
 

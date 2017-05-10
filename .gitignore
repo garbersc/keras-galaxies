@@ -74,6 +74,7 @@ loss_3cat*.txt
 *.gif
 *.mp4
 img_weight_hist/
+*.json
 
 # emacs autosave files and hidden files
 \#*
