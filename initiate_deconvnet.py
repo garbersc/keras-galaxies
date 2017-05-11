@@ -16,59 +16,45 @@ from custom_keras_model_and_fit_capsels import kaggle_winsol
 from custom_for_keras import input_generator
 from deconvnet import deconvnet
 
+##############################################
+# starting parameters
+##############################################
 starting_time = time.time()
-
 copy_to_ram_beforehand = False
-
 debug = True
-
 get_deconv_weights = False
-
 BATCH_SIZE = 32  # keep in mind
-
 NUM_INPUT_FEATURES = 3
 EPOCHS = 1
-
 MAKE_PLOTS = True
-
 included_flipped = True
-
 USE_BLENDED_PREDICTIONS = False
 PRED_BLENDED_PATH = ''
 if debug:
     print os.path.isfile(PRED_BLENDED_PATH)
-
-
 TRAIN_LOSS_SF_PATH = 'try_ellipseOnly_2param.txt'
 # TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
 WEIGHTS_PATH = 'analysis/final/try_goodWeights.h5'
 TXT_OUTPUT_PATH = '_'
-# IMAGE_OUTPUT_PATH = "img_ellipse_fit"
-
-# NUM_ELLIPSE_PARAMS = 2
 ELLIPSE_FIT = WEIGHTS_PATH.find('ellipse') >= 0
 if ELLIPSE_FIT:
     postfix = '_ellipse'
-
-
 DONT_LOAD_WEIGHTS = False
-
 input_sizes = [(69, 69), (69, 69)]
 PART_SIZE = 45
-
 postfix = ''
-
 N_INPUT_VARIATION = 2
 GEN_BUFFER_SIZE = 2
-
 # set to True if the prediction and evaluation should be done when the
 # prediction file already exists
 REPREDICT_EVERYTIME = False
 IMAGE_OUTPUT_PATH = "images_deconv"
-
 TEST = False  # disable this to not generate predictions on the testset
 
+##############################################
+# main
+##############################################
 
 output_names = ["smooth", "featureOrdisk", "NoGalaxy", "EdgeOnYes", "EdgeOnNo", "BarYes", "BarNo", "SpiralYes", "SpiralNo", "BulgeNo", "BulgeJust", "BulgeObvious", "BulgDominant", "OddYes", "OddNo", "RoundCompletly", "RoundBetween", "RoundCigar",
                 "Ring", "Lense", "Disturbed", "Irregular", "Other", "Merger", "DustLane", "BulgeRound", "BlulgeBoxy", "BulgeNo2", "SpiralTight", "SpiralMedium", "SpiralLoose", "Spiral1Arm", "Spiral2Arm", "Spiral3Arm", "Spiral4Arm", "SpiralMoreArms", "SpiralCantTell"]

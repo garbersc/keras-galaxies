@@ -581,7 +581,7 @@ class kaggle_base(object):
                          main_layer='main_seq', prediction_batch_size=1,
                          postfix=''):
         modelname += postfix
-        print 'Looking for layer'
+
         _layer = self.models[modelname].get_layer(main_layer).get_layer(
             layer)
 
