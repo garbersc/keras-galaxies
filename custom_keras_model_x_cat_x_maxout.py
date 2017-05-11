@@ -90,7 +90,17 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
         return True
 
     def init_models(self, final_units=3, n_maxout_layers=0,
-                    loss='categorical_crossentropy'):
+                    loss='categorical_crossentropy',
+                    freeze_conv=False,
+                    cut_out_conv=(False, False, False, False)):
+
+        if not (type(freeze_conv) in (tuple, list)):
+            freeze_conv = bool(freeze_conv)
+            freeze_conv = (freeze_conv, freeze_conv, freeze_conv, freeze_conv)
+        elif len(freeze_conv) != 4:
+            raise ValueError(
+                'Wrong number of freeze variables for the conv layers. Expected four  or bool, got %i' % len(freeze_conv))
+
         print "init model"
         input_tensor = Input(batch_shape=(self.BATCH_SIZE,
                                           self.NUM_INPUT_FEATURES,
@@ -138,19 +148,38 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
         # kerasCudaConvnetPooling2DLayer
         model.add(fPermute((1, 2, 3, 0), name='input_perm'))
 
-        model.add(kerasCudaConvnetConv2DLayer(
-            n_filters=32, filter_size=6, untie_biases=True, name='conv_0'))
+        if not cut_out_conv[0]:
+            model.add(kerasCudaConvnetConv2DLayer(
+                n_filters=32, filter_size=6, untie_biases=True, name='conv_0',
+                trainable=not freeze_conv[0]))
+        else:
+            del self.layer_formats['conv_0']
+
         model.add(kerasCudaConvnetPooling2DLayer(name='pool_0'))
 
-        model.add(kerasCudaConvnetConv2DLayer(
-            n_filters=64, filter_size=5, untie_biases=True, name='conv_1'))
+        if not cut_out_conv[1]:
+            model.add(kerasCudaConvnetConv2DLayer(
+                n_filters=64, filter_size=5, untie_biases=True, name='conv_1',
+                trainable=not freeze_conv[1]))
+        else:
+            del self.layer_formats['conv_1']
+
         model.add(kerasCudaConvnetPooling2DLayer(name='pool_1'))
 
-        model.add(kerasCudaConvnetConv2DLayer(
-            n_filters=128, filter_size=3, untie_biases=True, name='conv_2'))
-        model.add(kerasCudaConvnetConv2DLayer(n_filters=128,
-                                              filter_size=3,  weights_std=0.1,
-                                              untie_biases=True, name='conv_3'))
+        if not cut_out_conv[2]:
+            model.add(kerasCudaConvnetConv2DLayer(
+                n_filters=128, filter_size=3, untie_biases=True, name='conv_2',
+                trainable=not freeze_conv[2]))
+        else:
+            del self.layer_formats['conv_2']
+
+        if not cut_out_conv[3]:
+            model.add(kerasCudaConvnetConv2DLayer(n_filters=128,
+                                                  filter_size=3,  weights_std=0.1,
+                                                  untie_biases=True, name='conv_3',
+                                                  trainable=not freeze_conv[3]))
+        else:
+            del self.layer_formats['conv_3']
 
         model.add(kerasCudaConvnetPooling2DLayer(name='pool_2'))
 

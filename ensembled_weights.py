@@ -18,6 +18,8 @@ from termcolor import colored
 import functools
 
 
+debug = True
+
 weights_dir = 'weight_history'
 output_dir = 'img_weight_hist'
 
@@ -79,7 +81,14 @@ def print_weights(norm=False):
         os.path.join(weights_dir, "*.npy")
     )
 
-    print 'There are %s weight files available' % len(weights_history_paths)
+    if debug:
+        print len(weights_history_paths)
+
+    for i, n in enumerate(weights_history_paths):
+        if n.find('weights_of_conv_2_') < 0:
+            weights_history_paths.remove(n)
+
+    print 'There are %s weight files selected' % len(weights_history_paths)
     if not len(weights_history_paths):
         print weights_history_paths
         raise Warning('No weight files found in ' + weights_dir)
@@ -103,7 +112,9 @@ def print_weights(norm=False):
     figs = []  # plt.figure()
     axs = []  # fig.add_subplot(111)
 
-    for j in range(0, len(weights_history_paths), 10):
+    for j in range(0, len(weights_history_paths), 1):
+        if j > 350:  # BAD, BAD, BAD
+            continue
         w, b = np.load(base_path + str(j) + '.npy')
         w = np.transpose(w, (3, 0, 1, 2))
 
@@ -143,15 +154,17 @@ def print_weights(norm=False):
         im_ani.append(animation.ArtistAnimation(figs[i], k, interval=50,
                                                 repeat_delay=None,
                                                 ))
-        im_ani[i].save(output_dir + '/channel_' +
-                       str(i) + '_w.mp4', writer='imagemagick')
-        print 'saved gif to ' + output_dir + '/channel_' + str(i) + '_w.gif'
+        out_path = output_dir + '/' + \
+            base_path_l.split('/')[-1] + 'channel_' + str(i) + '_w.gif'
+        im_ani[i].save(out_path, writer='imagemagick')
+        print 'saved gif to %s' % out_path
 
     im_ani_b = animation.ArtistAnimation(fig_b, bias_imgs, interval=50,
                                          repeat_delay=None,
                                          )
-    im_ani_b.save(output_dir + '/b.mp4', writer='imagemagick')
-    print 'saved gif to ' + output_dir + '/b.gif'
+    out_path = output_dir + '/' + base_path_l.split('/')[-1] + '_b.gif'
+    im_ani_b.save(out_path, writer='imagemagick')
+    print 'saved gif to %s' % out_path
 
     # plt.show()
 
