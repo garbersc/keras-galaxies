@@ -7,6 +7,26 @@ from keras.callbacks import Callback
 import os
 
 
+def get_pool_flags(pooled, unpooled):
+    pooled = np.concatenate((pooled, pooled), axis=3)
+    pooled = np.concatenate((pooled, pooled), axis=4)
+
+    return np.equal(unpooled, pooled)
+
+
+def get_maxout_flags(mo_output, mo_input, weights):
+    warnings.warn(
+        'ate the moment only implemented for maxout with 2 dense layers')
+
+    w, b = weights
+
+    input_ = np.dot(mo_input, w) + b
+
+    pooled = np.reshape(np.concatenate(
+        (mo_output, mo_output), axis=-1), newshape=input_.shape)
+    return np.equal(input_, pooled)
+
+
 class weight_history(Callback):
     def __init__(self, layername='conv_0', submodelname='main_seq',
                  path='weight_history', **kwargs):
