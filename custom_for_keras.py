@@ -8,6 +8,8 @@ import os
 
 
 def get_pool_flags(pooled, unpooled):
+    warnings.warn(
+        'at the moment only implemented for (2,2) pool layers')
     pooled = np.concatenate((pooled, pooled), axis=3)
     pooled = np.concatenate((pooled, pooled), axis=4)
 
@@ -16,7 +18,7 @@ def get_pool_flags(pooled, unpooled):
 
 def get_maxout_flags(mo_output, mo_input, weights):
     warnings.warn(
-        'ate the moment only implemented for maxout with 2 dense layers')
+        'at the moment only implemented for maxout with 2 dense layers')
 
     w, b = weights
 
