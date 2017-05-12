@@ -2,6 +2,8 @@
 # from keras.utils import plot_model
 # plot_model(model, to_file='model.png')
 
+import matplotlib.lines as mlines
+import warnings
 import theano.sandbox.cuda.basic_ops as sbcuda
 import numpy as np
 import load_data
@@ -62,7 +64,7 @@ N_INPUT_VARIATION = 2
 
 # set to True if the prediction and evaluation should be done when the
 # prediction file already exists
-REPREDICT_EVERYTIME = False
+REPREDICT_EVERYTIME = True
 
 # TODO built this as functions, not with the if's
 DO_VALID = True  # disable this to not bother with the validation set evaluation
@@ -410,18 +412,54 @@ for i in range(len(predictions)):
         c += 1
 
 
-def P(i):
-    return (float(n_sliced_cat_agrement[i]) / float(n_sliced_cat_pred[i]))\
-        if n_sliced_cat_pred[i] else 0.
+def P_base(n_pred, n_agree):
+    return (float(n_agree) / float(n_pred))\
+        if n_pred else 0.
 
 
-def R(i):
-    for slice in question_slices:
-        if i >= slice.start and i < slice.stop:
-            false_neg = sum(n_sliced_cat_pred[slice]) - n_sliced_cat_pred[i] - (
-                sum(n_sliced_cat_agrement[slice]) - n_sliced_cat_agrement[i])
-            return float(n_sliced_cat_agrement[i]) / float(
-                n_sliced_cat_agrement[i] + false_neg)
+def P_i(i, n_pred, n_agree):
+    return P_base(n_pred[i], n_agree[i])
+
+
+P = functools.partial(P_i, n_pred=n_sliced_cat_pred,
+                      n_agree=n_sliced_cat_agrement)
+
+
+def R_base(n_pred, n_agree, n_false_neg):
+    return float(n_agree) / float(
+        n_pred + n_false_neg) if n_pred or n_false_neg else 0.
+
+
+def R_i(i, sli, n_pred, n_agree):
+    if i >= sli.start and i < sli.stop:
+        false_neg = sum(n_pred[sli]) - n_pred[i] - (
+            sum(n_agree[sli]) - n_agree[i])
+        return R_base(n_pred[i], n_agree[i], false_neg)
+    else:
+        warnings.warn('question number %i is not in slice %s' % (i, sli))
+
+
+def R_i_slices(i, slices, n_pred, n_agree):
+    for sli in slices:
+        if i >= sli.start and i < sli.stop:
+            return R_i(i, sli, n_pred, n_agree)
+        else:
+            continue
+    else:
+        warnings.warn('question number %i is not in one of the slices' % (i))
+
+
+R = functools.partial(R_i_slices, slices=question_slices,
+                      n_pred=n_sliced_cat_pred, n_agree=n_sliced_cat_agrement)
+
+
+# def R(i):
+#     for slice in question_slices:
+#         if i >= slice.start and i < slice.stop:
+#             false_neg = sum(n_sliced_cat_pred[slice]) - n_sliced_cat_pred[i] - (
+#                 sum(n_sliced_cat_agrement[slice]) - n_sliced_cat_agrement[i])
+#             return float(n_sliced_cat_agrement[i]) / float(
+#                 n_sliced_cat_agrement[i] + false_neg)
 
 
 def P_wcut(i):
@@ -494,6 +532,7 @@ print " mean P (with Cut):\t%.3f  mean R (with Cut):\t%.3f ,\t cut is on %s, mea
     np.mean([float(n_sliced_cat_pred_wcut[i]) / float(
         n_sliced_cat_pred[i]) if n_sliced_cat_pred[i] else 0.
         for i in range(VALID_CORR_OUTPUT_FILTER.shape[0])]))
+
 P_wcut_mean_noEmpty = []
 for i in range(VALID_CORR_OUTPUT_FILTER.shape[0]):
     if n_sliced_cat_pred_wcut[i]:
@@ -595,8 +634,148 @@ imshow_g = functools.partial(
 
 
 def try_different_cut_fraktion(cut_fraktions=map(lambda x: float(x) / 20.,
-                                                 range(0, 20))):
-    pass
+                                                 range(0, 20)), figname='different_cuts.jpg'):
+    print
+    print 'Testing different fraction cuts:'
+
+    cut_fraktions = cut_fraktions
+
+    n_wcut_pred = []
+    n_wcut_valid = []
+    n_wcut_agree = []
+    for _ in cut_fraktions:
+        n_wcut_pred.append([0] * len(output_names))
+        n_wcut_valid.append([0] * len(output_names))
+        n_wcut_agree.append([0] * len(output_names))
+
+    for i in range(len(predictions)):
+        for slic in question_slices:
+            sargpred = np.argmax(predictions[i][slic])
+            q_frak_pred = predictions[i][slic][sargpred] / \
+                sum(predictions[i][slic])
+            sargval = np.argmax(y_valid[i][slic])
+            q_frak_valid = y_valid[i][slic][sargval] / \
+                sum(y_valid[i][slic])
+
+            for j, cut_val in enumerate(cut_fraktions):
+                if q_frak_valid > cut_val:
+                    n_wcut_valid[j][sargpred + slic.start] += 1
+                if q_frak_pred > cut_val:
+                    n_wcut_pred[j][sargval + slic.start] += 1
+                    if sargval == sargpred:
+                        n_wcut_agree[j][sargval + slic.start] += 1
+
+    Ps_no_zero = []
+    Rs_no_zero = []
+    effs = []
+    signigicance = []  # agree/sqrt(pred-agree)
+    effs_sig = []
+
+    Ps = [np.mean([P_i(i, param[0], param[1]) for i in range(
+        VALID_CORR_OUTPUT_FILTER.shape[0])]) for param in zip(n_wcut_pred,
+                                                              n_wcut_agree)]
+    Rs = [np.mean([R_i_slices(i, slices=question_slices, n_pred=param[0],
+                              n_agree=param[1]) for i in range(
+                                  VALID_CORR_OUTPUT_FILTER.shape[0])])
+          for param in zip(n_wcut_pred, n_wcut_agree)]
+
+    if debug:
+        print n_sliced_cat_pred[0:3]
+        print n_wcut_pred[0][0:3]
+
+    def _ePReS(n_pred, n_agree):
+        eff_mean = []
+        eff_mean_s = []
+        P_wcut_mean_noEmpty = []
+        R_wcut_mean_noEmpty = []
+        signi = []
+        for i in range(VALID_CORR_OUTPUT_FILTER.shape[0]):
+            if n_sliced_cat_pred[i]:
+                eff_mean.append(float(n_pred[i]) / float(
+                    n_wcut_pred[0][i]))
+            if n_sliced_cat_agrement[i]:
+                eff_mean_s.append(float(n_agree[i]) / float(
+                    n_wcut_agree[0][i]))
+            if n_pred[i]:
+                P_wcut_mean_noEmpty.append(P_i(i, n_pred, n_agree))
+                R_wcut_mean_noEmpty.append(R_i_slices(
+                    i, question_slices, n_pred, n_agree))
+                if n_agree[i]:
+                    signi.append(
+                        float(n_agree[i]) / np.sqrt(float(n_pred[i]
+                                                          - n_agree[i])))
+        return (np.mean(eff_mean),
+                np.mean(P_wcut_mean_noEmpty),
+                np.mean(R_wcut_mean_noEmpty),
+                np.mean(signi),
+                np.mean(eff_mean_s))
+
+    for p, a in zip(n_wcut_pred, n_wcut_agree):
+        _e, _P, _R, _s, _es = _ePReS(p, a)
+        Ps_no_zero.append(_P)
+        Rs_no_zero.append(_R)
+        effs.append(_e)
+        effs_sig.append(_es)
+        signigicance.append(_s)
+
+    if debug:
+        print 'cut_fraktions'
+        print cut_fraktions
+        print 'effs'
+        print effs
+        print 'effs_sig'
+        print effs_sig
+        print 'signigicance / 120'
+        print [s / 120. for s in signigicance]
+        print 'Ps'
+        print Ps
+        print 'Rs'
+        print Rs
+        print 'Ps_no_zero'
+        print Ps_no_zero
+        print 'Rs_no_zero'
+        print Rs_no_zero
+
+    plots = []
+    label_h = []
+
+    plt.subplot(211)
+
+    plots.append(plt.plot(cut_fraktions, effs, 'r-', label="eff"))
+    label_h.append(mlines.Line2D([], [], color='red', label='eff'))
+
+    plots.append(plt.plot(
+        cut_fraktions, effs_sig, 'b-', label="eff sig"))
+    label_h.append(mlines.Line2D([], [], color='blue', label='eff sig'))
+
+    plots.append(plt.plot(cut_fraktions, [
+                 s / 120. for s in signigicance], 'g-', label="signif/120"))
+    label_h.append(mlines.Line2D([], [], color='green', label='signif/120'))
+
+    plots.append(plt.plot(cut_fraktions, Ps_no_zero, 'ro', label="Ps no zero"))
+    label_h.append(mlines.Line2D([], [], color='red', marker='o',
+                                 markersize=15, linewidth=0, label='P no 0.'))
+
+    plots.append(plt.plot(cut_fraktions, Rs_no_zero, 'bo', label="Rs no zero"))
+    label_h.append(mlines.Line2D([], [], color='blue', marker='o',
+                                 markersize=15, linewidth=0, label='R no 0.'))
+
+    plots.append(plt.plot(cut_fraktions, Ps, 'r.', label="Ps"))
+    label_h.append(mlines.Line2D([], [], color='red', marker='.',
+                                 markersize=15, linewidth=0, label='P'))
+
+    plots.append(plt.plot(cut_fraktions, Rs, 'b.', label="Rs"))
+    label_h.append(mlines.Line2D([], [], color='blue', marker='.',
+                                 markersize=15, linewidth=0, label='R'))
+
+    plt.legend(handles=label_h, bbox_to_anchor=(
+        0, -0.05), loc=2, borderaxespad=0.)
+
+    plt.xlabel('frac')
+    plt.ylabel('Cut Value')
+    plt.show()
+
+    plt.savefig(figname)
 
 
 def x_category_precision(predictions=predictions, y_valid=y_valid,
@@ -958,24 +1137,25 @@ def get_best_id(category_name, n=1):
 # print_filters(list(valid_ids).index(get_best_id('RoundCompletly')))
 # print_filters(list(valid_ids).index(get_best_id('Spiral3Arm')))
 
-print
-print
-print 'RoundCompletly:'
-for id in get_best_id('RoundCompletly', 5):
-    print 'predicted with %.3f' % predictions[list(valid_ids).index(id)][
-        output_names.index('RoundCompletly')]
-    highest_conv_activation(img_id=id)
-print
-print
-print 'Spiral3Arm:'
-for id in get_best_id('Spiral3Arm', 5):
-    print 'predicted with %.3f' % predictions[list(valid_ids).index(id)][
-        output_names.index('Spiral3Arm')]
-    highest_conv_activation(img_id=id)
-    print
+# print
+# print
+# print 'RoundCompletly:'
+# for id in get_best_id('RoundCompletly', 5):
+#     print 'predicted with %.3f' % predictions[list(valid_ids).index(id)][
+#         output_names.index('RoundCompletly')]
+#     highest_conv_activation(img_id=id)
+# print
+# print
+# print 'Spiral3Arm:'
+# for id in get_best_id('Spiral3Arm', 5):
+#     print 'predicted with %.3f' % predictions[list(valid_ids).index(id)][
+#         output_names.index('Spiral3Arm')]
+#     highest_conv_activation(img_id=id)
+#     print
 
+try_different_cut_fraktion()
 
-print_weights()
-print_weights(True)
+# print_weights()
+# print_weights(True)
 
 save_exit()

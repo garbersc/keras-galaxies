@@ -85,7 +85,7 @@ def print_weights(norm=False):
         print len(weights_history_paths)
 
     for i, n in enumerate(weights_history_paths):
-        if n.find('weights_of_conv_2_') < 0:
+        if n.find('weights_of_conv_0_') < 0:
             weights_history_paths.remove(n)
 
     print 'There are %s weight files selected' % len(weights_history_paths)
@@ -113,8 +113,8 @@ def print_weights(norm=False):
     axs = []  # fig.add_subplot(111)
 
     for j in range(0, len(weights_history_paths), 1):
-        if j > 350:  # BAD, BAD, BAD
-            continue
+        if j > 126:  # BAD, BAD, BAD
+            break
         w, b = np.load(base_path + str(j) + '.npy')
         w = np.transpose(w, (3, 0, 1, 2))
 
@@ -155,14 +155,14 @@ def print_weights(norm=False):
                                                 repeat_delay=None,
                                                 ))
         out_path = output_dir + '/' + \
-            base_path_l.split('/')[-1] + 'channel_' + str(i) + '_w.gif'
+            base_path_l[0].split('/')[-1] + 'channel_' + str(i) + '_w.gif'
         im_ani[i].save(out_path, writer='imagemagick')
         print 'saved gif to %s' % out_path
 
     im_ani_b = animation.ArtistAnimation(fig_b, bias_imgs, interval=50,
                                          repeat_delay=None,
                                          )
-    out_path = output_dir + '/' + base_path_l.split('/')[-1] + '_b.gif'
+    out_path = output_dir + '/' + base_path_l[0].split('/')[-1] + '_b.gif'
     im_ani_b.save(out_path, writer='imagemagick')
     print 'saved gif to %s' % out_path
 
