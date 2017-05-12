@@ -16,59 +16,45 @@ from custom_keras_model_and_fit_capsels import kaggle_winsol
 from custom_for_keras import input_generator
 from deconvnet import deconvnet
 
+##############################################
+# starting parameters
+##############################################
 starting_time = time.time()
-
 copy_to_ram_beforehand = False
-
 debug = True
-
 get_deconv_weights = False
-
 BATCH_SIZE = 32  # keep in mind
-
 NUM_INPUT_FEATURES = 3
 EPOCHS = 1
-
 MAKE_PLOTS = True
-
 included_flipped = True
-
 USE_BLENDED_PREDICTIONS = False
 PRED_BLENDED_PATH = ''
 if debug:
     print os.path.isfile(PRED_BLENDED_PATH)
-
-
 TRAIN_LOSS_SF_PATH = 'try_ellipseOnly_2param.txt'
 # TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
 WEIGHTS_PATH = 'analysis/final/try_goodWeights.h5'
 TXT_OUTPUT_PATH = '_'
-# IMAGE_OUTPUT_PATH = "img_ellipse_fit"
-
-# NUM_ELLIPSE_PARAMS = 2
 ELLIPSE_FIT = WEIGHTS_PATH.find('ellipse') >= 0
 if ELLIPSE_FIT:
     postfix = '_ellipse'
-
-
 DONT_LOAD_WEIGHTS = False
-
 input_sizes = [(69, 69), (69, 69)]
 PART_SIZE = 45
-
 postfix = ''
-
 N_INPUT_VARIATION = 2
 GEN_BUFFER_SIZE = 2
-
 # set to True if the prediction and evaluation should be done when the
 # prediction file already exists
 REPREDICT_EVERYTIME = False
 IMAGE_OUTPUT_PATH = "images_deconv"
-
 TEST = False  # disable this to not generate predictions on the testset
 
+##############################################
+# main
+##############################################
 
 output_names = ["smooth", "featureOrdisk", "NoGalaxy", "EdgeOnYes", "EdgeOnNo", "BarYes", "BarNo", "SpiralYes", "SpiralNo", "BulgeNo", "BulgeJust", "BulgeObvious", "BulgDominant", "OddYes", "OddNo", "RoundCompletly", "RoundBetween", "RoundCigar",
                 "Ring", "Lense", "Disturbed", "Irregular", "Other", "Merger", "DustLane", "BulgeRound", "BlulgeBoxy", "BulgeNo2", "SpiralTight", "SpiralMedium", "SpiralLoose", "Spiral1Arm", "Spiral2Arm", "Spiral3Arm", "Spiral4Arm", "SpiralMoreArms", "SpiralCantTell"]
@@ -378,52 +364,62 @@ def print_weights(norm=False, nameprefix=''):
     os.chdir('../..')
 
 
-def print_output(image_nr=0, plots=True):
-    print 'Checking save directory...'
+def print_output(nr_images=2, plots=False):
+    if debug:
+        print 'Checking save directory...'
     if not os.path.isdir(IMAGE_OUTPUT_PATH):
         os.mkdir(IMAGE_OUTPUT_PATH)
         print 'Creating directory %s...' % (IMAGE_OUTPUT_PATH)
 
     os.chdir(IMAGE_OUTPUT_PATH)
 
-    print 'Collecting output from merge layer...'
     print '  Output images will be saved at dir: %s' % (IMAGE_OUTPUT_PATH)
-
-    image_nr = image_nr
-    if type(image_nr) == int:
-        input_img = [np.asarray([validation_data[0][0][image_nr]]),
-                     np.asarray([validation_data[0][1][image_nr]])]
-    elif image_nr == 'ones':
-        input_img = [np.ones(shape=(np.asarray([validation_data[0][0][0]]).shape)), np.ones(
-            shape=(np.asarray([validation_data[0][0][0]]).shape))]
-    elif image_nr == 'zeros':
-        input_img = [np.zeros(shape=(np.asarray([validation_data[0][0][0]]).shape)), np.zeroes(
-            shape=(np.asarray([validation_data[0][0][0]]).shape))]
-
-    deconv.layer_formats['input_merge'] = 4
-    intermediate_outputs = {}
-    intermediate_outputs['input_merge'] = np.asarray(deconv.get_layer_output(
-        'input_merge', input_=input_img)[0])
 
     print 'Collecting output from Deconvnet... this may take a while...'
     output_deconv = deconv.predict(
         x=validation_data[0], modelname='model_deconv')
     if debug:
         print 'Deconv output shape:' + str(np.shape(output_deconv))
-        print 'Ids of input images are:' + str(valid_ids[0:5])
-    if plots:
-        print 'Plotting outputs...'
+        print 'Ids of input images are: ' + str(valid_ids[0:nr_images])
+    deconv.layer_formats['input_merge'] = 4
 
-        for i, img in enumerate(output_deconv[0:1]):
+    for i, img in enumerate(output_deconv[0:nr_images]):
+        image_nr = i
+        if type(image_nr) == int:
+            input_img = [np.asarray([validation_data[0][0][image_nr]]),
+                         np.asarray([validation_data[0][1][image_nr]])]
+        elif image_nr == 'ones':
+            input_img = [np.ones(shape=(np.asarray([validation_data[0][0][0]]).shape)), np.ones(
+                shape=(np.asarray([validation_data[0][0][0]]).shape))]
+        elif image_nr == 'zeros':
+            input_img = [np.zeros(shape=(np.asarray([validation_data[0][0][0]]).shape)), np.zeroes(
+                shape=(np.asarray([validation_data[0][0][0]]).shape))]
+
+        if debug:
+            print 'Collecting output from merge layer...'
+        intermediate_outputs = {}
+        intermediate_outputs['input_merge'] = np.asarray(deconv.get_layer_output(
+            'input_merge', input_=input_img)[0])
+
+        if plots:
+            print 'Creating plots for Image %s' % (valid_ids[i])
             for j, channel in enumerate(img):
-                canvas, (im1, im2) = plt.subplots(1, 2)
-                im1.imshow(_img_wall(
+                canvas, (im1, im2, im3) = plt.subplots(1, 3)
+                im1.imshow(input_img[0][0][image_nr],
+                           interpolation='none')
+                im1.set_title('Input Image %s' % (valid_ids[i]))
+
+                im2.imshow(_img_wall(
                     intermediate_outputs['input_merge']), interpolation='none', cmap=plt.get_cmap('gray'))
-                im1.set_title('Input Image %s' % (valid_ids[0]))
-                im2.imshow(channel, interpolation='none',
+                im2.set_title('Variations Image %s' % (valid_ids[i]))
+
+                im3.imshow(channel, interpolation='none',
                            cmap=plt.get_cmap('gray'))
-                im2.set_title('Channel %s of input Image %s' % (j, i))
-                plt.savefig('%s_%s.jpg' % (i, j), dpi=300)
+                im3.set_title('Filter %s of Image %s' %
+                              (j, valid_ids[i]))
+                plt.savefig('Image_%s_filter_%s.jpg' %
+                            (valid_ids[i], j), dpi=300)
+                plt.close()
 
         # for i, img in enumerate(output_deconv[0:5]):
         #     for j, channel in enumerate(img):
