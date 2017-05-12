@@ -194,7 +194,7 @@ class deconvnet(kaggle_winsol):
         deconv_perm_tensor = deconv_perm_layer(
             model.get_layer('conv_0').get_output_at(0))
 
-        deconv_layer = Conv2DTranspose(filters=32, kernel_size=6,
+        deconv_layer = Conv2DTranspose(filters=3, kernel_size=6,
                                        strides=(1, 1),
                                        name='deconv_layer',
                                        )(deconv_perm_tensor)

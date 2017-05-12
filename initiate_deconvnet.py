@@ -309,6 +309,8 @@ def _img_wall(img, norm=False):
         else:
             wall[:, x0:x1, y0:y1] = i_
         pos[0] = pos[0] + 1
+    if dim == 4:
+        wall = np.transpose(wall, (1, 2, 0))
     return wall
 
 
@@ -364,6 +366,16 @@ def print_weights(norm=False, nameprefix=''):
     os.chdir('../..')
 
 
+def reshape_output(x):
+    _shape = x.shape
+    if _shape[0] == 1:
+        x = x.reshape((_shape[2] / _shape[3], _shape[1], _shape[3], _shape[3]))
+    else:
+        x = x.reshape((_shape[0], _shape[2] / _shape[3],
+                       _shape[1], _shape[3], _shape[3]))
+    return x
+
+
 def print_output(nr_images=2, plots=False):
     if debug:
         print 'Checking save directory...'
@@ -378,6 +390,7 @@ def print_output(nr_images=2, plots=False):
     print 'Collecting output from Deconvnet... this may take a while...'
     output_deconv = deconv.predict(
         x=validation_data[0], modelname='model_deconv')
+    output_deconv = reshape_output(output_deconv)
     if debug:
         print 'Deconv output shape:' + str(np.shape(output_deconv))
         print 'Ids of input images are: ' + str(valid_ids[0:nr_images])
@@ -388,36 +401,34 @@ def print_output(nr_images=2, plots=False):
         if type(image_nr) == int:
             input_img = [np.asarray([validation_data[0][0][image_nr]]),
                          np.asarray([validation_data[0][1][image_nr]])]
-        elif image_nr == 'ones':
-            input_img = [np.ones(shape=(np.asarray([validation_data[0][0][0]]).shape)), np.ones(
-                shape=(np.asarray([validation_data[0][0][0]]).shape))]
-        elif image_nr == 'zeros':
-            input_img = [np.zeros(shape=(np.asarray([validation_data[0][0][0]]).shape)), np.zeroes(
-                shape=(np.asarray([validation_data[0][0][0]]).shape))]
-
         if debug:
             print 'Collecting output from merge layer...'
         intermediate_outputs = {}
         intermediate_outputs['input_merge'] = np.asarray(deconv.get_layer_output(
-            'input_merge', input_=input_img)[0])
+            'input_merge', input_=input_img))
+        intermediate_outputs['input_merge'] = reshape_output(
+            intermediate_outputs['input_merge'])
+        if debug:
+            print 'Shape of intermediate outputs: ' + str(np.shape(intermediate_outputs['input_merge']))
+            print 'Shape of input image array: ' + str(np.shape(input_img[0][0]))
 
         if plots:
             print 'Creating plots for Image %s' % (valid_ids[i])
             for j, channel in enumerate(img):
+                print np.shape(channel)
                 canvas, (im1, im2, im3) = plt.subplots(1, 3)
-                im1.imshow(input_img[0][0][image_nr],
+                im1.imshow(np.transpose((input_img[0][0]), (1, 2, 0)),
                            interpolation='none')
                 im1.set_title('Input Image %s' % (valid_ids[i]))
 
                 im2.imshow(_img_wall(
                     intermediate_outputs['input_merge']), interpolation='none', cmap=plt.get_cmap('gray'))
-                im2.set_title('Variations Image %s' % (valid_ids[i]))
+                im2.set_title('Variations')
 
-                im3.imshow(channel, interpolation='none',
+                im3.imshow(_img_wall(channel), interpolation='none',
                            cmap=plt.get_cmap('gray'))
-                im3.set_title('Filter %s of Image %s' %
-                              (j, valid_ids[i]))
-                plt.savefig('Image_%s_filter_%s.jpg' %
+                im3.set_title('Filter %s' % j)
+                plt.savefig('image_%s_filter_%s.jpg' %
                             (valid_ids[i], j), dpi=300)
                 plt.close()
 
