@@ -249,8 +249,8 @@ class kaggle_base(object):
             verbose=verbose)
 
         for i in range(len(self.models[modelname].metrics_names)):
-            self.hists[modelname][self.models[modelname].metrics_names[i]].append(
-                evalHist[i])
+            self.hists[modelname][self.models[modelname].metrics_names[i]]\
+                .append(evalHist[i])
 
         if verbose:
             self.print_last_hist(postfix=postfix)

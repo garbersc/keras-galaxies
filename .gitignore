@@ -77,8 +77,11 @@ img_weight_hist/
 *.json
 *.eps
 
+
 # emacs autosave files and hidden files
 \#*
 .*
+
+test2.py
 
 

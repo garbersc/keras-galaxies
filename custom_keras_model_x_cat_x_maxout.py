@@ -52,7 +52,7 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
     def _compile_models(self,
                         optimizer=None,
                         loss='mean_squared_error',
-                        postfix=''):
+                        postfix='', extra_metrics=[]):
         if not self.models:
             raise ValueError('Did not find any models to compile')
 
@@ -81,7 +81,7 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
                          'categorical_accuracy',
                          'mean_squared_error',
                          'categorical_crossentropy'
-                         ])
+                         ] + extra_metrics)
 
         except KeyError:
             pass
@@ -91,6 +91,7 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
 
     def init_models(self, final_units=3, n_maxout_layers=0,
                     loss='categorical_crossentropy',
+                    extra_metrics=[],
                     freeze_conv=False,
                     cut_out_conv=(False, False, False, False)):
 
@@ -232,6 +233,6 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
                        'model_norm_metrics': model_norm_metrics,
                        'model_noNorm': model_noNorm}
 
-        self._compile_models(loss=loss)
+        self._compile_models(loss=loss, extra_metrics=extra_metrics)
 
         return self.models

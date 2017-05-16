@@ -78,15 +78,15 @@ def print_weights(norm=False):
         os.mkdir(output_dir)
 
     weights_history_paths = glob.glob(
-        os.path.join(weights_dir, "*.npy")
+        os.path.join(weights_dir, "weights_of_dense_output_*.npy")
     )
 
     if debug:
         print len(weights_history_paths)
 
-    for i, n in enumerate(weights_history_paths):
-        if n.find('weights_of_conv_0_') < 0:
-            weights_history_paths.remove(n)
+    # for i, n in enumerate(weights_history_paths):
+        # if n.find('weights_of_conv_0_') < 0:
+        #     weights_history_paths.remove(n)
 
     print 'There are %s weight files selected' % len(weights_history_paths)
     if not len(weights_history_paths):
@@ -113,13 +113,28 @@ def print_weights(norm=False):
     axs = []  # fig.add_subplot(111)
 
     for j in range(0, len(weights_history_paths), 1):
-        if j > 126:  # BAD, BAD, BAD
-            break
+        # if j > 126:  # BAD, BAD, BAD
+        #     break
         w, b = np.load(base_path + str(j) + '.npy')
-        w = np.transpose(w, (3, 0, 1, 2))
+        # w = np.transpose(w, (3, 0, 1, 2))
 
-        w = _img_wall(w, norm)
-        b = _img_wall(b, norm)
+        if weights_history_paths[j].find('dense') >= 0:
+            if j == 0:
+                print w.shape
+                print w.shape[0]
+                print b.shape
+            board_side = int(np.ceil(np.sqrt(w.shape[0])))
+            board_square = int(board_side**2)
+            w = np.transpose(w, (1, 0))
+            wn = []
+            for wi in w:
+                wn.append(np.append(
+                    wi, [0] * (board_square - len(wi))))
+            w = np.reshape(
+                np.array(wn), (3, board_side, board_side,))
+
+        # w = _img_wall(w, norm)
+        # b = _img_wall(b, norm)
 
         for i in range(len(w)):
             if j:
@@ -141,9 +156,9 @@ def print_weights(norm=False):
             fig_b = plt.figure()
             ax_b = fig_b.add_subplot(111)
 
-        bias_imgs.append((ax_b.imshow(b, interpolation='none',
-                                      cmap=plt.get_cmap('gray')),
-                          axs[i].set_title('')))
+        # bias_imgs.append((ax_b.imshow(b, interpolation='none',
+        #                               cmap=plt.get_cmap('gray')),
+        #                   axs[i].set_title('')))
         # if not norm:
         # plt.colorbar()
 
@@ -159,12 +174,12 @@ def print_weights(norm=False):
         im_ani[i].save(out_path, writer='imagemagick')
         print 'saved gif to %s' % out_path
 
-    im_ani_b = animation.ArtistAnimation(fig_b, bias_imgs, interval=50,
-                                         repeat_delay=None,
-                                         )
-    out_path = output_dir + '/' + base_path_l[0].split('/')[-1] + '_b.gif'
-    im_ani_b.save(out_path, writer='imagemagick')
-    print 'saved gif to %s' % out_path
+    # im_ani_b = animation.ArtistAnimation(fig_b, bias_imgs, interval=50,
+    #                                      repeat_delay=None,
+    #                                      )
+    # out_path = output_dir + '/' + base_path_l[0].split('/')[-1] + '_b.gif'
+    # im_ani_b.save(out_path, writer='imagemagick')
+    # print 'saved gif to %s' % out_path
 
     # plt.show()
 

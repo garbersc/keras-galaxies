@@ -16,8 +16,12 @@ import os
 import matplotlib.pyplot as plt
 from termcolor import colored
 import functools
+from custom_for_keras import sliced_accuracy_mean, sliced_accuracy_std, rmse,\
+    lr_function
 from ellipse_fit import get_ellipse_kaggle_par
-from custom_keras_model_and_fit_capsels import kaggle_winsol
+# from custom_keras_model_and_fit_capsels import kaggle_winsol
+from custom_keras_model_x_cat_x_maxout import kaggle_x_cat_x_maxout\
+    as kaggle_winsol
 
 starting_time = time.time()
 
@@ -41,18 +45,19 @@ if debug:
     print os.path.isfile(PRED_BLENDED_PATH)
 
 
-TRAIN_LOSS_SF_PATH = 'try_goodWeights_test.txt'
+TRAIN_LOSS_SF_PATH = 'try_noMaxout.txt'
 # TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_goodWeights.h5"
-TXT_OUTPUT_PATH = 'try_goodWeights_test.txt'
-IMAGE_OUTPUT_PATH = "img_goodWeights_test"
+WEIGHTS_PATH = "analysis/final/try_started_with_3cat_noMaxout_next_next.h5"
+TXT_OUTPUT_PATH = 'try_noMaxout.txt'
+IMAGE_OUTPUT_PATH = "img_noMaxout"
 
 postfix = ''
 NUM_ELLIPSE_PARAMS = 2
-ELLIPSE_FIT = WEIGHTS_PATH.find('ellipse') >= 0
-if ELLIPSE_FIT:
-    postfix = '_ellipse'
+ELLIPSE_FIT = False
+# ELLIPSE_FIT = WEIGHTS_PATH.find('ellipse') >= 0
+# if ELLIPSE_FIT:
+#     postfix = '_ellipse'
 
 
 DONT_LOAD_WEIGHTS = False
@@ -202,7 +207,9 @@ if debug:
 if ELLIPSE_FIT:
     winsol.init_models_ellipse(input_shape=NUM_ELLIPSE_PARAMS)
 else:
-    winsol.init_models()
+    winsol.init_models(final_units=37, loss='mean_squared_error',
+                       extra_metrics=[
+                           sliced_accuracy_mean, sliced_accuracy_std])
 
 if debug:
     winsol.print_summary(postfix=postfix)
@@ -314,7 +321,8 @@ else:
 
         if DO_VALID:
             evalHist = winsol.evaluate(
-                validation_data[0], y_valid=y_valid, postfix=postfix)
+                [xs_valid[0], xs_valid[1]], y_valid=y_valid, postfix='')
+            # validation_data[0], y_valid=y_valid, postfix=postfix)
             winsol.save_loss(modelname='model_norm_metrics', postfix=postfix)
             evalHist = winsol.load_loss(
                 modelname='model_norm_metrics', postfix=postfix)
@@ -545,9 +553,17 @@ for i in range(VALID_CORR_OUTPUT_FILTER.shape[0]):
         R_wcut_mean_noEmpty.append(R_wcut(i))
 R_wcut_mean_noEmpty = np.mean(R_wcut_mean_noEmpty)
 
-print " without zero entry classes:\n mean P (with Cut):\t%.3f  mean R (with Cut):\t%.3f " % (
+cut_eff_noEmpty = []
+for i in range(VALID_CORR_OUTPUT_FILTER.shape[0]):
+    if n_sliced_cat_pred[i]:
+        cut_eff_noEmpty.append(float(n_sliced_cat_pred_wcut[i]) / float(
+            n_sliced_cat_pred[i]))
+cut_eff_noEmpty = np.mean(cut_eff_noEmpty)
+
+print " without zero entry classes:\n mean P (with Cut):\t%.3f  mean R (with Cut):\t%.3f" % (
     P_wcut_mean_noEmpty,
     R_wcut_mean_noEmpty)
+print 'mean cut eff, without zero uncuted pred. %.2f' % (cut_eff_noEmpty)
 print "  MSE output wise (augmented): P(recision), R(ecall)"
 
 qsc = 0
@@ -634,7 +650,8 @@ imshow_g = functools.partial(
 
 
 def try_different_cut_fraktion(cut_fraktions=map(lambda x: float(x) / 20.,
-                                                 range(0, 20)), figname='different_cuts.jpg'):
+                                                 range(0, 20)),
+                               figname='different_cuts.eps'):
     print
     print 'Testing different fraction cuts:'
 
@@ -676,8 +693,8 @@ def try_different_cut_fraktion(cut_fraktions=map(lambda x: float(x) / 20.,
                                                               n_wcut_agree)]
     Rs = [np.mean([R_i_slices(i, slices=question_slices, n_pred=param[0],
                               n_agree=param[1]) for i in range(
-                                  VALID_CORR_OUTPUT_FILTER.shape[0])])
-          for param in zip(n_wcut_pred, n_wcut_agree)]
+        VALID_CORR_OUTPUT_FILTER.shape[0])])
+        for param in zip(n_wcut_pred, n_wcut_agree)]
 
     if debug:
         print n_sliced_cat_pred[0:3]
@@ -769,11 +786,11 @@ def try_different_cut_fraktion(cut_fraktions=map(lambda x: float(x) / 20.,
                                  markersize=15, linewidth=0, label='R'))
 
     plt.legend(handles=label_h, bbox_to_anchor=(
-        0, -0.05), loc=2, borderaxespad=0.)
+        0, -0.1), loc=2, borderaxespad=0.)
 
     plt.xlabel('frac')
     plt.ylabel('Cut Value')
-    plt.show()
+    # plt.show()
 
     plt.savefig(figname)
 
@@ -1153,7 +1170,7 @@ def get_best_id(category_name, n=1):
 #     highest_conv_activation(img_id=id)
 #     print
 
-try_different_cut_fraktion()
+# try_different_cut_fraktion(figname='cuts_noMaxoutModel.eps')
 
 # print_weights()
 # print_weights(True)
