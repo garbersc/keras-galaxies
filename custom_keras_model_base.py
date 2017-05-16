@@ -4,6 +4,7 @@ import warnings
 import time
 from datetime import datetime, timedelta
 import functools
+import warnings
 
 import h5py
 
@@ -561,7 +562,7 @@ class kaggle_base(object):
         LSUVinit(self.models[modelname].get_layer(sub_modelname),
                  train_batch, batch_size=batch_size)
 
-    def reinit(self, WEIGHTS_PATH=None, LOSS_PATH=None):
+    def reinit(self, WEIGHTS_PATH=None, LOSS_PATH=None, **kwargs):
         self.reinit_counter += 1
         if WEIGHTS_PATH:
             self.WEIGHTS_PATH = WEIGHTS_PATH
@@ -577,7 +578,7 @@ class kaggle_base(object):
 
         self.first_loss_save = True
 
-        self.init_models()
+        self.init_models(**kwargs)
 
         return True
 
