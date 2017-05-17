@@ -794,6 +794,25 @@ def try_different_cut_fraktion(cut_fraktions=map(lambda x: float(x) / 20.,
 
     plt.savefig(figname)
 
+    # plots = []
+    # labels_h = []
+
+    # plt.subplot(121)
+
+    # plots.append(plt.plot(Rs_no_zero, Ps_no_zero, 'r-', label="no zero"))
+    # label_h.append(mlines.Line2D([], [], color='red', label='no zero'))
+
+    # plots.append(plt.plot(Rs, Ps, 'b-', label=""))
+    # label_h.append(mlines.Line2D([], [], color='blue', label='with zero'))
+
+    # plt.legend(handles=label_h, bbox_to_anchor=(
+    #     1.05, 1), loc=2, borderaxespad=0.)
+
+    # plt.xlabel('Recall')
+    # plt.ylabel('Precision')
+
+    # plt.savefig('ROC_test.eps')
+
 
 def x_category_precision(predictions=predictions, y_valid=y_valid,
                          conditions=spiral_or_ellipse_cat):
@@ -1170,7 +1189,7 @@ def get_best_id(category_name, n=1):
 #     highest_conv_activation(img_id=id)
 #     print
 
-# try_different_cut_fraktion(figname='cuts_noMaxoutModel.eps')
+try_different_cut_fraktion(figname='cuts_noMaxoutModel.eps')
 
 # print_weights()
 # print_weights(True)

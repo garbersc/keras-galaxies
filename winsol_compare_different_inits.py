@@ -8,7 +8,7 @@ import json
 from custom_for_keras import input_generator
 from datetime import datetime, timedelta
 
-from custom_keras_model_capsulated import kaggle_winsol
+from custom_keras_model_and_fit_capsels import kaggle_winsol
 
 start_time = time.time()
 
@@ -284,7 +284,8 @@ try:
             hist = winsol.fit_gen(modelname='model_noNorm',
                                   data_generator=input_gen,
                                   validation=validation_data,
-                                  samples_per_epoch=no_norm_events)
+                                  samples_per_epoch=no_norm_events,
+                                  data_gen_creator=create_data_gen)
 
         print 'starting main training'
 
@@ -297,7 +298,8 @@ try:
                         validation=validation_data,
                         samples_per_epoch=N_TRAIN,
                         validate_every=VALIDATE_EVERY,
-                        nb_epochs=EPOCHS)
+                        nb_epochs=EPOCHS,
+                        data_gen_creator=create_data_gen)
 
     for i in range(0, iter_per_method):
         print 'lsuv round %i' % i
@@ -327,7 +329,8 @@ try:
                         validation=validation_data,
                         samples_per_epoch=N_TRAIN,
                         validate_every=VALIDATE_EVERY,
-                        nb_epochs=EPOCHS)
+                        nb_epochs=EPOCHS,
+                        data_gen_creator=create_data_gen)
 
     for i in range(0, iter_per_method):
         print 'pre-trained convnet round %i' % i
@@ -356,7 +359,8 @@ try:
                         validation=validation_data,
                         samples_per_epoch=N_TRAIN,
                         validate_every=VALIDATE_EVERY,
-                        nb_epochs=EPOCHS)
+                        nb_epochs=EPOCHS,
+                        data_gen_creator=create_data_gen)
 
     for i in range(0, iter_per_method):
         print 'no no-norm %i' % i
@@ -383,7 +387,8 @@ try:
                         validation=validation_data,
                         samples_per_epoch=N_TRAIN,
                         validate_every=VALIDATE_EVERY,
-                        nb_epochs=EPOCHS)
+                        nb_epochs=EPOCHS,
+                        data_gen_creator=create_data_gen)
 
 
 except KeyboardInterrupt:
