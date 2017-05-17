@@ -43,6 +43,7 @@ CONV_WEIGHT_PATH = 'analysis/final/try_3cat_spiral_ellipse_other_started_with_ge
 
 LEARNING_RATE_SCHEDULE = {
     0: 0.005,
+    20: 0.001
 }
 
 input_sizes = [(69, 69), (69, 69)]
