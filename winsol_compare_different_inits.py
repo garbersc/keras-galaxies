@@ -7,6 +7,7 @@ import sys
 import json
 from custom_for_keras import input_generator
 from datetime import datetime, timedelta
+from keras.optimizers import Adam
 
 from custom_keras_model_and_fit_capsels import kaggle_winsol
 
@@ -141,7 +142,7 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models(optimizer='adam')
+winsol.init_models(optimizer=Adam(lr=LEARNING_RATE_SCHEDULE[0]))
 
 if debug:
     winsol.print_summary()
