@@ -14,9 +14,9 @@ import json
 from datetime import timedelta
 import os
 import matplotlib.pyplot as plt
-import skimage.io
 from termcolor import colored
 import functools
+from custom_for_keras import input_generator
 from custom_for_keras import sliced_accuracy_mean, sliced_accuracy_std, rmse,\
     lr_function
 from ellipse_fit import get_ellipse_kaggle_par
@@ -32,12 +32,13 @@ copy_to_ram_beforehand = False
 
 debug = True
 
-get_winsol_weights = True
+get_winsol_weights = False
 
 BATCH_SIZE = 16  # keep in mind
 
 NUM_INPUT_FEATURES = 3
-
+EPOCHS = 300
+GEN_BUFFER_SIZE = 2
 included_flipped = True
 
 USE_BLENDED_PREDICTIONS = False
@@ -46,13 +47,12 @@ if debug:
     print os.path.isfile(PRED_BLENDED_PATH)
 
 
-TRAIN_LOSS_SF_PATH = 'try_test.txt'
+TRAIN_LOSS_SF_PATH = 'try_ROC.txt'
 # TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-# WEIGHTS_PATH = "analysis/final/try_goodWeights.h5"
-WEIGHTS_PATH = "analysis/final/try_convent_gpu1_win_sol_net_on_0p0775_validation.pkl"
-TXT_OUTPUT_PATH = 'try_test.txt'
-IMAGE_OUTPUT_PATH = "img_orig_imported"
+WEIGHTS_PATH = "analysis/final/try_start_with_noMaxout_inBetween.h5"
+TXT_OUTPUT_PATH = 'try_ROC.txt'
+IMAGE_OUTPUT_PATH = "img_ROC"
 
 postfix = ''
 NUM_ELLIPSE_PARAMS = 2
@@ -73,23 +73,24 @@ N_INPUT_VARIATION = 2
 REPREDICT_EVERYTIME = True
 
 # TODO built this as functions, not with the if's
+DO_TRAIN = True
 DO_VALID = True  # disable this to not bother with the validation set evaluation
 DO_VALID_CORR = False  # not implemented yet
 
-VALID_CORR_OUTPUT_FILTER = np.ones((37))
+VALID_CORR_OUTPUT_FILTER = np.zeros((37))
 VALID_CORR_OUTPUT_FILTER[2] = 1  # star or artifact
 VALID_CORR_OUTPUT_FILTER[3] = 1  # edge on yes
 VALID_CORR_OUTPUT_FILTER[4] = 1  # edge on no
-# VALID_CORR_OUTPUT_FILTER[5] = 1  # bar feature yes
+VALID_CORR_OUTPUT_FILTER[5] = 1  # bar feature yes
 VALID_CORR_OUTPUT_FILTER[7] = 1  # spiral arms yes
-# VALID_CORR_OUTPUT_FILTER[14] = 1  # anything odd? no
-# VALID_CORR_OUTPUT_FILTER[18] = 1  # ring
-# VALID_CORR_OUTPUT_FILTER[19] = 1  # lence
-# VALID_CORR_OUTPUT_FILTER[20] = 1  # disturbed
-# VALID_CORR_OUTPUT_FILTER[21] = 1  # irregular
-# VALID_CORR_OUTPUT_FILTER[22] = 1  # other
-# VALID_CORR_OUTPUT_FILTER[23] = 1  # merger
-# VALID_CORR_OUTPUT_FILTER[24] = 1  # dust lane
+VALID_CORR_OUTPUT_FILTER[14] = 1  # anything odd? no
+VALID_CORR_OUTPUT_FILTER[18] = 1  # ring
+VALID_CORR_OUTPUT_FILTER[19] = 1  # lence
+VALID_CORR_OUTPUT_FILTER[20] = 1  # disturbed
+VALID_CORR_OUTPUT_FILTER[21] = 1  # irregular
+VALID_CORR_OUTPUT_FILTER[22] = 1  # other
+VALID_CORR_OUTPUT_FILTER[23] = 1  # merger
+VALID_CORR_OUTPUT_FILTER[24] = 1  # dust lane
 
 N_Corr_Filter_Images = np.sum(VALID_CORR_OUTPUT_FILTER)
 
@@ -145,6 +146,8 @@ ra.num_train -= ra.num_valid
 # training num check for EV usage
 if ra.num_train != 55420:
     print "num_train = %s not %s" % (ra.num_train, 55420)
+
+ra.num_train = ra.num_train - ra.num_train % BATCH_SIZE
 
 ra.y_valid = ra.y_train[ra.num_train:]
 ra.y_train = ra.y_train[:ra.num_train]
@@ -249,6 +252,35 @@ augmentation_params = {
 }
 
 
+def create_data_gen():
+    augmented_data_gen = ra.realtime_augmented_data_gen(
+        num_chunks=N_TRAIN / BATCH_SIZE * (EPOCHS + 1),
+        chunk_size=BATCH_SIZE,
+        augmentation_params=augmentation_params,
+        ds_transforms=ds_transforms,
+        target_sizes=input_sizes)
+
+    post_augmented_data_gen = ra.post_augment_brightness_gen(
+        augmented_data_gen, std=0.5)
+
+    train_gen = load_data.buffered_gen_mp(
+        post_augmented_data_gen, buffer_size=GEN_BUFFER_SIZE)
+
+    input_gen = input_generator(train_gen)
+
+    return input_gen
+
+
+#  # may need doubling the generator,can be done with
+# itertools.tee(iterable, n=2)
+input_gen = create_data_gen()
+
+
+def input_gen_data():
+    for data, y in input_gen:
+        yield data
+
+
 def create_valid_gen():
     data_gen_valid = ra.realtime_fixed_augmented_data_gen(
         valid_indices,
@@ -321,17 +353,17 @@ else:
         print ''
         print 'Re-evalulating and predicting'
 
-        if DO_VALID:
-            evalHist = winsol.evaluate(
-                [xs_valid[0], xs_valid[1]], y_valid=y_valid, postfix='')
-            # validation_data[0], y_valid=y_valid, postfix=postfix)
-            winsol.save_loss(modelname='model_norm_metrics', postfix=postfix)
-            evalHist = winsol.load_loss(
-                modelname='model_norm_metrics', postfix=postfix)
+        if DO_TRAIN:
+            # evalHist = winsol.evaluate_gen(
+            #     input_gen, num_events=num_train, postfix='')
+            # # validation_data[0], y_valid=y_valid, postfix=postfix)
+            # winsol.save_loss(modelname='model_norm_metrics', postfix=postfix)
+            # evalHist = winsol.load_loss(
+            #     modelname='model_norm_metrics', postfix=postfix)
 
             print ''
-            predictions = winsol.predict(
-                validation_data[0], postfix=postfix)
+            predictions = winsol.predict_gen(
+                input_gen_data(), num_events=num_train, postfix=postfix)
 
             print "Write predictions to %s" % target_path_valid
             load_data.save_gz(target_path_valid, predictions)
@@ -344,11 +376,11 @@ else:
         print e
         save_exit()
 
-evalHist = winsol.load_loss(modelname='model_norm_metrics', postfix=postfix)
+# evalHist = winsol.load_loss(modelname='model_norm_metrics', postfix=postfix)
 
-if np.shape(predictions) != np.shape(y_valid):
+if np.shape(predictions) != np.shape(y_train):
     raise ValueError('prediction and validation set have different shapes, %s to %s ' % (
-        np.shape(predictions), np.shape(y_valid)))
+        np.shape(predictions), np.shape(y_train)))
 
 # FIXME add this counts decision tree dependent
 
@@ -371,7 +403,7 @@ n_sliced_cat_agrement_wcut = [0] * len(output_names)
 
 for i in range(len(predictions)):
     argpred = np.argmax(predictions[i])
-    argval = np.argmax(y_valid[i])
+    argval = np.argmax(y_train[i])
     n_global_cat_pred[argpred] += 1
     n_global_cat_valid[argval] += 1
     if argval == argpred:
@@ -384,9 +416,9 @@ for i in range(len(predictions)):
         sargpred = np.argmax(predictions[i][slice])
         cutpred = predictions[i][slice][sargpred] / \
             sum(predictions[i][slice]) > cut_fraktion
-        sargval = np.argmax(y_valid[i][slice])
-        cutval = y_valid[i][slice][sargval] / \
-            sum(y_valid[i][slice]) > cut_fraktion
+        sargval = np.argmax(y_train[i][slice])
+        cutval = y_train[i][slice][sargval] / \
+            sum(y_train[i][slice]) > cut_fraktion
         n_sliced_cat_pred[sargpred + slice.start] += 1
         if cutpred:
             n_sliced_cat_pred_wcut[sargpred + slice.start] += 1
@@ -524,14 +556,15 @@ output_dic_short_hand_names = {'rmse': 'rmse',
                                # 'recall including tree requierement': 'R_req'
                                }
 
-rmse_valid = evalHist['rmse'][-1]
-rmse_augmented = np.sqrt(np.mean((y_valid - predictions)**2))
-print "  MSE (last iteration):\t%.6f" % float(rmse_valid)
-print '  sliced acc. (last iteration):\t%.4f' % float(evalHist['sliced_accuracy_mean'][-1])
-print '  categorical acc. (last iteration):\t%.4f' % float(evalHist['categorical_accuracy'][-1])
-print "  MSE (augmented):\t%.6f  RMSE/mean: %.2f " % (float(rmse_augmented),
-                                                      float(rmse_augmented) / float(np.mean(
-                                                          y_valid)))
+# rmse_valid = evalHist['rmse'][-1]
+rmse_augmented = np.sqrt(np.mean((y_train - predictions)**2))
+# print "  MSE (last iteration):\t%.6f" % float(rmse_valid)
+# print '  sliced acc. (last iteration):\t%.4f' % float(evalHist['sliced_accuracy_mean'][-1])
+# print '  categorical acc. (last iteration):\t%.4f' %
+# float(evalHist['categorical_accuracy'][-1])
+print "  RMSE (augmented):\t%.6f  RMSE/mean: %.2f " % (float(rmse_augmented),
+                                                       float(rmse_augmented) / float(np.mean(
+                                                           y_train)))
 print " mean P (augmented):\t%.3f  mean R (augmented):\t%.3f " % (
     np.mean([P(i) for i in range(VALID_CORR_OUTPUT_FILTER.shape[0])]),
     np.mean([R(i) for i in range(VALID_CORR_OUTPUT_FILTER.shape[0])]))
@@ -570,11 +603,11 @@ print "  MSE output wise (augmented): P(recision), R(ecall)"
 
 qsc = 0
 for i in xrange(0, VALID_CORR_OUTPUT_FILTER.shape[0]):
-    oneMSE = np.sqrt(np.mean((y_valid.T[i] - predictions.T[i])**2))
+    oneMSE = np.sqrt(np.mean((y_train.T[i] - predictions.T[i])**2))
     if not str(qsc) in output_dic.keys():
         output_dic[str(qsc)] = {}
     output_dic[str(qsc)][output_names[i]] = {'rmse': float(oneMSE),
-                                             'rmse/mean': float(oneMSE / np.mean(y_valid.T[i])),
+                                             'rmse/mean': float(oneMSE / np.mean(y_train.T[i])),
                                              # 'global categorized prediction': n_global_cat_pred[i],
                                              # 'global categorized valid': n_global_cat_valid[i],
                                              # 'global categorized agree': n_global_cat_agrement[i],
@@ -596,7 +629,7 @@ for i in xrange(0, VALID_CORR_OUTPUT_FILTER.shape[0]):
            # y_valid):
         print colored("    output % s ( % s): \t%.6f  RMSE/mean: % .2f \t  N sliced pred., valid, agree % i, % i, % i, P % .3f, R % .3f, wCut(eff.%.2f): pred., valid, agree % i, % i, % i, P % .3f, R % .3f" % (
             output_names[i], i, oneMSE, oneMSE /
-            np.mean(y_valid.T[i]),
+            np.mean(y_train.T[i]),
             # n_global_cat_pred[i], n_global_cat_valid[i],
             # n_global_cat_agrement[i],
             n_sliced_cat_pred[i], n_sliced_cat_valid[i], n_sliced_cat_agrement[i],
@@ -611,7 +644,7 @@ for i in xrange(0, VALID_CORR_OUTPUT_FILTER.shape[0]):
     elif P(i) > 0.9:  # oneMSE / np.mean(y_valid.T[i]) < 0.8 * rmse_augmented / np.mean(
             # y_valid):
         print colored("    output % s ( % s): \t%.6f  RMSE/mean: % .2f \t N sliced pred., valid, agree % i, % i, % i, P % .3f, R % .3f, wCut(eff.%.2f): pred., valid, agree % i, % i, % i, P % .3f, R % .3f " % (
-            output_names[i], i, oneMSE, oneMSE / np.mean(y_valid.T[i]),
+            output_names[i], i, oneMSE, oneMSE / np.mean(y_train.T[i]),
             # n_global_cat_pred[i], n_global_cat_valid[i],
             # n_global_cat_agrement[i],
             n_sliced_cat_pred[i], n_sliced_cat_valid[i], n_sliced_cat_agrement[i],
@@ -625,7 +658,7 @@ for i in xrange(0, VALID_CORR_OUTPUT_FILTER.shape[0]):
             'green')
     else:
         print ("    output % s ( % s): \t%.6f  RMSE/mean: % .2f \t  N sliced pred., valid, agree % i, % i, % i, P % .3f, R % .3f, wCut(eff.%.2f): pred., valid, agree % i, % i, % i, P % .3f, R % .3f " %
-               (output_names[i], i, oneMSE, oneMSE / np.mean(y_valid.T[i]),
+               (output_names[i], i, oneMSE, oneMSE / np.mean(y_train.T[i]),
                 # n_global_cat_pred[i], n_global_cat_valid[i],
                 # n_global_cat_agrement[i],
                 n_sliced_cat_pred[i], n_sliced_cat_valid[i],
@@ -672,9 +705,9 @@ def try_different_cut_fraktion(cut_fraktions=map(lambda x: float(x) / 20.,
             sargpred = np.argmax(predictions[i][slic])
             q_frak_pred = predictions[i][slic][sargpred] / \
                 sum(predictions[i][slic])
-            sargval = np.argmax(y_valid[i][slic])
-            q_frak_valid = y_valid[i][slic][sargval] / \
-                sum(y_valid[i][slic])
+            sargval = np.argmax(y_train[i][slic])
+            q_frak_valid = y_train[i][slic][sargval] / \
+                sum(y_train[i][slic])
 
             for j, cut_val in enumerate(cut_fraktions):
                 if q_frak_valid > cut_val:
@@ -813,130 +846,10 @@ def try_different_cut_fraktion(cut_fraktions=map(lambda x: float(x) / 20.,
     plt.xlabel('Recall')
     plt.ylabel('Precision')
 
-    plt.savefig('ROC_test3.eps')
+    plt.savefig('ROC_train_test.eps')
 
 
-def pixel_correlations(useTruth=False, dirname='InOutCorr'):
-    if not useTruth:
-        predict = predictions
-        dirname = dirname + '_valid'
-    else:
-        predict = y_valid
-        dirname = dirname + '_truth'
-
-    pixels_color0 = []
-    pixels_color1 = []
-    pixels_color2 = []
-
-    input_img = validation_data[0][0].transpose(1, 2, 3, 0)
-    # if b==0: print input_img.shape
-    pixels_color0.append(input_img[0])
-    pixels_color1.append(input_img[1])
-    pixels_color2.append(input_img[2])
-
-    print "begin correlation calculation"
-    pixels_color0_stack = np.dstack(pixels_color0)
-    pixels_color1_stack = np.dstack(pixels_color1)
-    pixels_color2_stack = np.dstack(pixels_color2)
-
-    if not os.path.isdir(IMAGE_OUTPUT_PATH):
-        os.mkdir(IMAGE_OUTPUT_PATH)
-    # plt.gray()
-    os.chdir(IMAGE_OUTPUT_PATH)
-    if not os.path.isdir(dirname):
-        os.mkdir(dirname)
-    os.chdir(dirname)
-
-    for i in xrange(0, VALID_CORR_OUTPUT_FILTER.shape[0]):
-        if not VALID_CORR_OUTPUT_FILTER[i]:
-            continue
-        print "begin correlation of output %s" % i
-        corr_image_line_c0 = np.zeros(
-            input_sizes[0][0] * input_sizes[0][1])
-        corr_image_line_c1 = np.zeros(
-            input_sizes[0][0] * input_sizes[0][1])
-        corr_image_line_c2 = np.zeros(
-            input_sizes[0][0] * input_sizes[0][1])
-        pixels_colors0_line = np.reshape(
-            pixels_color0_stack, (input_sizes[0][0] * input_sizes[0][1],
-                                  pixels_color0_stack.shape[2]))
-        pixels_colors1_line = np.reshape(
-            pixels_color1_stack, (input_sizes[0][0] * input_sizes[0][1],
-                                  pixels_color1_stack.shape[2]))
-        pixels_colors2_line = np.reshape(
-            pixels_color2_stack, (input_sizes[0][0] * input_sizes[0][1],
-                                  pixels_color2_stack.shape[2]))
-
-        for j in xrange(0, input_sizes[0][0] * input_sizes[0][1]):
-            if j == 0:
-                print pixels_colors0_line[j].shape
-                print predict.T[i].shape
-            corr_image_line_c0[j] = np.corrcoef(
-                pixels_colors0_line[j][:predict.shape[0]],
-                predict.T[i])[1][0]
-            corr_image_line_c1[j] = np.corrcoef(
-                pixels_colors1_line[j][:predict.shape[0]],
-                predict.T[i])[1][0]
-            corr_image_line_c2[j] = np.corrcoef(
-                pixels_colors2_line[j][:predict.shape[0]],
-                predict.T[i])[1][0]
-
-        # correlation_output_images.append(np.reshape(corr_image_line,(input_sizes[0][0],input_sizes[0][1])))
-
-        # Needs to be in row,col order
-        plt.imshow(np.reshape(np.fabs(corr_image_line_c0), (
-            input_sizes[0][0], input_sizes[0][1])), interpolation='none',
-            vmin=0.0, vmax=0.4)
-        plt.colorbar()
-        plt.savefig("inputCorrelationToOutput%s%s_c0_Red.jpg" %
-                    (i, output_names[i]))
-        plt.close()
-
-        skimage.io.imsave("inputCorrelationToOutput%s%s_c0_Red_small.jpg" %
-                          (i, output_names[i]), np.reshape(
-                              np.fabs(corr_image_line_c0), (
-                                  input_sizes[0][0], input_sizes[0][1])) / 0.4)
-
-        # Needs to be in row,col order
-        if np.max(np.fabs(np.dstack([corr_image_line_c0,
-                                     corr_image_line_c1,
-                                     corr_image_line_c2]))) > 0.4:
-            print np.max(np.fabs(np.dstack([corr_image_line_c0,
-                                            corr_image_line_c1,
-                                            corr_image_line_c2])))
-
-        plt.imshow(np.reshape(np.fabs(np.dstack([corr_image_line_c0,
-                                                 corr_image_line_c1,
-                                                 corr_image_line_c2])) / 0.4, (
-            input_sizes[0][0], input_sizes[0][1], 3)),
-            interpolation='none',
-            vmin=0.0, vmax=0.1)
-        # plt.colorbar()
-        plt.savefig("inputCorrelationToOutput%s%s_RGB.jpg" %
-                    (i, output_names[i]))
-        plt.close()
-
-        skimage.io.imsave("inputCorrelationToOutput%s%s_RGB_small.jpg" %
-                          (i, output_names[i]), np.reshape(np.fabs(
-                              np.dstack([
-                                  corr_image_line_c0,
-                                  corr_image_line_c1,
-                                  corr_image_line_c2])) / 0.4, (
-                              input_sizes[0][0],
-                              input_sizes[0][1], 3)))
-
-        # # Needs to be in row,col order
-        # plt.imshow(np.reshape(corr_image_line_c2, (
-        #     input_sizes[0][0], input_sizes[0][1])), interpolation='none', vmin=-0.4, vmax=0.4)
-        # plt.colorbar()
-        # plt.savefig("inputCorrelationToOutput%s%s_c2_Blue.jpg" %
-        #             (i, output_names[i]))
-        # plt.close()
-
-    os.chdir("../..")
-
-
-def x_category_precision(predictions=predictions, y_valid=y_valid,
+def x_category_precision(predictions=predictions, y_valid=y_train,
                          conditions=spiral_or_ellipse_cat):
     counts = [[0, 0, 0]]
     for _ in conditions:
@@ -1180,33 +1093,21 @@ def print_filters(image_nr=0, norm=False):
         imshow_c(np.transpose(input_img[0][0], (1, 2, 0)))
         plt.savefig('input_fig_%s_rotation_0.jpg' % (image_nr))
         plt.close()
-        skimage.io.imsave('input_fig_%s_rotation_0_small.jpg' % (
-            image_nr), np.transpose(input_img[0][0], (1, 2, 0)) /
-            np.max(input_img[0][0]))
 
         imshow_c(np.transpose(input_img[1][0], (1, 2, 0)))
         plt.savefig('input_fig_%s_rotation_45.jpg' % (image_nr))
         plt.close()
-        skimage.io.imsave('input_fig_%s_rotation_45_small.jpg' % (
-            image_nr), np.transpose(input_img[1][0], (1, 2, 0)) /
-            np.max(input_img[1][0]))
 
         for i in range(len(input_img[0][0])):
             imshow_g(input_img[0][0][i])
             plt.savefig('input_fig_%s_rotation_0_dim_%s.jpg' % (image_nr, i))
             plt.close()
-            skimage.io.imsave('input_fig_%s_rotation_0_dim_%s_small.jpg' %
-                              (image_nr, i), input_img[0][0][i] /
-                              np.max(input_img[0][0][i]))
 
         for i in range(len(input_img[1][0])):
             imshow_g(input_img[1][0][i])
             plt.savefig('input_fig_%s_rotation_45_dim_%s.jpg' %
                         (image_nr, i))
             plt.close()
-            skimage.io.imsave('input_fig_%s_rotation_45_dim_%s_small.jpg' %
-                              (image_nr, i), input_img[1][0][i] /
-                              np.max(input_img[1][0][i]))
 
     for n in layer_names:
         if layer_formats[n] > 0:
@@ -1216,11 +1117,6 @@ def print_filters(image_nr=0, norm=False):
             plt.savefig('output_fig_%s_%s.jpg' %
                         (image_nr, n))
             plt.close()
-            skimage.io.imsave('output_fig_%s_%s_small.jpg' %
-                              (image_nr, n), _img_wall(
-                                  intermediate_outputs[n], norm) /
-                              np.max())
-
         else:
             imshow_g(normalize_img(
                 intermediate_outputs[n]) if norm else intermediate_outputs[n])
@@ -1229,11 +1125,6 @@ def print_filters(image_nr=0, norm=False):
             plt.savefig('output_fig_%s_%s.jpg' %
                         (image_nr, n))
             plt.close()
-            skimage.io.imsave('output_fig_%s_%s_small.jpg' %
-                              (image_nr, n), normalize_img(
-                                  intermediate_outputs[n]) if norm
-                              else intermediate_outputs[n])
-
     os.chdir('../..')
 
 
@@ -1271,15 +1162,12 @@ def print_weights(norm=False):
                 plt.colorbar()
             plt.savefig('weight_layer_%s_kernel_channel_%s.jpg' % (name, i))
             plt.close()
-            skimage.io.imsave(
-                'weight_layer_%s_kernel_channel_%s_small.jpg' % (name, i), w[i])
 
         imshow_g(b)
         if not norm:
             plt.colorbar()
         plt.savefig('weight_layer_%s_bias.jpg' % (name))
         plt.close()
-        skimage.io.imsave('weight_layer_%s_bias_small.jpg' % (name), b)
 
     os.chdir('../..')
 
@@ -1310,17 +1198,15 @@ def get_best_id(category_name, n=1):
 
 # x_category_precision(predictions=predictions, y_valid=y_valid)
 # # print_weights(norm=True)
- # print_weights(norm=True)
+# print_weights(norm=True)
 # valid_scatter()
 # print_filters(2, norm=True)
 # #print_filters(3, norm=True)
-# highest_conv_activation(img_id=get_best_id('RoundCigar'))
-# highest_conv_activation(img_id=get_best_id('Spiral2Arm'))
-# highest_conv_activation(img_id=get_best_id('Lense'))
+# highest_conv_activation(img_id=get_best_id('RoundCompletly'))
+# highest_conv_activation(img_id=get_best_id('Spiral3Arm'))
 
-print_filters(list(valid_ids).index(get_best_id('RoundCigar')))
-print_filters(list(valid_ids).index(get_best_id('Spiral2Arm')))
-print_filters(list(valid_ids).index(get_best_id('Lense')))
+# print_filters(list(valid_ids).index(get_best_id('RoundCompletly')))
+# print_filters(list(valid_ids).index(get_best_id('Spiral3Arm')))
 
 # print
 # print
@@ -1338,10 +1224,7 @@ print_filters(list(valid_ids).index(get_best_id('Lense')))
 #     highest_conv_activation(img_id=id)
 #     print
 
-# try_different_cut_fraktion(figname='cuts_test3.eps')
-
-# pixel_correlations(True)
-# pixel_correlations()
+try_different_cut_fraktion(figname='cuts_train_data.eps')
 
 # print_weights()
 # print_weights(True)

@@ -258,6 +258,26 @@ class kaggle_base(object):
 
         return evalHist
 
+    def evaluate_gen(self, x, num_events, batch_size=None,
+                     modelname='model_norm_metrics', verbose=1, postfix='',
+                     max_q_size=1, workers=1):
+        modelname = modelname + postfix
+        if not batch_size:
+            batch_size = self.BATCH_SIZE
+        evalHist = self.models[modelname].evaluate_generator(
+            x, steps=num_events / batch_size, max_q_size=max_q_size,
+            workers=workers, pickle_safe=False,
+        )
+
+        for i in range(len(self.models[modelname].metrics_names)):
+            self.hists[modelname][self.models[modelname].metrics_names[i]]\
+                .append(evalHist[i])
+
+        if verbose:
+            self.print_last_hist(postfix=postfix)
+
+        return evalHist
+
     def predict(self, x, batch_size=None,
                 modelname='model_norm_metrics', verbose=1, postfix=''):
         modelname += postfix
@@ -265,6 +285,20 @@ class kaggle_base(object):
             batch_size = self.BATCH_SIZE
         predictions = self.models[modelname].predict(
             x=x, batch_size=batch_size,
+            verbose=verbose)
+
+        return predictions
+
+    def predict_gen(self, x, num_events, batch_size=None,
+                    modelname='model_norm_metrics',
+                    verbose=1, postfix='',
+                    max_q_size=1, workers=1):
+        modelname += postfix
+        if not batch_size:
+            batch_size = self.BATCH_SIZE
+        predictions = self.models[modelname].predict_generator(
+            x, steps=num_events / batch_size, max_q_size=max_q_size,
+            workers=workers, pickle_safe=False,
             verbose=verbose)
 
         return predictions

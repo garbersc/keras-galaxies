@@ -154,7 +154,8 @@ def simple_unsupervised_loss(y_true, y_pred):
 # initilizer are now available. orth_style will need custom initilizer
 
 
-def dense_weight_init_values(n_inputs, n_outputs, nb_feature=None, w_std=0.001, b_init_val=0.01, orth_style=False):
+def dense_weight_init_values(n_inputs, n_outputs, nb_feature=None, w_std=0.001,
+                             b_init_val=0.01, orth_style=False):
     if type(n_inputs) != tuple and type(n_inputs) == int:
         n_inputs = (n_inputs,)
     if type(n_outputs) != tuple and type(n_outputs) == int:

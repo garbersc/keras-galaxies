@@ -141,7 +141,7 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models()
+winsol.init_models(optimizer='adam')
 
 if debug:
     winsol.print_summary()
@@ -249,67 +249,68 @@ try:
 
     print '\nStart training\n'
 
-    for i in range(0, iter_per_method):
-        print 'standard round %i' % i
-        if not i:
-            WEIGHTS_PATH = WEIGHTS_PATH.split('.', 1)[0] + '_standard_0.h5'
-            TRAIN_LOSS_SF_PATH = TRAIN_LOSS_SF_PATH.split(
-                '.', 1)[0] + '_standard_0.txt'
-        else:
-            WEIGHTS_PATH = connect_string_list(WEIGHTS_PATH.split(
-                '_', 100)[:-1]) + '_standard_%i.h5' % i
-            TRAIN_LOSS_SF_PATH = connect_string_list(TRAIN_LOSS_SF_PATH.split(
-                '_', 100)[:-1]) + '_standard_%i.txt' % i
+    # for i in range(0, iter_per_method):
+    #     print 'standard round %i' % i
+    #     if not i:
+    #         WEIGHTS_PATH = WEIGHTS_PATH.split('.', 1)[0] + '_standard_0.h5'
+    #         TRAIN_LOSS_SF_PATH = TRAIN_LOSS_SF_PATH.split(
+    #             '.', 1)[0] + '_standard_0.txt'
+    #     else:
+    #         WEIGHTS_PATH = connect_string_list(WEIGHTS_PATH.split(
+    #             '_', 100)[:-2]) + '_standard_%i.h5' % i
+    #         TRAIN_LOSS_SF_PATH = connect_string_list(TRAIN_LOSS_SF_PATH.split(
+    #             '_', 100)[:-2]) + '_standard_%i.txt' % i
 
-        print 'reinit model'
-        winsol.reinit(WEIGHTS_PATH=WEIGHTS_PATH, LOSS_PATH=TRAIN_LOSS_SF_PATH)
+    #     print 'reinit model'
+    #     input_gen = create_data_gen()
+    #     winsol.reinit(WEIGHTS_PATH=WEIGHTS_PATH, LOSS_PATH=TRAIN_LOSS_SF_PATH)
 
-        print ''
-        print "losses without training on validation sample up front"
+    #     print ''
+    #     print "losses without training on validation sample up front"
 
-        evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
+    #     evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
 
-        if debug:
-            print("Free GPU Mem after validation check %s MiB " %
-                  (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0]
-                   / 1024. / 1024.))
-            print ''
+    #     if debug:
+    #         print("Free GPU Mem after validation check %s MiB " %
+    #               (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0]
+    #                / 1024. / 1024.))
+    #         print ''
 
-        print "Train %s epoch without norm" % NUM_EPOCHS_NONORM
+    #     print "Train %s epoch without norm" % NUM_EPOCHS_NONORM
 
-        time1 = time.time()
+    #     time1 = time.time()
 
-        no_norm_events = int(NUM_EPOCHS_NONORM * N_TRAIN)
+    #     no_norm_events = int(NUM_EPOCHS_NONORM * N_TRAIN)
 
-        if no_norm_events:
-            hist = winsol.fit_gen(modelname='model_noNorm',
-                                  data_generator=input_gen,
-                                  validation=validation_data,
-                                  samples_per_epoch=no_norm_events,
-                                  data_gen_creator=create_data_gen)
+    #     if no_norm_events:
+    #         hist = winsol.fit_gen(modelname='model_noNorm',
+    #                               data_generator=input_gen,
+    #                               validation=validation_data,
+    #                               samples_per_epoch=no_norm_events)
 
-        print 'starting main training'
+    #     print 'starting main training'
 
-        if no_norm_events:
-            eta = (time.time() - time1) / NUM_EPOCHS_NONORM * EPOCHS
-            print 'rough ETA %s sec. -> finishes at %s' % (
-                int(eta), datetime.now() + timedelta(seconds=eta))
+    #     if no_norm_events:
+    #         eta = (time.time() - time1) / NUM_EPOCHS_NONORM * EPOCHS
+    #         print 'rough ETA %s sec. -> finishes at %s' % (
+    #             int(eta), datetime.now() + timedelta(seconds=eta))
 
-        winsol.full_fit(data_gen=input_gen,
-                        validation=validation_data,
-                        samples_per_epoch=N_TRAIN,
-                        validate_every=VALIDATE_EVERY,
-                        nb_epochs=EPOCHS,
-                        data_gen_creator=create_data_gen)
+    #     winsol.full_fit(data_gen=input_gen,
+    #                     validation=validation_data,
+    #                     samples_per_epoch=N_TRAIN,
+    #                     validate_every=VALIDATE_EVERY,
+    #                     nb_epochs=EPOCHS,
+    #                     data_gen_creator=create_data_gen)
 
     for i in range(0, iter_per_method):
         print 'lsuv round %i' % i
         WEIGHTS_PATH = connect_string_list(WEIGHTS_PATH.split(
-            '_', 100)[:-1]) + '_lsuv_%i.h5' % i
+            '_', 100)[:-2]) + '_lsuvAdam_%i.h5' % i
         TRAIN_LOSS_SF_PATH = connect_string_list(TRAIN_LOSS_SF_PATH.split(
-            '_', 100)[:-1]) + '_lsuv_%i.txt' % i
+            '_', 100)[:-2]) + '_lsuvAdam_%i.txt' % i
 
         print 'reinit model'
+        input_gen = create_data_gen()
         winsol.reinit(WEIGHTS_PATH=WEIGHTS_PATH, LOSS_PATH=TRAIN_LOSS_SF_PATH)
 
         train_batch = input_gen.next()[0]
@@ -333,63 +334,65 @@ try:
                         nb_epochs=EPOCHS,
                         data_gen_creator=create_data_gen)
 
-    for i in range(0, iter_per_method):
-        print 'pre-trained convnet round %i' % i
-        WEIGHTS_PATH = connect_string_list(WEIGHTS_PATH.split(
-            '_', 100)[:-1]) + '_preConv_%i.h5' % i
-        TRAIN_LOSS_SF_PATH = connect_string_list(TRAIN_LOSS_SF_PATH.split(
-            '_', 100)[:-1]) + '_preConv_%i.txt' % i
+    # for i in range(0, iter_per_method):
+    #     print 'pre-trained convnet round %i' % i
+    #     WEIGHTS_PATH = connect_string_list(WEIGHTS_PATH.split(
+    #         '_', 100)[:-2]) + '_preConv_%i.h5' % i
+    #     TRAIN_LOSS_SF_PATH = connect_string_list(TRAIN_LOSS_SF_PATH.split(
+    #         '_', 100)[:-2]) + '_preConv_%i.txt' % i
 
-        print 'reinit model'
-        winsol.reinit(WEIGHTS_PATH=WEIGHTS_PATH, LOSS_PATH=TRAIN_LOSS_SF_PATH)
+    #     print 'reinit model'
+    #     input_gen = create_data_gen()
+    #     winsol.reinit(WEIGHTS_PATH=WEIGHTS_PATH, LOSS_PATH=TRAIN_LOSS_SF_PATH)
 
-        winsol.load_conv_layers(path=CONV_WEIGHT_PATH)
+    #     winsol.load_conv_layers(path=CONV_WEIGHT_PATH)
 
-        print ''
-        print "losses without training on validation sample up front"
+    #     print ''
+    #     print "losses without training on validation sample up front"
 
-        evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
+    #     evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
 
-        if debug:
-            print("Free GPU Mem after validation check %s MiB " %
-                  (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0]
-                   / 1024. / 1024.))
-            print ''
+    #     if debug:
+    #         print("Free GPU Mem after validation check %s MiB " %
+    #               (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0]
+    #                / 1024. / 1024.))
+    #         print ''
 
-        winsol.full_fit(data_gen=input_gen,
-                        validation=validation_data,
-                        samples_per_epoch=N_TRAIN,
-                        validate_every=VALIDATE_EVERY,
-                        nb_epochs=EPOCHS,
-                        data_gen_creator=create_data_gen)
+    #     winsol.full_fit(data_gen=input_gen,
+    #                     validation=validation_data,
+    #                     samples_per_epoch=N_TRAIN,
+    #                     validate_every=VALIDATE_EVERY,
+    #                     nb_epochs=EPOCHS,
+    #                     data_gen_creator=create_data_gen)
 
-    for i in range(0, iter_per_method):
-        print 'no no-norm %i' % i
-        WEIGHTS_PATH = connect_string_list(WEIGHTS_PATH.split(
-            '_', 100)[:-1]) + '_noNoNOrm_%i.h5' % i
-        TRAIN_LOSS_SF_PATH = connect_string_list(TRAIN_LOSS_SF_PATH.split(
-            '_', 100)[:-1]) + '_noNoNorm_%i.txt' % i
+    # for i in range(0, iter_per_method):
+    #     print 'no no-norm %i' % i
+    #     WEIGHTS_PATH = connect_string_list(WEIGHTS_PATH.split(
+    #         '_', 100)[:-2]) + '_noNoNOrm_%i.h5' % i
+    #     TRAIN_LOSS_SF_PATH = connect_string_list(TRAIN_LOSS_SF_PATH.split(
+    #         '_', 100)[:-2]) + '_noNoNorm_%i.txt' % i
 
-        print 'reinit model'
-        winsol.reinit(WEIGHTS_PATH=WEIGHTS_PATH, LOSS_PATH=TRAIN_LOSS_SF_PATH)
+    #     print 'reinit model'
+    #     input_gen = create_data_gen()
+    #     winsol.reinit(WEIGHTS_PATH=WEIGHTS_PATH, LOSS_PATH=TRAIN_LOSS_SF_PATH)
 
-        print ''
-        print "losses without training on validation sample up front"
+    #     print ''
+    #     print "losses without training on validation sample up front"
 
-        evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
+    #     evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
 
-        if debug:
-            print("Free GPU Mem after validation check %s MiB " %
-                  (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0]
-                   / 1024. / 1024.))
-            print ''
+    #     if debug:
+    #         print("Free GPU Mem after validation check %s MiB " %
+    #               (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0]
+    #                / 1024. / 1024.))
+    #         print ''
 
-        winsol.full_fit(data_gen=input_gen,
-                        validation=validation_data,
-                        samples_per_epoch=N_TRAIN,
-                        validate_every=VALIDATE_EVERY,
-                        nb_epochs=EPOCHS,
-                        data_gen_creator=create_data_gen)
+    #     winsol.full_fit(data_gen=input_gen,
+    #                     validation=validation_data,
+    #                     samples_per_epoch=N_TRAIN,
+    #                     validate_every=VALIDATE_EVERY,
+    #                     nb_epochs=EPOCHS,
+    #                     data_gen_creator=create_data_gen)
 
 
 except KeyboardInterrupt:

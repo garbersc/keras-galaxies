@@ -76,7 +76,7 @@ loss_3cat*.txt
 img_weight_hist/
 *.json
 *.eps
-
+trainingLoss_different_*.txt
 
 # emacs autosave files and hidden files
 \#*
