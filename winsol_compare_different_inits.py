@@ -47,6 +47,8 @@ LEARNING_RATE_SCHEDULE = {
     20: 0.001
 }
 
+optimizer = Adam(lr=LEARNING_RATE_SCHEDULE[0])
+
 input_sizes = [(69, 69), (69, 69)]
 PART_SIZE = 45
 
@@ -264,12 +266,12 @@ try:
 
     #     print 'reinit model'
     #     input_gen = create_data_gen()
-    #     winsol.reinit(WEIGHTS_PATH=WEIGHTS_PATH, LOSS_PATH=TRAIN_LOSS_SF_PATH)
+    # winsol.reinit(WEIGHTS_PATH=WEIGHTS_PATH, LOSS_PATH=TRAIN_LOSS_SF_PATH)
 
     #     print ''
     #     print "losses without training on validation sample up front"
 
-    #     evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
+    # evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
 
     #     if debug:
     #         print("Free GPU Mem after validation check %s MiB " %
@@ -312,7 +314,8 @@ try:
 
         print 'reinit model'
         input_gen = create_data_gen()
-        winsol.reinit(WEIGHTS_PATH=WEIGHTS_PATH, LOSS_PATH=TRAIN_LOSS_SF_PATH)
+        winsol.reinit(WEIGHTS_PATH=WEIGHTS_PATH,
+                      LOSS_PATH=TRAIN_LOSS_SF_PATH, optimizer=optimizer)
 
         train_batch = input_gen.next()[0]
         winsol.LSUV_init(train_batch)
@@ -335,6 +338,46 @@ try:
                         nb_epochs=EPOCHS,
                         data_gen_creator=create_data_gen)
 
+    for i in range(0, iter_per_method):
+        print 'lsuv round %i' % i
+        WEIGHTS_PATH = connect_string_list(WEIGHTS_PATH.split(
+            '_', 100)[:-2]) + '_lsuvLRp005_%i.h5' % i
+        TRAIN_LOSS_SF_PATH = connect_string_list(TRAIN_LOSS_SF_PATH.split(
+            '_', 100)[:-2]) + '_lsuvLRp005_%i.txt' % i
+
+        print 'reinit model'
+
+        LEARNING_RATE_SCHEDULE = {
+            0: 0.005,
+            # 20: 0.001
+        }
+
+        winsol.LEARNING_RATE_SCHEDULE = LEARNING_RATE_SCHEDULE
+
+        input_gen = create_data_gen()
+        winsol.reinit(WEIGHTS_PATH=WEIGHTS_PATH,
+                      LOSS_PATH=TRAIN_LOSS_SF_PATH, optimizer=None)
+
+        train_batch = input_gen.next()[0]
+        winsol.LSUV_init(train_batch)
+
+        print ''
+        print "losses without training on validation sample up front"
+
+        evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
+
+        if debug:
+            print("Free GPU Mem after validation check %s MiB " %
+                  (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0]
+                   / 1024. / 1024.))
+            print ''
+
+        winsol.full_fit(data_gen=input_gen,
+                        validation=validation_data,
+                        samples_per_epoch=N_TRAIN,
+                        validate_every=VALIDATE_EVERY,
+                        nb_epochs=EPOCHS,
+                        data_gen_creator=create_data_gen)
     # for i in range(0, iter_per_method):
     #     print 'pre-trained convnet round %i' % i
     #     WEIGHTS_PATH = connect_string_list(WEIGHTS_PATH.split(
@@ -344,14 +387,14 @@ try:
 
     #     print 'reinit model'
     #     input_gen = create_data_gen()
-    #     winsol.reinit(WEIGHTS_PATH=WEIGHTS_PATH, LOSS_PATH=TRAIN_LOSS_SF_PATH)
+    # winsol.reinit(WEIGHTS_PATH=WEIGHTS_PATH, LOSS_PATH=TRAIN_LOSS_SF_PATH)
 
     #     winsol.load_conv_layers(path=CONV_WEIGHT_PATH)
 
     #     print ''
     #     print "losses without training on validation sample up front"
 
-    #     evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
+    # evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
 
     #     if debug:
     #         print("Free GPU Mem after validation check %s MiB " %
@@ -375,12 +418,12 @@ try:
 
     #     print 'reinit model'
     #     input_gen = create_data_gen()
-    #     winsol.reinit(WEIGHTS_PATH=WEIGHTS_PATH, LOSS_PATH=TRAIN_LOSS_SF_PATH)
+    # winsol.reinit(WEIGHTS_PATH=WEIGHTS_PATH, LOSS_PATH=TRAIN_LOSS_SF_PATH)
 
     #     print ''
     #     print "losses without training on validation sample up front"
 
-    #     evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
+    # evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
 
     #     if debug:
     #         print("Free GPU Mem after validation check %s MiB " %
