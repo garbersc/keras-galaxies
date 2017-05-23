@@ -380,7 +380,7 @@ def print_weights(norm=False, nameprefix=''):
     os.chdir('../..')
 
 
-def print_output(nr_images=1, plots=False):
+def print_output(nr_images=2, plots=False):
     if debug:
         print 'Checking save directory...'
     if not os.path.isdir(IMAGE_OUTPUT_PATH):
@@ -431,7 +431,7 @@ def print_output(nr_images=1, plots=False):
     validation_data_ = [np.array(np.repeat(input_img[0], BATCH_SIZE, axis=0)),
                         np.array(np.repeat(input_img[1], BATCH_SIZE, axis=0))]
     output_deconv = deconv.predict(
-        x=validation_data_, modelname='model_deconv')
+        x=validation_data[0], modelname='model_deconv')
     if debug:
         print 'Deconv output shape:' + str(np.shape(output_deconv))
         print 'Ids of input images are: ' + str(valid_ids[0:nr_images])
@@ -440,8 +440,8 @@ def print_output(nr_images=1, plots=False):
     for i, img in enumerate(output_deconv[0:nr_images]):
         image_nr = i
         if type(image_nr) == int:
-            input_img = [np.asarray([validation_data_[0][image_nr]]),
-                         np.asarray([validation_data_[1][image_nr]])]
+            input_img = [np.asarray([validation_data[0][0][image_nr]]),
+                         np.asarray([validation_data[0][1][image_nr]])]
         elif image_nr == 'ones':
             input_img = [np.ones(shape=(np.asarray([validation_data[0][0]]).shape)), np.ones(
                 shape=(np.asarray([validation_data[0][0]]).shape))]
@@ -455,27 +455,32 @@ def print_output(nr_images=1, plots=False):
         intermediate_outputs['input_merge'] = np.asarray(
             deconv.get_layer_output(
                 'input_merge', input_=input_img)[0])
+        print np.shape(intermediate_outputs['input_merge'])
+        intermediate_outputs['input_merge'] = np.reshape(
+            intermediate_outputs['input_merge'], (8, 3, 45, 45))
 
         if plots:
             print 'Creating plots for Image %s' % (valid_ids[i])
-            for j, channel in enumerate(img):
-                canvas, (im1, im2, im3) = plt.subplots(1, 3)
-                im1.imshow(input_img[0][0][j],
-                           interpolation='none')
-                im1.set_title('Input Image %s' % (valid_ids[i]))
+            channel = np.transpose(img, (1, 2, 0))
+            # for j, channel in enumerate(img):
+            canvas, (im1, im2, im3) = plt.subplots(1, 3)
+            im1.imshow(input_img[0][0].transpose(1, 2, 0),
+                       interpolation='none')
+            im1.set_title('Input Image %s' % (valid_ids[i]))
 
-                im2.imshow(_img_wall(
-                    intermediate_outputs['input_merge']), interpolation='none',
-                    cmap=plt.get_cmap('gray'))
-                im2.set_title('Variations Image %s' % (valid_ids[i]))
+            im2.imshow(_img_wall(
+                intermediate_outputs['input_merge']).transpose(1, 2, 0),
+                interpolation='none',)
+            # cmap=plt.get_cmap('gray'))
+            im2.set_title('Variations Image %s' % (valid_ids[i]))
 
-                im3.imshow(channel, interpolation='none',
-                           cmap=plt.get_cmap('gray'))
-                im3.set_title('Filter %s of Image %s' %
-                              (j, valid_ids[i]))
-                plt.savefig('Image_%s_filter_%s.jpg' %
-                            (valid_ids[i], j), dpi=300)
-                plt.close()
+            im3.imshow(channel, interpolation='none',
+                       cmap=plt.get_cmap('gray'))
+            im3.set_title('Filter %s of Image %s' %
+                          ('rgb', valid_ids[i]))
+            plt.savefig('Image_%s_filter_%s.jpg' %
+                        (valid_ids[i], 'rgb'), dpi=300)
+            plt.close()
 
         # for i, img in enumerate(output_deconv[0:5]):
         #     for j, channel in enumerate(img):
