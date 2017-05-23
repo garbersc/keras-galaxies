@@ -75,9 +75,13 @@ loss_3cat*.txt
 *.mp4
 img_weight_hist/
 *.json
+*.eps
+trainingLoss_different_*.txt
 
 # emacs autosave files and hidden files
 \#*
 .*
+
+test2.py
 
 

@@ -4,6 +4,7 @@ import warnings
 import time
 from datetime import datetime, timedelta
 import functools
+import warnings
 
 import h5py
 
@@ -249,8 +250,28 @@ class kaggle_base(object):
             verbose=verbose)
 
         for i in range(len(self.models[modelname].metrics_names)):
-            self.hists[modelname][self.models[modelname].metrics_names[i]].append(
-                evalHist[i])
+            self.hists[modelname][self.models[modelname].metrics_names[i]]\
+                .append(evalHist[i])
+
+        if verbose:
+            self.print_last_hist(postfix=postfix)
+
+        return evalHist
+
+    def evaluate_gen(self, x, num_events, batch_size=None,
+                     modelname='model_norm_metrics', verbose=1, postfix='',
+                     max_q_size=1, workers=1):
+        modelname = modelname + postfix
+        if not batch_size:
+            batch_size = self.BATCH_SIZE
+        evalHist = self.models[modelname].evaluate_generator(
+            x, steps=num_events / batch_size, max_q_size=max_q_size,
+            workers=workers, pickle_safe=False,
+        )
+
+        for i in range(len(self.models[modelname].metrics_names)):
+            self.hists[modelname][self.models[modelname].metrics_names[i]]\
+                .append(evalHist[i])
 
         if verbose:
             self.print_last_hist(postfix=postfix)
@@ -264,6 +285,20 @@ class kaggle_base(object):
             batch_size = self.BATCH_SIZE
         predictions = self.models[modelname].predict(
             x=x, batch_size=batch_size,
+            verbose=verbose)
+
+        return predictions
+
+    def predict_gen(self, x, num_events, batch_size=None,
+                    modelname='model_norm_metrics',
+                    verbose=1, postfix='',
+                    max_q_size=1, workers=1):
+        modelname += postfix
+        if not batch_size:
+            batch_size = self.BATCH_SIZE
+        predictions = self.models[modelname].predict_generator(
+            x, steps=num_events / batch_size, max_q_size=max_q_size,
+            workers=workers, pickle_safe=False,
             verbose=verbose)
 
         return predictions
@@ -561,7 +596,7 @@ class kaggle_base(object):
         LSUVinit(self.models[modelname].get_layer(sub_modelname),
                  train_batch, batch_size=batch_size)
 
-    def reinit(self, WEIGHTS_PATH=None, LOSS_PATH=None):
+    def reinit(self, WEIGHTS_PATH=None, LOSS_PATH=None, **kwargs):
         self.reinit_counter += 1
         if WEIGHTS_PATH:
             self.WEIGHTS_PATH = WEIGHTS_PATH
@@ -577,7 +612,7 @@ class kaggle_base(object):
 
         self.first_loss_save = True
 
-        self.init_models()
+        self.init_models(**kwargs)
 
         return True
 

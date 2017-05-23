@@ -62,7 +62,7 @@ class kaggle_winsol(kaggle_base):
             WEIGHTS_PATH=WEIGHTS_PATH,
             **kwargs)
 
-    def init_models(self):
+    def init_models(self, optimizer=None):
         print "init model"
         input_tensor = Input(batch_shape=(self.BATCH_SIZE,
                                           self.NUM_INPUT_FEATURES,
@@ -175,7 +175,7 @@ class kaggle_winsol(kaggle_base):
                        'model_norm_metrics': model_norm_metrics,
                        'model_noNorm': model_noNorm}
 
-        self._compile_models()
+        self._compile_models(optimizer=optimizer)
 
         return self.models
 

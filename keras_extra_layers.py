@@ -87,6 +87,55 @@ class fPermute(Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+class DePool(Layer):
+    def __init__(self,  model,
+                 pool_layer_origin=['pool_0'], stride=(2, 2),
+                 **kwargs):
+
+        self.stride = stride
+        self.model = model
+        self.pool_layer_origin = pool_layer_origin
+        super(DePool, self).__init__(**kwargs)
+
+    def _get_pool_flags(self, pool):
+        # permutation needed if the layer is in the 'normal' not the pylearn
+        # order, maybe make a switch for that and the channel order
+        input_ = K.permute_dimensions(pool.get_input_at(0), (3, 0, 1, 2))
+        pooled = K.permute_dimensions(pool.get_output_at(0), (3, 0, 1, 2))
+
+        pooled = K.repeat_elements(pooled, self.stride[0], axis=-2)
+        pooled = K.repeat_elements(pooled, self.stride[1], axis=-1)
+
+        print 'shapes before k.equal %s \t %s' % (K.int_shape(input_),
+                                                  K.int_shape(
+            pooled))
+
+        return K.equal(input_, pooled)
+
+    def call(self, x):
+        pool = self.model
+        for name in self.pool_layer_origin:
+            pool = pool.get_layer(name)
+        flags = self._get_pool_flags(pool)
+
+        x_up = K.repeat_elements(x, self.stride[0], axis=-2)
+        x_up = K.repeat_elements(x_up, self.stride[1], axis=-1)
+
+        print 'shapes before * %s ' % str(K.int_shape(x_up))
+
+        x_up = x_up * K.cast(flags, 'float32')
+
+        return x_up
+
+    def get_output_shape_for(self, input_shape):
+        m_b,  l, w, h = input_shape
+
+        return (m_b, l, self.stride[0] * w, self.stride[1] * h)
+
+    def compute_output_shape(self, input_shape):
+        return self.get_output_shape_for(input_shape)
+
+
 class kerasCudaConvnetPooling2DLayer(Layer):
     def __init__(self, pool_size=2, stride=None, **kwargs):
         self.pool_size = pool_size

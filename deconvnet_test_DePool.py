@@ -2,7 +2,7 @@ from custom_keras_model_and_fit_capsels import kaggle_winsol
 
 import keras.backend as T
 from keras.models import Sequential, Model
-from keras.layers import Dense, Dropout, Input
+from keras.layers import Dense, Dropout, Input, Conv2DTranspose
 from keras.layers.core import Lambda
 # TODO will be removed from keras2, can this be achieved with a lambda
 # layer now? looks like it:
@@ -12,7 +12,7 @@ from keras.engine.topology import InputLayer
 from keras import initializers
 
 from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute,\
-    kerasCudaConvnetConv2DLayer, MaxoutDense
+    kerasCudaConvnetConv2DLayer, MaxoutDense, DePool
 from custom_for_keras import kaggle_MultiRotMergeLayer_output,  kaggle_input,\
     dense_weight_init_values
 
@@ -20,7 +20,7 @@ from keras.optimizers import SGD
 from custom_for_keras import rmse
 
 
-class kaggle_x_cat_x_maxout(kaggle_winsol):
+class deconvnet(kaggle_winsol):
     '''
    Arguments:
     BATCH_SIZE: image fitted at the same time
@@ -36,14 +36,10 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
     def __init__(self, *args,
                  **kwargs):
 
-        super(kaggle_x_cat_x_maxout, self).__init__(
+        super(deconvnet, self).__init__(
             *args,
             **kwargs)
 
-        self.layer_formats = {'conv_0': 1, 'conv_1': 1, 'conv_2': 1,
-                              'conv_3': 1, 'pool_0': 2, 'pool_1': 2,
-                              'pool_2': 2, 'conv_out_merge': -1,
-                              'dense_output': 0}
     '''
     compliles all available models
     initilises loss histories
@@ -52,7 +48,7 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
     def _compile_models(self,
                         optimizer=None,
                         loss='mean_squared_error',
-                        postfix='', extra_metrics=[]):
+                        postfix=''):
         if not self.models:
             raise ValueError('Did not find any models to compile')
 
@@ -79,29 +75,20 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
                 optimizer=optimizer,
                 metrics=[rmse,
                          'categorical_accuracy',
-                         'mean_squared_error',
-                         'categorical_crossentropy'
-                         ] + extra_metrics)
-
+                         ])
+        except KeyError:
+            pass
+        try:
+            self.models['model_deconv' + postfix].compile(
+                loss=loss,
+                optimizer=optimizer)
         except KeyError:
             pass
         self._init_hist_dics(self.models)
 
         return True
 
-    def init_models(self, final_units=3, n_maxout_layers=0,
-                    loss='categorical_crossentropy',
-                    extra_metrics=[],
-                    freeze_conv=False,
-                    cut_out_conv=(False, False, False, False)):
-
-        if not (type(freeze_conv) in (tuple, list)):
-            freeze_conv = bool(freeze_conv)
-            freeze_conv = (freeze_conv, freeze_conv, freeze_conv, freeze_conv)
-        elif len(freeze_conv) != 4:
-            raise ValueError(
-                'Wrong number of freeze variables for the conv layers. Expected four  or bool, got %i' % len(freeze_conv))
-
+    def init_models(self, final_units=3):
         print "init model"
         input_tensor = Input(batch_shape=(self.BATCH_SIZE,
                                           self.NUM_INPUT_FEATURES,
@@ -149,38 +136,19 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
         # kerasCudaConvnetPooling2DLayer
         model.add(fPermute((1, 2, 3, 0), name='input_perm'))
 
-        if not cut_out_conv[0]:
-            model.add(kerasCudaConvnetConv2DLayer(
-                n_filters=32, filter_size=6, untie_biases=True, name='conv_0',
-                trainable=not freeze_conv[0]))
-        else:
-            del self.layer_formats['conv_0']
-
+        model.add(kerasCudaConvnetConv2DLayer(
+            n_filters=32, filter_size=6, untie_biases=True, name='conv_0'))
         model.add(kerasCudaConvnetPooling2DLayer(name='pool_0'))
 
-        if not cut_out_conv[1]:
-            model.add(kerasCudaConvnetConv2DLayer(
-                n_filters=64, filter_size=5, untie_biases=True, name='conv_1',
-                trainable=not freeze_conv[1]))
-        else:
-            del self.layer_formats['conv_1']
-
+        model.add(kerasCudaConvnetConv2DLayer(
+            n_filters=64, filter_size=5, untie_biases=True, name='conv_1'))
         model.add(kerasCudaConvnetPooling2DLayer(name='pool_1'))
 
-        if not cut_out_conv[2]:
-            model.add(kerasCudaConvnetConv2DLayer(
-                n_filters=128, filter_size=3, untie_biases=True, name='conv_2',
-                trainable=not freeze_conv[2]))
-        else:
-            del self.layer_formats['conv_2']
-
-        if not cut_out_conv[3]:
-            model.add(kerasCudaConvnetConv2DLayer(n_filters=128,
-                                                  filter_size=3,  weights_std=0.1,
-                                                  untie_biases=True, name='conv_3',
-                                                  trainable=not freeze_conv[3]))
-        else:
-            del self.layer_formats['conv_3']
+        model.add(kerasCudaConvnetConv2DLayer(
+            n_filters=128, filter_size=3, untie_biases=True, name='conv_2'))
+        model.add(kerasCudaConvnetConv2DLayer(n_filters=128,
+                                              filter_size=3,  weights_std=0.1,
+                                              untie_biases=True, name='conv_3'))
 
         model.add(kerasCudaConvnetPooling2DLayer(name='pool_2'))
 
@@ -191,21 +159,20 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
                              x[0] // 4 // N_INPUT_VARIATION, (x[1] * x[2]
                                                               * x[3] * 4
                                                               * num_views)),
-                         arguments={'num_views': num_views},
-                         name='conv_out_merge'))
-
-        for i in range(n_maxout_layers - 1) if n_maxout_layers > -1 else []:
-            mo_name = 'maxout_%s' % str(i)
-            self.layer_formats[mo_name] = 0
-            model.add(Dropout(0.5))
-            model.add(MaxoutDense(output_dim=2048, nb_feature=2,
-                                  weights=dense_weight_init_values(
-                                      model.output_shape[-1], 2048,
-                                      nb_feature=2),
-                                  name=mo_name))
+                         arguments={'num_views': num_views}, name='conv_out_merge'))
 
         model.add(Dropout(0.5))
-        model.add(Dense(units=final_units, activation='softmax',
+        model.add(MaxoutDense(output_dim=2048, nb_feature=2,
+                              weights=dense_weight_init_values(
+                                  model.output_shape[-1], 2048, nb_feature=2), name='maxout_0'))
+
+        model.add(Dropout(0.5))
+        model.add(MaxoutDense(output_dim=2048, nb_feature=2,
+                              weights=dense_weight_init_values(
+                                  model.output_shape[-1], 2048, nb_feature=2), name='maxout_1'))
+
+        model.add(Dropout(0.5))
+        model.add(Dense(units=final_units, activation='relu',
                         kernel_initializer=initializers.RandomNormal(
                             stddev=0.01),
                         bias_initializer=initializers.Constant(value=0.1),
@@ -213,7 +180,6 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
 
         model_seq = model([input_tensor, input_tensor_45])
 
-        # schould not matter due to softmax activation in last layer
         output_layer_norm = Lambda(function=lambda x: (x - T.min(x)) / (T.max(x) - T.min(x)),
                                    output_shape=lambda x: x,
                                    )(model_seq)
@@ -222,17 +188,57 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
                                      output_shape=lambda x: x,
                                      )(model_seq)
 
+        deconv_perm_layer = fPermute((3, 0, 1, 2), name='deconv_out_perm')
+
+        deconv_perm_tensor = deconv_perm_layer(
+            model.get_layer('pool_0').get_output_at(0))
+
+        depool_layer = DePool(model=model, name='depool_layer')(
+            deconv_perm_tensor)
+
+        deconv_layer = Conv2DTranspose(filters=32, kernel_size=6,
+                                       strides=(1, 1),
+                                       name='deconv_layer',
+                                       )(depool_layer)
+
+        def reshape_output(x, BATCH_SIZE=self.BATCH_SIZE):
+            input_shape = T.shape(x)
+            input_ = x
+            new_input_shape = (
+                BATCH_SIZE, input_shape[1], input_shape[2] * input_shape[0] / BATCH_SIZE, input_shape[3])
+            input_ = input_.reshape(new_input_shape)
+            return input_
+
+        output_layer_deconv = Lambda(function=reshape_output,
+                                     output_shape=lambda input_shape: (
+                                         self.BATCH_SIZE, input_shape[1],
+                                         input_shape[2] * input_shape[0] /
+                                         self.BATCH_SIZE, input_shape[3]))(
+                                             deconv_layer)
+
+        # self.layer_formats[3] =
+
+        # output_layer_deconv = Lambda(function=deconv_fun
+        #                              output_shape=deconv_fun_output_shape,
+        #                              arguments={'weights': model.get_layer('conv_0').
+        #                                         get_weights()}
+        #                              )(model.get_layer('conv_0').get_output_at(0))
+
         model_norm = Model(
             inputs=[input_tensor, input_tensor_45], outputs=output_layer_norm, name='full_model_norm')
         model_norm_metrics = Model(
             inputs=[input_tensor, input_tensor_45], outputs=output_layer_norm, name='full_model_metrics')
         model_noNorm = Model(
             inputs=[input_tensor, input_tensor_45], outputs=output_layer_noNorm, name='full_model_noNorm')
+        model_deconv = Model(inputs=model.get_input_at(0), outputs=output_layer_deconv,
+                             name='deconv_1')
 
         self.models = {'model_norm': model_norm,
                        'model_norm_metrics': model_norm_metrics,
-                       'model_noNorm': model_noNorm}
+                       'model_noNorm': model_noNorm,
+                       'model_deconv': model_deconv
+                       }
 
-        self._compile_models(loss=loss, extra_metrics=extra_metrics)
+        self._compile_models(loss='categorical_crossentropy')
 
         return self.models
