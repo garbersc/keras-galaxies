@@ -169,9 +169,34 @@ deconv.init_models()
 if debug:
     deconv.print_summary(postfix=postfix)
 
-print "Load model weights"
+
+def get_inverse_layer_weights(layer, model='model_deconv'):
+    conv_weights, conv_bias = deconv.get_layer_weights(
+        'conv_0', postfix=postfix)
+
+    print "Inverting weights..."
+    conv_weights, conv_bias = deconv.get_layer_weights(layer, postfix=postfix)
+    if debug:
+        print type(deconv.get_layer_weights(layer, postfix=postfix))
+        print np.shape(conv_weights)
+    deconv_weights = np.transpose(conv_weights, (3, 0, 1, 2))
+    deconv_weights = np.array([np.flipud(filter_)
+                               for filter_ in deconv_weights])
+    deconv_weights = np.array([np.fliplr(filter_)
+                               for filter_ in deconv_weights])
+    if debug:
+        print np.shape(deconv_weights)
+    deconv_weights = np.transpose(deconv_weights, (2, 3, 1, 0))
+    deconv_bias = conv_bias * (-1)
+
+    return [deconv_weights, deconv_bias]
+
+
+print "Load model weights..."
 deconv.load_weights(path=WEIGHTS_PATH, postfix=postfix)
 deconv.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
+deconv.models['model_deconv'].get_layer(
+    'deconv_layer').set_weights(get_inverse_layer_weights('conv_0'))
 
 
 print "Set up data loading"
@@ -309,6 +334,7 @@ def _img_wall(img, norm=False):
         else:
             wall[:, x0:x1, y0:y1] = i_
         pos[0] = pos[0] + 1
+
     if dim == 4:
         wall = np.transpose(wall, (1, 2, 0))
     return wall
@@ -376,7 +402,7 @@ def reshape_output(x):
     return x
 
 
-def print_output(nr_images=2, plots=False):
+def print_output(nr_images=2, plots=False, combined_rgb=True):
     if debug:
         print 'Checking save directory...'
     if not os.path.isdir(IMAGE_OUTPUT_PATH):
@@ -388,6 +414,7 @@ def print_output(nr_images=2, plots=False):
     print '  Output images will be saved at dir: %s' % (IMAGE_OUTPUT_PATH)
 
     print 'Collecting output from Deconvnet... this may take a while...'
+
     output_deconv = deconv.predict(
         x=validation_data[0], modelname='model_deconv')
     output_deconv = reshape_output(output_deconv)
@@ -415,20 +442,24 @@ def print_output(nr_images=2, plots=False):
         if plots:
             print 'Creating plots for Image %s' % (valid_ids[i])
             for j, channel in enumerate(img):
-                print np.shape(channel)
                 canvas, (im1, im2, im3) = plt.subplots(1, 3)
                 im1.imshow(np.transpose((input_img[0][0]), (1, 2, 0)),
                            interpolation='none')
                 im1.set_title('Input Image %s' % (valid_ids[i]))
 
-                im2.imshow(_img_wall(
-                    intermediate_outputs['input_merge']), interpolation='none', cmap=plt.get_cmap('gray'))
-                im2.set_title('Variations')
+                im2.imshow(np.transpose(intermediate_outputs['input_merge'][0], (
+                    1, 2, 0)), interpolation='none', cmap=plt.get_cmap('gray'))
+                im2.set_title('Variation %s' % j)
 
-                im3.imshow(_img_wall(channel), interpolation='none',
-                           cmap=plt.get_cmap('gray'))
-                im3.set_title('Filter %s' % j)
-                plt.savefig('image_%s_filter_%s.jpg' %
+                if combined_rgb:
+                    im3.imshow(np.transpose((channel),
+                                            (1, 2, 0)), interpolation='none')
+                    im3.set_title('Deconv Variation %s' % j)
+                else:
+                    im3.imshow(_img_wall(channel), interpolation='none',
+                               cmap=plt.get_cmap('gray'))
+                    im3.set_title('Deconv Variation %s' % j)
+                plt.savefig('image_%s_variation_%s.jpg' %
                             (valid_ids[i], j), dpi=300)
                 plt.close()
 
