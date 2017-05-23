@@ -3,19 +3,23 @@ import matplotlib.pyplot as plt
 import json
 import matplotlib.lines as mlines
 
-filenames = ['trainingLoss_different_inits_standard_0.txt',
-             'trainingLoss_different_inits_standard_standard_1.txt',
-             # 'trainingLoss_different_inits.txt',
-             'trainingLoss_different_lsuv_0.txt',
-             'trainingLoss_different_lsuv_lsuv_1.txt',
-             'trainingLoss_different_lsuv_lsuv_preConv_0.txt',
-             'trainingLoss_different_lsuv_lsuv_preConv_preConv_1.txt',
-             'trainingLoss_different_lsuv_lsuv_preConv_preConv_noNoNorm_0.txt',
-             'trainingLoss_different_lsuv_lsuv_preConv_preConv_noNoNorm_noNoNorm_1.txt'
-             ]
+filenames = [  # 'trainingLoss_different_inits_standard_0.txt',
+    # 'trainingLoss_different_inits_standard_standard_1.txt',
+    # 'trainingLoss_different_inits.txt',
+    'trainingLoss_different_lsuv_0.txt',
+    'trainingLoss_different_lsuv_lsuv_1.txt',
+    'trainingLoss_lsuvAdam_0.txt',
+    'trainingLoss_lsuvAdam_1.txt',
+    # 'trainingLoss_different_lsuv_lsuv_preConv_0.txt',
+    # 'trainingLoss_different_lsuv_lsuv_preConv_preConv_1.txt',
+    # 'trainingLoss_different_lsuv_lsuv_preConv_preConv_noNoNorm_0.txt',
+    # 'trainingLoss_different_lsuv_lsuv_preConv_preConv_noNoNorm_noNoNorm_1.txt'
+]
 
-label_names = ['no Norm 1', 'no Norm 2', 'lsuv 1', 'lsuv 2',
-               'pre-training 1 ', 'pre-training 2', 'none 1', 'none 2']
+label_names = [  # 'no Norm 1', 'no Norm 2',
+    'lsuv 1', 'lsuv 2', 'lsuv w/ Adam 1', 'lsuv w/ Adam 2'
+    # 'pre-training 1 ', 'pre-training 2', 'none 1', 'none 2'
+]
 
 plot_opts = ['r-', 'ro', 'b-', 'bo', 'g-', 'go', 'k-', 'ko']
 colors = ['red', 'red', 'blue', 'blue', 'green', 'green', 'black', 'black']
@@ -74,8 +78,8 @@ plt.legend(handles=label_h,  # bbox_to_anchor=(
            # 0., 1.05),
            loc=1, borderaxespad=0.)
 
-plt.xlabel('mse')
-plt.ylabel('epochs')
+plt.ylabel('mse')
+plt.xlabel('epochs')
 
 
 plt.show()

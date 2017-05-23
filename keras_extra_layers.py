@@ -49,7 +49,32 @@ class MyLayer(Layer):
         return (input_shape[0], self.output_dim)
 
 
+class Debias(Layer):
+    def __init__(self, nFilters, **kwargs):
+        self.nFilters = nFilters
+        super(MyLayer, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        # Create a trainable weight variable for this layer.
+        self.b = self.add_weight(shape=(self.nFilters),
+                                 initializer='constant',
+                                 trainable=True)
+        super(MyLayer, self).build()  # Be sure to call this somewhere!
+
+    def call(self, x, mask=None):
+        output = x
+        output -= self.b.dimshuffle(0, 'x', 'x', 'x')
+        return output
+
+    def get_output_shape_for(self, input_shape):
+        return input_shape
+
+    def compute_output_shape(self, input_shape):
+        return self.get_output_shape_for(input_shape)
+
 # not neede anymore, available in keras 2
+
+
 def constant(shape, scale=1., name=None):
     constant = scale
     for i in shape[::-1]:
