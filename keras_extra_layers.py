@@ -49,21 +49,24 @@ class MyLayer(Layer):
         return (input_shape[0], self.output_dim)
 
 
-class Debias(Layer):
+class DeBias(Layer):
     def __init__(self, nFilters, **kwargs):
         self.nFilters = nFilters
-        super(MyLayer, self).__init__(**kwargs)
+        super(DeBias, self).__init__(**kwargs)
 
     def build(self, input_shape):
         # Create a trainable weight variable for this layer.
-        self.b = self.add_weight(shape=(self.nFilters),
+        self.b = self.add_weight(shape=(input_shape[1:]),
                                  initializer='constant',
-                                 trainable=True)
-        super(MyLayer, self).build()  # Be sure to call this somewhere!
+                                 trainable=True,
+                                 name='{}_b'.format(self.name))
+        self.built = True
+        # Be sure to call this somewhere!
+        super(DeBias, self).build(input_shape)
 
     def call(self, x, mask=None):
         output = x
-        output -= self.b.dimshuffle(0, 'x', 'x', 'x')
+        output -= self.b.dimshuffle('x', 0, 1, 2)
         return output
 
     def get_output_shape_for(self, input_shape):
