@@ -7,7 +7,7 @@ import load_data
 import functools
 import time
 import os
-
+import skimage.io
 from datetime import timedelta
 from custom_for_keras import input_generator
 from deconvnet_test_DePool import deconvnet
@@ -171,15 +171,16 @@ deconv.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
 
 conv_weight, conv_bias = deconv.get_layer_weights(layer='conv_0')
 print conv_weight.shape
-deconv_weight = conv_weight.T
-deconv_weight = np.flip(deconv_weight, 1)
-deconv_weight = np.flip(deconv_weight, 2)
-deconv_weight = np.transpose(deconv_weight, (1, 2, 3, 0))
+deconv_weight = np.transpose(conv_weight, (1, 2, 0, 3))
+# deconv_weight = conv_weight  # .T
+# deconv_weight = np.flip(deconv_weight, 1)
+# deconv_weight = np.flip(deconv_weight, 2)
+# deconv_weight = np.transpose(deconv_weight, (1, 2, 3, 0))
 
 print deconv_weight.shape
 
 print conv_bias.shape
-print deconv.models['model_deconv'].get_layer('debias_layer').get_weights()[0].shape
+print deconv.models['model_deconv'].get_layer('deconv_layer').get_weights()[0].shape
 
 # print
 # deconv.models['model_deconv'].get_layer('depool_layer').get_output_shape_at(0)
@@ -261,7 +262,7 @@ xs_valid = [x_valid.transpose(0, 3, 1, 2) for x_valid in xs_valid]
 validation_data = (
     [xs_valid[0], xs_valid[1]], y_valid)
 validation_data = (
-    [np.asarray(xs_valid[0]), np.asarray(xs_valid[1])], validation_data[1])
+    [np.asarray(xs_valid[0][0:BATCH_SIZE]), np.asarray(xs_valid[1][0:BATCH_SIZE])], validation_data[1][0:BATCH_SIZE])
 
 t_val = (time.time() - start_time)
 print "  took %.2f seconds" % (t_val)
@@ -454,14 +455,56 @@ def print_output(nr_images=2, plots=False):
         intermediate_outputs = {}
         intermediate_outputs['input_merge'] = np.asarray(
             deconv.get_layer_output(
-                'input_merge', input_=input_img)[0])
+                'input_merge', input_=input_img))[0]
         print np.shape(intermediate_outputs['input_merge'])
         intermediate_outputs['input_merge'] = np.reshape(
             intermediate_outputs['input_merge'], (8, 3, 45, 45))
 
         if plots:
             print 'Creating plots for Image %s' % (valid_ids[i])
-            channel = np.transpose(img, (1, 2, 0))
+            # channel = np.transpose(img, (1, 2, 0))
+            channel = np.reshape(img, (8, 3, 45, 45))
+            channel = _img_wall(channel)
+            # channel = np.transpose(channecl, (1, 0, 2, 3))
+            channel = np.transpose(channel, (1, 2, 0))
+            # channel = np.reshape(channel, (8 * 45, 45, 3))
+
+            print np.max(channel)
+            print np.min(channel)
+
+            channel -= np.min(channel)
+            channel = channel / np.max(channel)
+
+        # channel = np.stack(channel, -1)
+            # plt.imshow(np.hstack(channel))
+            # plt.show()
+
+            # # skimage.io.imsave('0.png', channel[0] / np.max(channel))
+            # # skimage.io.imsave('1.png', channel[1] / np.max(channel))
+            # # skimage.io.imsave('2.png', channel[2] / np.max(channel))
+
+            # plt.imshow(channel[0])
+            # plt.show()
+            # plt.imshow(channel[1])
+            # plt.show()
+            # plt.imshow(channel[2])
+            # plt.show()
+
+            # plt.imshow(np.stack(channel[0:3], -1))
+            # plt.show()
+
+            # plt.imshow(channel[1])
+            # plt.show()
+            # plt.imshow(channel[2])
+            # plt.show()
+            # plt.imshow(np.transpose(
+            #     [channel[0], channel[9], channel[18]], (1, 2, 0)))
+            # plt.show()
+
+            # plt.imshow(np.transpose(
+            #     channel[0:3], (1, 2, 0)))
+            # plt.show()
+
             # for j, channel in enumerate(img):
             canvas, (im1, im2, im3) = plt.subplots(1, 3)
             im1.imshow(input_img[0][0].transpose(1, 2, 0),
@@ -478,7 +521,7 @@ def print_output(nr_images=2, plots=False):
                        cmap=plt.get_cmap('gray'))
             im3.set_title('Filter %s of Image %s' %
                           ('rgb', valid_ids[i]))
-            plt.savefig('Image_%s_filter_%s.jpg' %
+            plt.savefig('Image_%s_filter_%s_wDebias_relu.jpg' %
                         (valid_ids[i], 'rgb'), dpi=300)
             plt.close()
 
@@ -521,7 +564,7 @@ def print_output(nr_images=2, plots=False):
 
 if MAKE_PLOTS:
     print_output(plots=True)
-    save_exit()
+    # save_exit()
 
 print 'Done'
 # sys.exit(0)
