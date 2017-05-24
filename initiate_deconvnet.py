@@ -170,32 +170,15 @@ if debug:
     deconv.print_summary(postfix=postfix)
 
 
-def get_inverse_layer_weights(layer, model='model_deconv'):
-    print "Inverting weights..."
-    conv_weights, conv_bias = deconv.get_layer_weights(layer, postfix=postfix)
-    if debug:
-        print 'shape of conv_weights: ' + str(np.shape(conv_weights))
-
-    deconv_weights = conv_weights.T
-    deconv_weights = np.flip(deconv_weights, 1)
-    deconv_weights = np.flip(deconv_weights, 2)
-    deconv_weights = deconv_weights.transpose(1, 2, 3, 0)
-
-    if debug:
-        print 'shape of deconv_weights: ' + str(np.shape(deconv_weights))
-    deconv_bias = conv_bias * (-1)
-
-    x = [deconv_weights, deconv_bias]
-
-    return x
-
-
 print "Load model weights..."
 deconv.load_weights(path=WEIGHTS_PATH, postfix=postfix)
 deconv.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
-deconv_weight, conv_bias = get_inverse_layer_weights('conv_0')
-deconv.models['model_deconv'].get_layer('deconv_layer').set_weights(
-    [deconv_weight, ])
+# c, y, x, filter
+# y, x, c, filter
+deconv_weight, conv_bias = deconv.get_layer_weights(layer='conv_0')
+deconv_weight = np.transpose(deconv_weight, (1, 2, 0, 3))
+deconv.models['model_deconv'].get_layer(
+    'deconv_layer').set_weights([deconv_weight, ])
 deconv.models['model_deconv'].get_layer('debias_layer').set_weights(
     [conv_bias, ])
 
@@ -403,7 +386,7 @@ def reshape_output(x):
     return x
 
 
-def print_output(nr_images=2, plots=False, combined_rgb=True):
+def print_output(nr_images=2, plots=False, combined_rgb=True, combined_variations=False):
     if debug:
         print 'Checking save directory...'
     if not os.path.isdir(IMAGE_OUTPUT_PATH):
@@ -448,13 +431,22 @@ def print_output(nr_images=2, plots=False, combined_rgb=True):
                            interpolation='none')
                 im1.set_title('Input Image %s' % (valid_ids[i]))
 
-                im2.imshow(np.transpose(intermediate_outputs['input_merge'][0], (
-                    1, 2, 0)), interpolation='none', cmap=plt.get_cmap('gray'))
-                im2.set_title('Variation %s' % j)
+                channel -= np.min(channel)
+                channel = channel / np.max(channel)
+
+                if combined_variations:  # not working yet
+                    im2.imshow(_img_wall(np.transpose(
+                        intermediate_outputs['input_merge'], (3, 2, 1, 0))), interpolation='none', cmap=plt.get_cmap('gray'))
+                    im2.set_title('Variation %s' % j)
+                else:
+                    im2.imshow(np.transpose(intermediate_outputs['input_merge'][j], (
+                        1, 2, 0)), interpolation='none', cmap=plt.get_cmap('gray'))
+                    im2.set_title('Variation %s' % j)
 
                 if combined_rgb:
-                    im3.imshow(np.transpose((channel),
-                                            (1, 2, 0)), interpolation='none')
+                    fpicture = np.transpose((channel),
+                                            (1, 2, 0))
+                    im3.imshow(fpicture, interpolation='none')
                     im3.set_title('Deconv Variation %s' % j)
                 else:
                     im3.imshow(_img_wall(channel), interpolation='none',
