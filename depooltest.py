@@ -464,16 +464,14 @@ def print_output(nr_images=2, plots=False):
             print 'Creating plots for Image %s' % (valid_ids[i])
             # channel = np.transpose(img, (1, 2, 0))
             channel = np.reshape(img, (8, 3, 45, 45))
+            print np.max(channel)
+            print np.min(channel)
+            channel -= np.min(channel)
+            channel = channel / np.max(channel)
             channel = _img_wall(channel)
             # channel = np.transpose(channecl, (1, 0, 2, 3))
             channel = np.transpose(channel, (1, 2, 0))
             # channel = np.reshape(channel, (8 * 45, 45, 3))
-
-            print np.max(channel)
-            print np.min(channel)
-
-            channel -= np.min(channel)
-            channel = channel / np.max(channel)
 
         # channel = np.stack(channel, -1)
             # plt.imshow(np.hstack(channel))
@@ -521,7 +519,7 @@ def print_output(nr_images=2, plots=False):
                        cmap=plt.get_cmap('gray'))
             im3.set_title('Filter %s of Image %s' %
                           ('rgb', valid_ids[i]))
-            plt.savefig('Image_%s_filter_%s_wDebias_relu.jpg' %
+            plt.savefig('Image_%s_filter_%s_test.jpg' %
                         (valid_ids[i], 'rgb'), dpi=300)
             plt.close()
 
