@@ -171,25 +171,25 @@ if debug:
 
 
 def get_inverse_layer_weights(layer, model='model_deconv'):
-    conv_weights, conv_bias = deconv.get_layer_weights(
-        'conv_0', postfix=postfix)
-
     print "Inverting weights..."
     conv_weights, conv_bias = deconv.get_layer_weights(layer, postfix=postfix)
     if debug:
-        print type(deconv.get_layer_weights(layer, postfix=postfix))
-        print np.shape(conv_weights)
-    deconv_weights = np.transpose(conv_weights, (3, 0, 1, 2))
-    deconv_weights = np.array([np.flipud(filter_)
-                               for filter_ in deconv_weights])
-    deconv_weights = np.array([np.fliplr(filter_)
-                               for filter_ in deconv_weights])
+        print 'shape of conv_weights: ' + str(np.shape(conv_weights))
+    deconv_weights = conv_weights.T
+    deconv_weights = np.flip(deconv_weights, 1)
+    deconv_weights = np.flip(deconv_weights, 2)
+    deconv_weights = deconv_weights.transpose(1, 2, 3, 0)
+
     if debug:
-        print np.shape(deconv_weights)
-    deconv_weights = np.transpose(deconv_weights, (2, 3, 1, 0))
+        print 'shape of deconv_weights: ' + str(np.shape(deconv_weights))
     deconv_bias = conv_bias * (-1)
 
-    return [deconv_weights, deconv_bias]
+    x = [deconv_weights, deconv_bias]
+    print 'shape of inverse bias: ' + str(np.shape(x[1]))
+    print 'shape of deconv bias:' + str(np.shape(deconv.models['model_deconv'].get_layer(
+        'deconv_layer').get_weights()[1]))
+
+    return x
 
 
 print "Load model weights..."
