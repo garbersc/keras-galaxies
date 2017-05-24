@@ -3,7 +3,7 @@ from custom_keras_model_and_fit_capsels import kaggle_winsol
 import keras.backend as T
 from keras.models import Sequential, Model
 from keras.layers import Dense, Dropout, Input, Conv2DTranspose
-from keras.layers.core import Lambda
+from keras.layers.core import Lambda, Activation
 # TODO will be removed from keras2, can this be achieved with a lambda
 # layer now? looks like it:
 # https://stackoverflow.com/questions/43160181/keras-merge-layer-warning
@@ -196,8 +196,10 @@ class deconvnet(kaggle_winsol):
         # depool_layer = DePool(model=model, name='depool_layer')(
         #     deconv_perm_tensor)
 
+        relu = Activation('relu')(deconv_perm_tensor)
+
         debias_layer = DeBias(nFilters=32, name='debias_layer')(
-            deconv_perm_tensor)
+            relu)
 
         deconv_layer = Conv2DTranspose(filters=3, kernel_size=6,
                                        strides=(1, 1),

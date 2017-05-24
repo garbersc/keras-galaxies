@@ -8,8 +8,8 @@ filenames = [  # 'trainingLoss_different_inits_standard_0.txt',
     # 'trainingLoss_different_inits.txt',
     'trainingLoss_different_lsuv_0.txt',
     'trainingLoss_different_lsuv_lsuv_1.txt',
-    'trainingLoss_lsuvAdam_0.txt',
-    'trainingLoss_lsuvAdam_1.txt',
+    'trainingLoss_lsuvLRp005_0.txt',
+    'trainingLoss_lsuvLRp005_1.txt',
     # 'trainingLoss_different_lsuv_lsuv_preConv_0.txt',
     # 'trainingLoss_different_lsuv_lsuv_preConv_preConv_1.txt',
     # 'trainingLoss_different_lsuv_lsuv_preConv_preConv_noNoNorm_0.txt',
@@ -17,7 +17,7 @@ filenames = [  # 'trainingLoss_different_inits_standard_0.txt',
 ]
 
 label_names = [  # 'no Norm 1', 'no Norm 2',
-    'lsuv 1', 'lsuv 2', 'lsuv w/ Adam 1', 'lsuv w/ Adam 2'
+    'lsuv 1', 'lsuv 2', 'lsuv w/ no LR change', 'lsuv w/ no LR change'
     # 'pre-training 1 ', 'pre-training 2', 'none 1', 'none 2'
 ]
 
