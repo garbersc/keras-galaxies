@@ -12,7 +12,7 @@ from keras.engine.topology import InputLayer
 from keras import initializers
 
 from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute,\
-    kerasCudaConvnetConv2DLayer, MaxoutDense
+    kerasCudaConvnetConv2DLayer, MaxoutDense, DeBias
 from custom_for_keras import kaggle_MultiRotMergeLayer_output,  kaggle_input,\
     dense_weight_init_values
 
@@ -194,10 +194,14 @@ class deconvnet(kaggle_winsol):
         deconv_perm_tensor = deconv_perm_layer(
             model.get_layer('conv_0').get_output_at(0))
 
-        deconv_layer = Conv2DTranspose(filters=32, kernel_size=6,
+        debias_layer = DeBias(nFilters=32, name='debias_layer')(
+            deconv_perm_tensor)
+
+        deconv_layer = Conv2DTranspose(filters=3, kernel_size=6,
                                        strides=(1, 1),
+                                       use_bias=False,
                                        name='deconv_layer',
-                                       )(deconv_perm_tensor)
+                                       )(debias_layer)
 
         def reshape_output(x, BATCH_SIZE=self.BATCH_SIZE):
             input_shape = T.shape(x)
