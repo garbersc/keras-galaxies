@@ -175,6 +175,7 @@ def get_inverse_layer_weights(layer, model='model_deconv'):
     conv_weights, conv_bias = deconv.get_layer_weights(layer, postfix=postfix)
     if debug:
         print 'shape of conv_weights: ' + str(np.shape(conv_weights))
+
     deconv_weights = conv_weights.T
     deconv_weights = np.flip(deconv_weights, 1)
     deconv_weights = np.flip(deconv_weights, 2)
@@ -185,9 +186,6 @@ def get_inverse_layer_weights(layer, model='model_deconv'):
     deconv_bias = conv_bias * (-1)
 
     x = [deconv_weights, deconv_bias]
-    print 'shape of inverse bias: ' + str(np.shape(x[1]))
-    print 'shape of deconv bias:' + str(np.shape(deconv.models['model_deconv'].get_layer(
-        'deconv_layer').get_weights()[1]))
 
     return x
 
@@ -195,8 +193,11 @@ def get_inverse_layer_weights(layer, model='model_deconv'):
 print "Load model weights..."
 deconv.load_weights(path=WEIGHTS_PATH, postfix=postfix)
 deconv.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
-deconv.models['model_deconv'].get_layer(
-    'deconv_layer').set_weights(get_inverse_layer_weights('conv_0'))
+deconv_weight, conv_bias = get_inverse_layer_weights('conv_0')
+deconv.models['model_deconv'].get_layer('deconv_layer').set_weights(
+    [deconv_weight, ])
+deconv.models['model_deconv'].get_layer('debias_layer').set_weights(
+    [conv_bias, ])
 
 
 print "Set up data loading"
