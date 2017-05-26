@@ -426,13 +426,13 @@ def print_output(nr_images=2, plots=False, combined_rgb=True, combined_variation
         if plots:
             print 'Creating plots for Image %s' % (valid_ids[i])
             for j, channel in enumerate(img):
+                channel -= np.min(channel)
+                channel = channel / np.max(channel)
+
                 canvas, (im1, im2, im3) = plt.subplots(1, 3)
                 im1.imshow(np.transpose((input_img[0][0]), (1, 2, 0)),
                            interpolation='none')
                 im1.set_title('Input Image %s' % (valid_ids[i]))
-
-                channel -= np.min(channel)
-                channel = channel / np.max(channel)
 
                 if combined_variations:  # not working yet
                     im2.imshow(_img_wall(np.transpose(

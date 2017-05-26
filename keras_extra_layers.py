@@ -1,7 +1,7 @@
 '''
 Author: Christoph Garbers
 keras layers that are needed if no CuDNN speed up is available
-and layer that fell out of faver in keras2
+and layers that fell out of favor in keras2
 '''
 from keras import backend as K
 from keras.engine.topology import Layer, InputSpec
