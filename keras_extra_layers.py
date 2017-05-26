@@ -9,6 +9,7 @@ import numpy as np
 import copy
 import warnings
 
+from keras.layers import Conv2DTranspose
 from keras import initializers
 from keras import activations
 from keras import regularizers
@@ -47,6 +48,70 @@ class MyLayer(Layer):
 
     def get_output_shape_for(self, input_shape):
         return (input_shape[0], self.output_dim)
+
+
+class DeConv(Conv2DTranspose):
+    # Adds a scaling of the edges to the Conv2DTranspose layer to avoid
+    # artifacts in the stride=(1,1) case
+    def __init__(self, filters,
+                 kernel_size,
+                 strides=(1, 1),
+                 padding='valid',
+                 data_format=None,
+                 activation=None,
+                 use_bias=True,
+                 kernel_initializer='glorot_uniform',
+                 bias_initializer='zeros',
+                 kernel_regularizer=None,
+                 bias_regularizer=None,
+                 activity_regularizer=None,
+                 kernel_constraint=None,
+                 bias_constraint=None,
+                 **kwargs):
+        # if type(kernel_size) == 'int':
+        #     self.kernel_size = (kernel_size, kernel_size)
+        # else:
+        #     self.kernel_size = kernel_size
+        if strides != (1, 1) or padding != 'valid':
+            warnings.warn(
+                'Layer DeConv was not build for this stride and/or padding option!')
+        super(DeConv, self).__init__(
+            filters,
+            kernel_size,
+            strides=strides,
+            padding=padding,
+            data_format=data_format,
+            activation=activation,
+            use_bias=use_bias,
+            kernel_initializer=kernel_initializer,
+            bias_initializer=bias_initializer,
+            kernel_regularizer=kernel_regularizer,
+            bias_regularizer=bias_regularizer,
+            activity_regularizer=activity_regularizer,
+            kernel_constraint=kernel_constraint,
+            bias_constraint=bias_constraint,
+            **kwargs)
+
+    def build(self, input_shape):
+        super(DeConv, self).build(input_shape)
+
+        shape = super(DeConv, self).compute_output_shape(input_shape)
+
+        a = np.zeros(shape)
+        for i in range(shape[2]):
+            for j in range(shape[3]):
+                a[:, :, i, j] = float(np.prod(self.kernel_size))\
+                    / min(float(i + 1), self.kernel_size[0])\
+                    / min(float(j + 1), self.kernel_size[1])
+
+        self.edge_scale = K.variable(value=a)
+
+    def call(self, inputs):
+        outputs = super(DeConv, self).call(inputs)
+
+        outputs = outputs * self.edge_scale
+
+        return outputs
 
 
 class DeBias(Layer):

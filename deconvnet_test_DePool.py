@@ -12,7 +12,7 @@ from keras.engine.topology import InputLayer
 from keras import initializers
 
 from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute,\
-    kerasCudaConvnetConv2DLayer, MaxoutDense, DePool, DeBias
+    kerasCudaConvnetConv2DLayer, MaxoutDense, DePool, DeBias, DeConv
 from custom_for_keras import kaggle_MultiRotMergeLayer_output,  kaggle_input,\
     dense_weight_init_values
 
@@ -196,17 +196,34 @@ class deconvnet(kaggle_winsol):
         # depool_layer = DePool(model=model, name='depool_layer')(
         #     deconv_perm_tensor)
 
-        relu = Activation('relu')(deconv_perm_tensor)
+        # TODO put this function in custom_for_keras
+        def deconv_block(x, filters_in, filters_out, kernel_size, name='layer_0'):
+            relu = Activation('relu', name='activation_' + name)(x)
+            debias_layer = DeBias(nFilters=filters_in, name='debias_' + name)(
+                relu)
+            deconv_layer = DeConv(filters=filters_out, kernel_size=kernel_size,
+                                  strides=(1, 1),
+                                  use_bias=False,
+                                  name='deconv_' + name,
+                                  )(debias_layer)
+            return deconv_layer
 
-        debias_layer = DeBias(nFilters=32, name='debias_layer')(
-            relu)
+        # relu = Activation('relu')(deconv_perm_tensor)
 
-        deconv_layer = Conv2DTranspose(filters=3, kernel_size=6,
-                                       strides=(1, 1),
-                                       use_bias=False,
-                                       name='deconv_layer',
-                                       )(debias_layer)
+        # debias_layer = DeBias(nFilters=32, name='debias_layer')(
+        #     relu)
 
+        # deconv_layer = DeConv(filters=3, kernel_size=6,
+        #                       strides=(1, 1),
+        #                       use_bias=False,
+        #                       name='deconv_layer',
+        #                       # activation='relu'
+        #                       )(debias_layer)
+
+        deconv_layer = deconv_block(
+            deconv_perm_tensor, 32, 3, 6, name='layer')
+
+        # TODO put this with another name in custom_for_kers
         def reshape_output(x, BATCH_SIZE=self.BATCH_SIZE):
             input_shape = T.shape(x)
             input_ = x
