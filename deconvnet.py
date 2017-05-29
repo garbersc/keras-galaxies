@@ -115,6 +115,13 @@ class deconvnet(kaggle_winsol):
 
         model = Sequential(name='main_seq')
 
+        smodel = Sequential(name='simple_mod')
+
+        smodel.add(fPermute((1, 2, 3, 0), name='input_perm'))
+
+        smodel.add(kerasCudaConvnetConv2DLayer(
+            n_filters=32, filter_size=6, untie_biases=True, name='conv_0'))
+
         N_INPUT_VARIATION = 2  # depends on the kaggle input settings
         include_flip = self.include_flip
 
@@ -181,6 +188,8 @@ class deconvnet(kaggle_winsol):
 
         model_seq = model([input_tensor, input_tensor_45])
 
+        smodel_seq = smodel([input_tensor, input_tensor_45])
+
         output_layer_norm = Lambda(function=lambda x: (x - T.min(x)) / (T.max(x) - T.min(x)),
                                    output_shape=lambda x: x,
                                    )(model_seq)
@@ -188,6 +197,10 @@ class deconvnet(kaggle_winsol):
         output_layer_noNorm = Lambda(function=lambda x: x,
                                      output_shape=lambda x: x,
                                      )(model_seq)
+
+        output_layer_smodel = Lambda(function=lambda x: x,
+                                     output_shape=lambda x: x,
+                                     )(smodel)
 
         deconv_perm_layer = fPermute((3, 0, 1, 2), name='deconv_out_perm')
 
@@ -230,6 +243,8 @@ class deconvnet(kaggle_winsol):
             inputs=[input_tensor, input_tensor_45], outputs=output_layer_noNorm, name='full_model_noNorm')
         model_deconv = Model(inputs=model.get_input_at(0), outputs=output_layer_deconv,
                              name='deconv_1')
+        model_simple = Model([input_tensor, input_tensor_45],
+                             outputs=output_layer_smodel, name='simple_model')
 
         self.models = {'model_norm': model_norm,
                        'model_norm_metrics': model_norm_metrics,
