@@ -7,7 +7,7 @@ import json
 # data=np.loadtxt(fname="trainingNmbrs_keras_adam_expLR.txt",delimiter=",")
 # data=data.transpose()
 
-f = open("trainingNmbrs_geometry_no_maxout_cutOutConv0111.txt", "r")
+f = open("trainingNmbrs_started_lsuv_fromG1.txt", "r")
 f_lines = f. readlines()
 
 print len(f_lines)
@@ -47,13 +47,25 @@ for dic in dics:
 
 trainLoss = dics[-1]["loss"]
 validLoss = dics[-2]["loss"]
+
+# trainLoss += (dics[-7]['loss'])
+# trainLoss += (dics[-5]['loss'])
+# trainLoss += (dics[-3]['loss'])
+# trainLoss += (dics[-1]['loss'])
+
+# validLoss += (dics[-8]['loss'])
+# validLoss += (dics[-6]['loss'])
+# validLoss += (dics[-4]['loss'])
+# validLoss += (dics[-2]['loss'])
+
 # validLoss_weighted=data[6]
 
 #trainP = plt.plot( rounds, trainLoss, 'ro',label="train")
 #validP = plt.plot(rounds, validLoss, 'bo',label="valid")
-trainP = plt.plot(xrange(0, len(trainLoss)), trainLoss, 'ro', label="train")
+trainP = plt.plot(np.array(range(0, len(trainLoss))),
+                  np.array(trainLoss), 'r-', label="train")
 validP = plt.plot(np.array(range(0, len(validLoss))) * len(trainLoss) /
-                  len(validLoss), validLoss, 'go', label="valid")
+                  len(validLoss), np.array(validLoss), 'g-', label="valid")
 #validP = plt.plot( xrange(0,rounds.shape[0]), validLoss_weighted, 'bo',label="sliced_accuracy")
 
 plt.legend([trainP, validP], ["train", "valid"])
