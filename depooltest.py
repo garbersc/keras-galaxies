@@ -180,15 +180,40 @@ deconv_weight = np.transpose(conv_weight, (1, 2, 0, 3))
 print deconv_weight.shape
 
 print conv_bias.shape
-print deconv.models['model_deconv'].get_layer('deconv_layer').get_weights()[0].shape
+# print
+# deconv.models['model_deconv'].get_layer('deconv_layer').get_weights()[0].shape
 
 # print
 # deconv.models['model_deconv'].get_layer('depool_layer').get_output_shape_at(0)
 
-deconv.models['model_deconv'].get_layer('deconv_layer').set_weights(
+deconv.models['model_deconv'].get_layer('deconv_layer_0').set_weights(
     [deconv_weight, ])
-deconv.models['model_deconv'].get_layer('debias_layer').set_weights(
+deconv.models['model_deconv'].get_layer('debias_layer_0').set_weights(
     [conv_bias, ])
+
+conv_weight, conv_bias = deconv.get_layer_weights(layer='conv_1')
+deconv_weight = np.transpose(conv_weight, (1, 2, 0, 3))
+
+deconv.models['model_deconv'].get_layer('deconv_layer_1').set_weights(
+    [deconv_weight, ])
+deconv.models['model_deconv'].get_layer('debias_layer_1').set_weights(
+    [conv_bias, ])
+
+conv_weight, conv_bias = deconv.get_layer_weights(layer='conv_2')
+deconv_weight = np.transpose(conv_weight, (1, 2, 0, 3))
+
+deconv.models['model_deconv'].get_layer('deconv_layer_2').set_weights(
+    [deconv_weight, ])
+deconv.models['model_deconv'].get_layer('debias_layer_2').set_weights(
+    [conv_bias, ])
+
+# conv_weight, conv_bias = deconv.get_layer_weights(layer='conv_3')
+# deconv_weight = np.transpose(conv_weight, (1, 2, 0, 3))
+
+# deconv.models['model_deconv'].get_layer('deconv_layer_3').set_weights(
+#     [deconv_weight, ])
+# deconv.models['model_deconv'].get_layer('debias_layer_3').set_weights(
+#     [conv_bias, ])
 
 
 print "Set up data loading"
@@ -381,7 +406,41 @@ def print_weights(norm=False, nameprefix=''):
     os.chdir('../..')
 
 
-def print_output(nr_images=2, plots=False):
+from skimage import data
+from skimage.util.dtype import dtype_range
+from skimage.util import img_as_ubyte
+from skimage import exposure
+from skimage.morphology import disk
+from skimage.filters import rank
+
+
+def plot_img_and_hist(image, axes, bins=256):
+    """Plot an image along with its histogram and cumulative histogram.
+
+    """
+    ax_img, ax_hist = axes
+    ax_cdf = ax_hist.twinx()
+
+    # Display image
+    ax_img.imshow(image, cmap=plt.cm.gray)
+    ax_img.set_axis_off()
+
+    # Display histogram
+    ax_hist.hist(image.ravel(), bins=bins)
+    ax_hist.ticklabel_format(axis='y', style='scientific', scilimits=(0, 0))
+    ax_hist.set_xlabel('Pixel intensity')
+
+    xmin, xmax = dtype_range[image.dtype.type]
+    ax_hist.set_xlim(xmin, xmax)
+
+    # Display cumulative distribution
+    img_cdf, bins = exposure.cumulative_distribution(image, bins)
+    ax_cdf.plot(bins, img_cdf, 'r')
+
+    return ax_img, ax_hist, ax_cdf
+
+
+def print_output(nr_images=5, plots=False):
     if debug:
         print 'Checking save directory...'
     if not os.path.isdir(IMAGE_OUTPUT_PATH):
@@ -463,11 +522,83 @@ def print_output(nr_images=2, plots=False):
         if plots:
             print 'Creating plots for Image %s' % (valid_ids[i])
             # channel = np.transpose(img, (1, 2, 0))
+
             channel = np.reshape(img, (8, 3, 45, 45))
+
+            print 'global'
             print np.max(channel)
             print np.min(channel)
-            channel -= np.min(channel)
-            channel = channel / np.max(channel)
+            print 'inner'
+            print np.max(channel[:, :, 10:35, 10:35])
+            print np.min(channel[:, :, 10:35, 10:35])
+
+            def norm(pic):
+                pic_ = pic
+                # pic_ = np.clip(pic, -5., 5.)
+
+                # if len(np.shape(pic_)) == 2:
+                #     pic_ = np.clip(pic_, np.min(
+                #         pic_[10:35, 10:35]), np.max(pic_[10:35, 10:35]))
+                # elif len(np.shape(pic_)) == 3:
+                #     pic_ = np.clip(pic_, np.min(
+                #         pic_[:, 10:35, 10:35]), np.max(pic_[:, 10:35, 10:35]))
+                # elif len(np.shape(pic_)) == 4:
+                #     pic_ = np.clip(pic_, np.min(
+                # pic_[:, :, 10:35, 10:35]), np.max(pic_[:, :10:35, 10:35]))
+
+                pic_ -= np.min(pic_)
+                return pic_ / np.max(pic_)
+
+            # ch_clipped = norm(np.clip(channel[0, 0], -5., 5.))
+
+            for bi, b in enumerate(channel):
+                # for ci, c in enumerate(b):
+                channel[bi] = norm(channel[bi])
+                for ci, c in enumerate(channel[bi]):
+                    channel[bi, ci] = exposure.equalize_hist(channel[bi, ci])
+
+            # Global equalize
+            img_rescale = exposure.equalize_hist(channel[0, 0])
+
+            # # Equalization
+            # selem = disk(30)
+            # img_eq = rank.equalize(channel[0, 0], selem=selem)
+
+            # fig = plt.figure(figsize=(8, 5))
+            # axes = np.zeros((2, 4), dtype=np.object)
+            # axes[0, 0] = plt.subplot(2, 4, 1, adjustable='box-forced')
+            # axes[0, 1] = plt.subplot(2, 4, 2, sharex=axes[0, 0], sharey=axes[0, 0],
+            #                          adjustable='box-forced')
+            # axes[0, 2] = plt.subplot(2, 4, 3, sharex=axes[0, 0], sharey=axes[0, 0],
+            #                          adjustable='box-forced')
+            # axes[0, 3] = plt.subplot(2, 4, 4, sharex=axes[0, 0], sharey=axes[0, 0],
+            #                          adjustable='box-forced')
+            # axes[1, 0] = plt.subplot(2, 4, 5)
+            # axes[1, 1] = plt.subplot(2, 4, 6)
+            # axes[1, 2] = plt.subplot(2, 4, 7)
+            # axes[1, 3] = plt.subplot(2, 4, 8)
+
+            # ax_img, ax_hist, ax_cdf = plot_img_and_hist(
+            #     channel[0, 0, :, :], axes[:, 0])
+            # ax_img.set_title('original')
+            # ax_hist.set_ylabel('Number of pixels')
+
+            # ax_img, ax_hist, ax_cdf = plot_img_and_hist(
+            #     img_rescale, axes[:, 1])
+            # ax_img.set_title('Global equalise')
+
+            # ax_img, ax_hist, ax_cdf = plot_img_and_hist(img_eq, axes[:, 2])
+            # ax_img.set_title('Local equalize')
+            # ax_cdf.set_ylabel('Fraction of total intensity')
+
+            # ax_img, ax_hist, ax_cdf = plot_img_and_hist(ch_clipped, axes[:, 3])
+            # ax_img.set_title('clip equalize')
+            # ax_cdf.set_ylabel('Fraction of total intensity')
+
+            # # prevent overlap of y-axis labels
+            # fig.tight_layout()
+            # plt.show()
+
             channel = _img_wall(channel)
             # channel = np.transpose(channecl, (1, 0, 2, 3))
             channel = np.transpose(channel, (1, 2, 0))
@@ -519,7 +650,7 @@ def print_output(nr_images=2, plots=False):
                        cmap=plt.get_cmap('gray'))
             im3.set_title('Filter %s of Image %s' %
                           ('rgb', valid_ids[i]))
-            plt.savefig('Image_%s_filter_%s_test.jpg' %
+            plt.savefig('Image_%s_filter_%s_test_invRelu.jpg' %
                         (valid_ids[i], 'rgb'), dpi=300)
             plt.close()
 

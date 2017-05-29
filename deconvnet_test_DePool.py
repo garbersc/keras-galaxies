@@ -19,6 +19,9 @@ from custom_for_keras import kaggle_MultiRotMergeLayer_output,  kaggle_input,\
 from keras.optimizers import SGD
 from custom_for_keras import rmse
 
+from functools import partial
+import sys
+
 
 class deconvnet(kaggle_winsol):
     '''
@@ -191,10 +194,7 @@ class deconvnet(kaggle_winsol):
         deconv_perm_layer = fPermute((3, 0, 1, 2), name='deconv_out_perm')
 
         deconv_perm_tensor = deconv_perm_layer(
-            model.get_layer('conv_0').get_output_at(0))
-
-        # depool_layer = DePool(model=model, name='depool_layer')(
-        #     deconv_perm_tensor)
+            model.get_layer('conv_2').get_output_at(0))
 
         # TODO put this function in custom_for_keras
         def deconv_block(x, filters_in, filters_out, kernel_size, name='layer_0'):
@@ -208,20 +208,24 @@ class deconvnet(kaggle_winsol):
                                   )(debias_layer)
             return deconv_layer
 
-        # relu = Activation('relu')(deconv_perm_tensor)
-
-        # debias_layer = DeBias(nFilters=32, name='debias_layer')(
-        #     relu)
-
-        # deconv_layer = DeConv(filters=3, kernel_size=6,
-        #                       strides=(1, 1),
-        #                       use_bias=False,
-        #                       name='deconv_layer',
-        #                       # activation='relu'
-        #                       )(debias_layer)
+        # depool_layer = DePool(model=model, pool_layer_origin=['pool_2'], name='depool_2_layer')(
+        #     deconv_perm_tensor)
+        # deconv_layer = deconv_block(
+        #     depool_layer, 128, 128, 3, name='layer_3')
 
         deconv_layer = deconv_block(
-            deconv_perm_tensor, 32, 3, 6, name='layer')
+            deconv_perm_tensor, 128, 64, 3, name='layer_2')
+
+        depool_layer = DePool(model=model, pool_layer_origin=['pool_1'], name='depool_1_layer')(
+            deconv_layer)
+        deconv_layer = deconv_block(
+            depool_layer, 64, 32, 5, name='layer_1')
+
+        depool_layer = DePool(model=model, pool_layer_origin=['pool_0'], name='depool_0_layer')(
+            deconv_layer)
+        deconv_layer = deconv_block(
+            depool_layer, 32, 3, 6, name='layer_0')
+        # deconv_layer = Activation('relu', name='activation_out')(deconv_layer)
 
         # TODO put this with another name in custom_for_kers
         def reshape_output(x, BATCH_SIZE=self.BATCH_SIZE):
@@ -265,3 +269,6 @@ class deconvnet(kaggle_winsol):
         self._compile_models(loss='categorical_crossentropy')
 
         return self.models
+
+    def load_deconv_weights():
+        pass  # TODO
