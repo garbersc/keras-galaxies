@@ -32,7 +32,7 @@ copy_to_ram_beforehand = False
 
 debug = True
 
-get_winsol_weights = True
+get_winsol_weights = False
 
 BATCH_SIZE = 16  # keep in mind
 
@@ -50,9 +50,10 @@ TRAIN_LOSS_SF_PATH = 'try_test.txt'
 # TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
 # WEIGHTS_PATH = "analysis/final/try_goodWeights.h5"
-WEIGHTS_PATH = "analysis/final/try_convent_gpu1_win_sol_net_on_0p0775_validation.pkl"
+# "try_convent_gpu1_win_sol_net_on_0p0775_validation.pkl"
+WEIGHTS_PATH = "analysis/final/try_lsuv_adam_next.h5"
 TXT_OUTPUT_PATH = 'try_test.txt'
-IMAGE_OUTPUT_PATH = "img_orig_imported"
+IMAGE_OUTPUT_PATH = "img_wAdamG1"
 
 postfix = ''
 NUM_ELLIPSE_PARAMS = 2
@@ -1318,9 +1319,9 @@ def get_best_id(category_name, n=1):
 # highest_conv_activation(img_id=get_best_id('Spiral2Arm'))
 # highest_conv_activation(img_id=get_best_id('Lense'))
 
-print_filters(list(valid_ids).index(get_best_id('RoundCigar')))
-print_filters(list(valid_ids).index(get_best_id('Spiral2Arm')))
-print_filters(list(valid_ids).index(get_best_id('Lense')))
+# print_filters(list(valid_ids).index(get_best_id('RoundCigar')))
+# print_filters(list(valid_ids).index(get_best_id('Spiral2Arm')))
+# print_filters(list(valid_ids).index(get_best_id('Lense')))
 
 # print
 # print
@@ -1338,7 +1339,7 @@ print_filters(list(valid_ids).index(get_best_id('Lense')))
 #     highest_conv_activation(img_id=id)
 #     print
 
-# try_different_cut_fraktion(figname='cuts_test3.eps')
+try_different_cut_fraktion(figname='cuts_wAdamG1.eps')
 
 # pixel_correlations(True)
 # pixel_correlations()

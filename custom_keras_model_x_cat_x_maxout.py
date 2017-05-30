@@ -91,9 +91,11 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
 
     def init_models(self, final_units=3, n_maxout_layers=0,
                     loss='categorical_crossentropy',
+                    optimizer=None,
                     extra_metrics=[],
                     freeze_conv=False,
-                    cut_out_conv=(False, False, False, False)):
+                    cut_out_conv=(False, False, False, False),
+                    final_activation='softmax'):
 
         if not (type(freeze_conv) in (tuple, list)):
             freeze_conv = bool(freeze_conv)
@@ -205,7 +207,7 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
                                   name=mo_name))
 
         model.add(Dropout(0.5))
-        model.add(Dense(units=final_units, activation='softmax',
+        model.add(Dense(units=final_units, activation=final_activation,
                         kernel_initializer=initializers.RandomNormal(
                             stddev=0.01),
                         bias_initializer=initializers.Constant(value=0.1),
@@ -233,6 +235,7 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
                        'model_norm_metrics': model_norm_metrics,
                        'model_noNorm': model_noNorm}
 
-        self._compile_models(loss=loss, extra_metrics=extra_metrics)
+        self._compile_models(
+            loss=loss, extra_metrics=extra_metrics, optimizer=optimizer)
 
         return self.models
