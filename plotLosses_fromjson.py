@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import json
+import matplotlib
 
 
 # data=np.loadtxt(fname="trainingNmbrs_christmas.txt",delimiter=",")
@@ -60,6 +61,8 @@ validLoss = dics[-2]["loss"]
 
 # validLoss_weighted=data[6]
 
+matplotlib.rc('font', size=20)
+
 #trainP = plt.plot( rounds, trainLoss, 'ro',label="train")
 #validP = plt.plot(rounds, validLoss, 'bo',label="valid")
 trainP = plt.plot(np.array(range(0, len(trainLoss))),
@@ -70,8 +73,8 @@ validP = plt.plot(np.array(range(0, len(validLoss))) * len(trainLoss) /
 
 plt.legend([trainP, validP], ["train", "valid"])
 
-plt.xlabel('Chunks')
-plt.ylabel('Mean Square Loss')
+plt.xlabel('epochs',)  # fontsize=20)
+plt.ylabel('Mean Square Loss',)  # fontsize=20)
 
 
 plt.show()
