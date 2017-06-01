@@ -85,6 +85,13 @@ class deconvnet(kaggle_winsol):
                 optimizer=optimizer)
         except KeyError:
             pass
+        try:
+            self.models['model_simple' + postfix].compile(
+                loss=loss,
+                optimizer=optimizer)
+        except KeyError:
+            pass
+
         self._init_hist_dics(self.models)
 
         return True
@@ -117,10 +124,10 @@ class deconvnet(kaggle_winsol):
 
         smodel = Sequential(name='simple_mod')
 
-        smodel.add(fPermute((1, 2, 3, 0), name='input_perm'))
+        smodel.add(fPermute((1, 2, 3, 0), mode=kaggle_input, name='sinput_perm'))
 
         smodel.add(kerasCudaConvnetConv2DLayer(
-            n_filters=32, filter_size=6, untie_biases=True, name='conv_0'))
+            n_filters=32, filter_size=6, untie_biases=True, name='sconv_0'))
 
         N_INPUT_VARIATION = 2  # depends on the kaggle input settings
         include_flip = self.include_flip
@@ -200,12 +207,12 @@ class deconvnet(kaggle_winsol):
 
         output_layer_smodel = Lambda(function=lambda x: x,
                                      output_shape=lambda x: x,
-                                     )(smodel)
+                                     )(smodel_seq)
 
         deconv_perm_layer = fPermute((3, 0, 1, 2), name='deconv_out_perm')
 
         deconv_perm_tensor = deconv_perm_layer(
-            model.get_layer('conv_0').get_output_at(0))
+            smodel.get_layer('sconv_0').get_output_at(0))
 
         debias_layer = DeBias(nFilters=32, name='debias_layer')(
             deconv_perm_tensor)
@@ -249,7 +256,8 @@ class deconvnet(kaggle_winsol):
         self.models = {'model_norm': model_norm,
                        'model_norm_metrics': model_norm_metrics,
                        'model_noNorm': model_noNorm,
-                       'model_deconv': model_deconv
+                       'model_deconv': model_deconv,
+                       'model_simple': model_simple
                        }
 
         self._compile_models(loss='categorical_crossentropy')

@@ -6,9 +6,8 @@ import realtime_augmentation as ra
 import load_data
 import functools
 import time
-import sys
-import json
 import os
+import skimage.io
 
 from termcolor import colored
 from datetime import datetime, timedelta
