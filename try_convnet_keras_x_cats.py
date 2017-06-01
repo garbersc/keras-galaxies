@@ -7,7 +7,6 @@ import sys
 import json
 from custom_for_keras import input_generator
 from datetime import datetime, timedelta
-
 from custom_keras_model_x_cat import kaggle_x_cat
 
 start_time = time.time()
@@ -322,7 +321,8 @@ try:
                     validation=validation_data,
                     samples_per_epoch=N_TRAIN,
                     validate_every=VALIDATE_EVERY,
-                    nb_epochs=EPOCHS)
+                    nb_epochs=EPOCHS,
+                    )
 
 except KeyboardInterrupt:
     print "\ngot keyboard interuption"

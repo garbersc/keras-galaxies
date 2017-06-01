@@ -99,8 +99,17 @@ DO_VALIDSTUFF_ON_TRAIN = True
 DO_TEST = False  # disable this to not generate predictions on the testset
 
 
-output_names = ["smooth", "featureOrdisk", "NoGalaxy", "EdgeOnYes", "EdgeOnNo", "BarYes", "BarNo", "SpiralYes", "SpiralNo", "BulgeNo", "BulgeJust", "BulgeObvious", "BulgDominant", "OddYes", "OddNo", "RoundCompletly", "RoundBetween", "RoundCigar",
-                "Ring", "Lense", "Disturbed", "Irregular", "Other", "Merger", "DustLane", "BulgeRound", "BlulgeBoxy", "BulgeNo2", "SpiralTight", "SpiralMedium", "SpiralLoose", "Spiral1Arm", "Spiral2Arm", "Spiral3Arm", "Spiral4Arm", "SpiralMoreArms", "SpiralCantTell"]
+output_names = ["smooth", "featureOrdisk", "NoGalaxy",
+                "EdgeOnYes", "EdgeOnNo",
+                "BarYes", "BarNo",
+                "SpiralYes", "SpiralNo",
+                "BulgeNo", "BulgeJust", "BulgeObvious", "BulgDominant",
+                "OddYes", "OddNo",
+                "RoundCompletly", "RoundBetween", "RoundCigar",
+                "Ring", "Lense", "Disturbed", "Irregular", "Other", "Merger", "DustLane",
+                "BulgeRound", "BlulgeBoxy", "BulgeNo2",
+                "SpiralTight", "SpiralMedium", "SpiralLoose",
+                "Spiral1Arm", "Spiral2Arm", "Spiral3Arm", "Spiral4Arm", "SpiralMoreArms", "SpiralCantTell"]
 
 question_slices = [slice(0, 3), slice(3, 5), slice(5, 7), slice(7, 9),
                    slice(9, 13), slice(13, 15), slice(15, 18), slice(18, 25),
