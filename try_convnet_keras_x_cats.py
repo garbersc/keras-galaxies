@@ -37,9 +37,9 @@ VALIDATE_EVERY = 5  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 INCLUDE_FLIP = True
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_10cat.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_10cat_wMaxout.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_10cat.h5"
+WEIGHTS_PATH = "analysis/final/try_10cat_wMaxout.h5"
 
 CONV_WEIGHT_PATH = ''  # 'analysis/final/try_3cat_geometry_corr_geopics_next.h5'
 
