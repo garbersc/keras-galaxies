@@ -8,6 +8,7 @@ import json
 from custom_for_keras import input_generator
 from datetime import datetime, timedelta
 from custom_keras_model_x_cat import kaggle_x_cat
+from keras.optimizers import Adam
 
 start_time = time.time()
 
