@@ -196,7 +196,7 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
                          arguments={'num_views': num_views},
                          name='conv_out_merge'))
 
-        for i in range(n_maxout_layers - 1) if n_maxout_layers > -1 else []:
+        for i in range(n_maxout_layers) if n_maxout_layers > 0 else []:
             mo_name = 'maxout_%s' % str(i)
             self.layer_formats[mo_name] = 0
             model.add(Dropout(0.5))

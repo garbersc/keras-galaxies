@@ -46,7 +46,7 @@ CONV_WEIGHT_PATH = ''  # 'analysis/final/try_3cat_geometry_corr_geopics_next.h5'
 
 
 LEARNING_RATE_SCHEDULE = {
-    0: 0.005,
+    0: 0.002,
     # 2: 0.1,
     # 10: 0.05,
     # 40: 0.01,
