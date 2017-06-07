@@ -157,7 +157,8 @@ y_train = ra.y_train
 valid_ids = ra.valid_ids
 train_ids = ra.train_ids
 
-train_indices = np.arange(num_train)
+train_indices = np.arange(num_train
+                          )
 valid_indices = np.arange(num_train, num_train + num_valid)
 test_indices = np.arange(num_test)
 
@@ -336,7 +337,11 @@ n_sliced_cat_pred_wcut = [0] * len(output_names)
 n_sliced_cat_valid_wcut = [0] * len(output_names)
 n_sliced_cat_agrement_wcut = [0] * len(output_names)
 
-wrong_categories = np.zeros((10, 10))
+wrong_categories = list(np.zeros((10, 10)))
+
+categories = np.zeros((10, 10))
+val_l = []
+pred_l = []
 
 for i in range(len(predictions)):
     argpred = np.argmax(predictions[i])
@@ -346,18 +351,21 @@ for i in range(len(predictions)):
     if argval == argpred:
         n_global_cat_agrement[argval] += 1
     else:
-        if not wrong_categories[argval, argpred]:
+        if not wrong_categories[argval][argpred]:
             print '%sto%s' % (str(argval), str(argpred))
             print valid_ids[i]
-        wrong_categories[argval, argpred] += [valid_ids[i]]
+            wrong_categories[argval][argpred] = valid_ids[i]
 
+    categories[argval, argpred] += 1.
+    val_l.append(argval)
+    pred_l.append(argpred)
     c = 0
     for slice in question_slices:
         sargpred = np.argmax(predictions[i][slice])
-        cutpred = predictions[i][slice][sargpred] / \
+        cutpred = predictions[i][slice][sargpred] /\
             sum(predictions[i][slice]) > cut_fraktion
         sargval = np.argmax(y_valid[i][slice])
-        cutval = y_valid[i][slice][sargval] / \
+        cutval = y_valid[i][slice][sargval] /\
             sum(y_valid[i][slice]) > cut_fraktion
         n_sliced_cat_pred[sargpred + slice.start] += 1
         if cutpred:
@@ -371,6 +379,31 @@ for i in range(len(predictions)):
                 n_sliced_cat_agrement_wcut[sargval + slice.start] += 1
 
         c += 1
+
+weights_l = []
+
+
+for p, v in zip(pred_l, val_l):
+    weights_l.append(1. / float(n_global_cat_valid[v]))
+
+# print categories
+
+plt.hist2d(pred_l, val_l, bins=10, range=[[0., 10.], [0., 10.]])
+cb = plt.colorbar()
+cb.set_label('# categorised')
+plt.xlabel('predicted category')
+plt.ylabel('validation category')
+plt.savefig(IMAGE_OUTPUT_PATH + '/categories.eps')
+cb.remove()
+
+plt.hist2d(pred_l, val_l, bins=10, weights=weights_l,
+           range=[[0., 10.], [0., 10.]])
+cb = plt.colorbar()
+cb.set_label('# categorised / # validation in this category')
+plt.xlabel('predicted category')
+plt.ylabel('validation category')
+plt.savefig(IMAGE_OUTPUT_PATH + '/categories_normToVal.eps')
+cb.remove()
 
 
 def P_base(n_pred, n_agree):

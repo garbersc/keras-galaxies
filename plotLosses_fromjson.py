@@ -8,7 +8,7 @@ import matplotlib
 # data=np.loadtxt(fname="trainingNmbrs_keras_adam_expLR.txt",delimiter=",")
 # data=data.transpose()
 
-f = open("trainingNmbrs_10cat.txt", "r")
+f = open("trainingNmbrs_10cat_wMaxout.txt", "r")
 f_lines = f. readlines()
 
 print len(f_lines)
@@ -49,14 +49,14 @@ for dic in dics:
 trainLoss = []  # dics[-1]["loss"]
 validLoss = []  # dics[-2]["loss"]
 
-# trainLoss += (dics[-7]['loss'])
+trainLoss += (dics[-7]['loss'])
 trainLoss += (dics[-5]['loss'])
-trainLoss += (dics[-3]['loss'])
+# trainLoss += (dics[-3]['loss'])
 trainLoss += (dics[-1]['loss'])
 
-# validLoss += (dics[-8]['loss'])
+validLoss += (dics[-8]['loss'])
 validLoss += (dics[-6]['loss'])
-validLoss += (dics[-4]['loss'])
+# validLoss += (dics[-4]['loss'])
 validLoss += (dics[-2]['loss'])
 
 # validLoss_weighted=data[6]
