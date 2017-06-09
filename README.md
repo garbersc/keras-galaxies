@@ -12,10 +12,10 @@ Documentation about the method and the code is available in `doc/documentation.p
 
 Needed dependecies:
 keras with theano backend:
-      https://github.com/fchollet/keras/
-      https://github.com/Theano/
+      * `github.com/fchollet/keras`
+      * `github.com/Theano`
 pylearn2:
-	git://github.com/lisa-lab/pylearn2.git
+	* `github.com/lisa-lab/pylearn2`
 
 Instructions for installing Theano and getting it to run on the GPU can be found [here](http://deeplearning.net/software/theano/install.html). It should be possible to install NumPy, SciPy, scikit-image and pandas using `pip` or `easy_install`. 
 
@@ -33,13 +33,13 @@ Note that the zip file with the training images is called `images_training_rev1.
 ### 10 categories model
 
 Generate solutions for 10 category model:
-	 solutions_to_10cat.py
+	* `solutions_to_10cat.py`
 	 
 Definition of 10 category model:
-	 custom_keras_model_x_cat.py
+	* `custom_keras_model_x_cat.py`
 
 Start with python for training:
- 	try_convnet_keras_x_cats.py
+ 	*  `try_convnet_keras_x_cats.py`
 
 Functions for evaluation of the 10 category:
-	  predict_convnet_keras_10cat.py	
+	* `predict_convnet_keras_10cat.py`	

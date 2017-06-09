@@ -24,18 +24,30 @@ y_train = np.load("data/solutions_train.npy")
 
 new_sol = []
 
+new_certainty = []
+cert_check = []
+
 for i, p in enumerate(y_train):
     p_sol = [1]
     p_sol += [1 for _ in cat_10]
+
+    cert = [1]
+    cert += [1 for _ in cat_10]
+
     for j, cond in enumerate(cat_10):
         for sup_cond in cond:
             combined = False
+            cert_add = 0
             for answere in sup_cond[1:]:
                 combined = combined or (np.argmax(
                     p[question_slices[sup_cond[0]]]) == answere)
-                if combined:
-                    break
+
+                cert_add += p[question_slices[sup_cond[0]]][answere]
+
+                # if combined:
+                #     break
             p_sol[j] *= combined
+            cert[j] *= cert_add
     if np.sum(p_sol[0:-1]):
         p_sol[-1] = 0
     if np.sum(p_sol) != 1:
@@ -43,6 +55,11 @@ for i, p in enumerate(y_train):
         warnings.warn('categories not exclusive in picture %s' % i)
     new_sol += [p_sol]
 
+    cert = [c / float(np.sum(cert)) for c in cert]
+    new_certainty += [cert]
+
+
 print np.shape(new_sol)
 np.save('data/solutions_train_10cat.npy', new_sol)
+np.save('data/solution_certainties_train_10cat.npy', new_certainty)
 print 'Done!'

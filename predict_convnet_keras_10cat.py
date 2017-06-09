@@ -21,12 +21,12 @@ from custom_for_keras import sliced_accuracy_mean, sliced_accuracy_std, rmse,\
     lr_function
 from ellipse_fit import get_ellipse_kaggle_par
 # from custom_keras_model_and_fit_capsels import kaggle_winsol
-from custom_keras_model_x_cat_x_maxout import kaggle_x_cat_x_maxout\
+from custom_keras_model_x_cat import kaggle_x_cat\
     as kaggle_winsol
 
 starting_time = time.time()
 
-cut_fraktion = 0.8
+cut_fraktion = 0.9
 
 copy_to_ram_beforehand = False
 
@@ -49,7 +49,7 @@ if debug:
 TRAIN_LOSS_SF_PATH = 'loss_10cat.txt'
 # TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_10cat_next_next.h5"
+WEIGHTS_PATH = "analysis/final/try_10cat_wMaxout_next_next_next.h5"
 TXT_OUTPUT_PATH = 'try_10cat_test.txt'
 WRONG_CAT_IMGS_PATH = 'wrong_categorized_10cat.json'
 IMAGE_OUTPUT_PATH = "img_10cat"
@@ -71,7 +71,7 @@ N_INPUT_VARIATION = 2
 
 # set to True if the prediction and evaluation should be done when the
 # prediction file already exists
-REPREDICT_EVERYTIME = True
+REPREDICT_EVERYTIME = False
 
 # TODO built this as functions, not with the if's
 DO_VALID = True  # disable this to not bother with the validation set evaluation
@@ -102,20 +102,12 @@ target_path_test = os.path.join(
     "predictions/final/augmented/test", target_filename)
 
 
-target_filename = os.path.basename(WEIGHTS_PATH).replace(".h5", ".npy.gz")
-if get_winsol_weights:
-    target_filename = os.path.basename(WEIGHTS_PATH).replace(".pkl", ".npy.gz")
-target_path_valid = os.path.join(
-    "predictions/final/augmented/valid", target_filename)
-target_path_test = os.path.join(
-    "predictions/final/augmented/test", target_filename)
-
-
 if copy_to_ram_beforehand:
     ra.myLoadFrom_RAM = True
     import copy_data_to_shm
 
 y_train = np.load("data/solutions_train_10cat.npy")
+
 ra.y_train = y_train
 
 # split training data into training + a small validation set
@@ -164,7 +156,6 @@ test_indices = np.arange(num_test)
 
 N_TRAIN = num_train
 N_VALID = num_valid
-
 
 print("validation sample contains %s images. \n" %
       (ra.num_valid))
@@ -337,11 +328,14 @@ n_sliced_cat_pred_wcut = [0] * len(output_names)
 n_sliced_cat_valid_wcut = [0] * len(output_names)
 n_sliced_cat_agrement_wcut = [0] * len(output_names)
 
-wrong_categories = list(np.zeros((10, 10)))
+wrong_cat_cutted = []
 
 categories = np.zeros((10, 10))
 val_l = []
 pred_l = []
+
+val_l_cutted = []
+pred_l_cutted = []
 
 for i in range(len(predictions)):
     argpred = np.argmax(predictions[i])
@@ -350,11 +344,6 @@ for i in range(len(predictions)):
     n_global_cat_valid[argval] += 1
     if argval == argpred:
         n_global_cat_agrement[argval] += 1
-    else:
-        if not wrong_categories[argval][argpred]:
-            print '%sto%s' % (str(argval), str(argpred))
-            print valid_ids[i]
-            wrong_categories[argval][argpred] = valid_ids[i]
 
     categories[argval, argpred] += 1.
     val_l.append(argval)
@@ -365,14 +354,22 @@ for i in range(len(predictions)):
         cutpred = predictions[i][slice][sargpred] /\
             sum(predictions[i][slice]) > cut_fraktion
         sargval = np.argmax(y_valid[i][slice])
-        cutval = y_valid[i][slice][sargval] /\
-            sum(y_valid[i][slice]) > cut_fraktion
         n_sliced_cat_pred[sargpred + slice.start] += 1
+
         if cutpred:
             n_sliced_cat_pred_wcut[sargpred + slice.start] += 1
-        n_sliced_cat_valid[sargval + slice.start] += 1
-        if cutval:
             n_sliced_cat_valid_wcut[sargval + slice.start] += 1
+            val_l_cutted.append(argval)
+            pred_l_cutted.append(argpred)
+            if sargval != sargpred:
+                # print '%sto%s' % (str(argval), str(argpred))
+                # print valid_ids[i]
+                wrong_cat_cutted.append(('%sto%s' % (str(argval),
+                                                     str(argpred)),
+                                         i))
+
+        n_sliced_cat_valid[sargval + slice.start] += 1
+
         if sargval == sargpred:
             n_sliced_cat_agrement[sargval + slice.start] += 1
             if cutpred:
@@ -380,30 +377,62 @@ for i in range(len(predictions)):
 
         c += 1
 
-weights_l = []
 
+def pred_to_val_hist(path=IMAGE_OUTPUT_PATH, also_cutted=True):
+    weights_l = []
 
-for p, v in zip(pred_l, val_l):
-    weights_l.append(1. / float(n_global_cat_valid[v]))
+    for p, v in zip(pred_l, val_l):
+        weights_l.append(1. / float(n_global_cat_valid[v]))
 
-# print categories
+    # print categories
 
-plt.hist2d(pred_l, val_l, bins=10, range=[[0., 10.], [0., 10.]])
-cb = plt.colorbar()
-cb.set_label('# categorised')
-plt.xlabel('predicted category')
-plt.ylabel('validation category')
-plt.savefig(IMAGE_OUTPUT_PATH + '/categories.eps')
-cb.remove()
+    plt.hist2d(pred_l, val_l, bins=10, range=[[0., 10.], [0., 10.]])
+    cb = plt.colorbar()
+    cb.set_label('# categorised')
+    plt.xlabel('predicted category')
+    plt.ylabel('validation category')
+    plt.xticks([a + 0.5 for a in range(10)], output_names, rotation=90)
+    plt.yticks([a + 0.5 for a in range(10)], output_names)
+    plt.tight_layout()
+    plt.savefig(path + '/categories.eps')
+    cb.remove()
 
-plt.hist2d(pred_l, val_l, bins=10, weights=weights_l,
-           range=[[0., 10.], [0., 10.]])
-cb = plt.colorbar()
-cb.set_label('# categorised / # validation in this category')
-plt.xlabel('predicted category')
-plt.ylabel('validation category')
-plt.savefig(IMAGE_OUTPUT_PATH + '/categories_normToVal.eps')
-cb.remove()
+    plt.hist2d(pred_l, val_l, bins=10, weights=weights_l,
+               range=[[0., 10.], [0., 10.]])
+    cb = plt.colorbar()
+    cb.set_label('# categorised / # validation in this category')
+    plt.xlabel('predicted category')
+    plt.ylabel('validation category')
+    plt.tight_layout()
+    plt.savefig(path + '/categories_normToVal.eps')
+    cb.remove()
+
+    weights_l_cutted = []
+
+    for p, v in zip(pred_l_cutted, val_l_cutted):
+        weights_l_cutted.append(1. / float(n_sliced_cat_valid_wcut[v]))
+
+        # print categories
+
+    plt.hist2d(pred_l_cutted, val_l_cutted, bins=10,
+               range=[[0., 10.], [0., 10.]])
+    cb = plt.colorbar()
+    cb.set_label('# categorised')
+    plt.xlabel('predicted category')
+    plt.ylabel('validation category')
+    plt.tight_layout()
+    plt.savefig(path + '/categories_cutted.eps')
+    cb.remove()
+
+    plt.hist2d(pred_l_cutted, val_l_cutted, bins=10, weights=weights_l_cutted,
+               range=[[0., 10.], [0., 10.]])
+    cb = plt.colorbar()
+    cb.set_label('# categorised / # validation in this category')
+    plt.xlabel('predicted category')
+    plt.ylabel('validation category')
+    plt.tight_layout()
+    plt.savefig(path + '/categories_normToVal_cutted.eps')
+    cb.remove()
 
 
 def P_base(n_pred, n_agree):
@@ -621,14 +650,11 @@ def try_different_cut_fraktion(cut_fraktions=map(lambda x: float(x) / 20.,
             q_frak_pred = predictions[i][slic][sargpred] / \
                 sum(predictions[i][slic])
             sargval = np.argmax(y_valid[i][slic])
-            q_frak_valid = y_valid[i][slic][sargval] / \
-                sum(y_valid[i][slic])
 
             for j, cut_val in enumerate(cut_fraktions):
-                if q_frak_valid > cut_val:
-                    n_wcut_valid[j][sargpred + slic.start] += 1
                 if q_frak_pred > cut_val:
                     n_wcut_pred[j][sargval + slic.start] += 1
+                    n_wcut_valid[j][sargpred + slic.start] += 1
                     if sargval == sargpred:
                         n_wcut_agree[j][sargval + slic.start] += 1
 
@@ -1116,7 +1142,8 @@ def print_filters(image_nr=0, norm=False):
             skimage.io.imsave('output_fig_%s_%s_small.jpg' %
                               (image_nr, n), _img_wall(
                                   intermediate_outputs[n], norm) /
-                              np.max())
+                              np.max(_img_wall(
+                                  intermediate_outputs[n], norm)))
 
         else:
             imshow_g(normalize_img(
@@ -1205,12 +1232,27 @@ def get_best_id(category_name, n=1):
             -1 - n: len(predictions_dtyped['img_nr'])]
 
 
-# x_category_precision(predictions=predictions, y_valid=y_valid)
-# # print_weights(norm=True)
- # print_weights(norm=True)
-valid_scatter()
+def save_wrong_cat_cutted():
+    if not os.path.isdir(IMAGE_OUTPUT_PATH + '/wrong_cat'):
+        os.mkdir(IMAGE_OUTPUT_PATH + '/wrong_cat/')
+    for i in wrong_cat_cutted:
+        plt.imsave(IMAGE_OUTPUT_PATH + '/wrong_cat/' +
+                   i[0] + '_' + str(valid_ids[i[1]]) + '.jpg',
+                   np.transpose(validation_data[0][0][i[1]], (1, 2, 0)))
+
+
+# pred_to_val_hist()
+
+save_wrong_cat_cutted()
+
+# print_weights(norm=True)
+# print_weights(norm=True)
+
+# valid_scatter()
+
 # print_filters(2, norm=True)
-# #print_filters(3, norm=True)
+# print_filters(3, norm=True)
+
 # highest_conv_activation(img_id=get_best_id('RoundCigar'))
 # highest_conv_activation(img_id=get_best_id('Spiral2Arm'))
 # highest_conv_activation(img_id=get_best_id('Lense'))
@@ -1235,7 +1277,8 @@ valid_scatter()
 #     highest_conv_activation(img_id=id)
 #     print
 
-try_different_cut_fraktion(figname='10_cat.eps')
+# try_different_cut_fraktion(cut_fraktions=map(lambda x: float(
+# x) / 80., range(32, 80)), figname=IMAGE_OUTPUT_PATH + '/10_cat.eps')
 
 # pixel_correlations(True)
 # pixel_correlations()
