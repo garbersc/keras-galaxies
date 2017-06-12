@@ -146,7 +146,9 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models(input_shape=NUM_ELLIPSE_PARAMS, output_shape=10)
+winsol.init_models(input_shape=NUM_ELLIPSE_PARAMS, output_shape=10,
+                   final_activation='softmax',
+                   loss='categorical_crossentropy')
 
 if debug:
     winsol.print_summary(modelname='model_norm_ellipse', postfix='')
