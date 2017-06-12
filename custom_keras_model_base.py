@@ -477,15 +477,15 @@ class kaggle_base(object):
     def save(self, option_string=None, postfix=''):
         if not option_string:
             self.save_weights(postfix=postfix)
-            self.save_loss(modelname='model_norm_metrics' + postfix)
-            self.save_loss(modelname='model_norm' + postfix)
+            self.save_loss(modelname='model_norm_metrics',  postfix=postfix)
+            self.save_loss(modelname='model_norm', postfix=postfix)
         elif option_string == 'interrupt':
             self.save_weights(path=self.WEIGHTS_PATH +
                               '_interrupted.h5', postfix=postfix)
             self.save_loss(path=self.LOSS_PATH + '_interrupted.txt',
-                           modelname='model_norm_metrics' + postfix)
+                           modelname='model_norm_metrics', postfix=postfix)
             self.save_loss(path=self.LOSS_PATH + '_interrupted.txt',
-                           modelname='model_norm' + postfix)
+                           modelname='model_norm', postfix=postfix)
         else:
             print 'WARNING: unknown saving opotion *' + option_string + '*'
             self.save(postfix=postfix)

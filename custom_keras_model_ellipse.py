@@ -1,5 +1,6 @@
 from custom_keras_model_base import kaggle_base
 
+import keras.backend as T
 from keras.models import Sequential, Model
 from keras.layers import Dense, Dropout, Input
 from keras.layers.core import Lambda
