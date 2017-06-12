@@ -49,9 +49,9 @@ if debug:
 TRAIN_LOSS_SF_PATH = 'loss_10cat.txt'
 # TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_10cat_wMaxout_next_next_next.h5"
+WEIGHTS_PATH = "analysis/final/try_10cat_wMaxout_next_next_next_next.h5"
 TXT_OUTPUT_PATH = 'try_10cat_test.txt'
-WRONG_CAT_IMGS_PATH = 'wrong_categorized_10cat.json'
+WRONG_CAT_IMGS_PATH = 'wrong_categorized_10cat_further_trained.json'
 IMAGE_OUTPUT_PATH = "img_10cat"
 
 
@@ -1243,7 +1243,7 @@ def save_wrong_cat_cutted():
 
 # pred_to_val_hist()
 
-save_wrong_cat_cutted()
+# save_wrong_cat_cutted()
 
 # print_weights(norm=True)
 # print_weights(norm=True)
@@ -1277,8 +1277,8 @@ save_wrong_cat_cutted()
 #     highest_conv_activation(img_id=id)
 #     print
 
-# try_different_cut_fraktion(cut_fraktions=map(lambda x: float(
-# x) / 80., range(32, 80)), figname=IMAGE_OUTPUT_PATH + '/10_cat.eps')
+try_different_cut_fraktion(cut_fraktions=map(lambda x: float(
+    x) / 80., range(32, 80)), figname=IMAGE_OUTPUT_PATH + '/10_cat.eps')
 
 # pixel_correlations(True)
 # pixel_correlations()

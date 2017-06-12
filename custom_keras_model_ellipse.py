@@ -56,7 +56,7 @@ class kaggle_ellipse_fit(kaggle_base):
     dictinary with the model without normalisation, with normalisation and with normalisation and extra metrics for validation
     '''
 
-    def init_models(self, input_shape=3):
+    def init_models(self, input_shape=3, output_shape=37):
         print "init model"
         input_tensor = Input(batch_shape=(self.BATCH_SIZE,
                                           input_shape),
@@ -77,7 +77,7 @@ class kaggle_ellipse_fit(kaggle_base):
                               name='maxout_1'))
 
         model.add(Dropout(0.5))
-        model.add(Dense(units=37, activation='relu',
+        model.add(Dense(units=output_shape, activation='relu',
                         kernel_initializer=initializers.RandomNormal(
                             stddev=0.01),
                         bias_initializer=initializers.Constant(value=0.1),
