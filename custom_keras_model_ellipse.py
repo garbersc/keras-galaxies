@@ -87,16 +87,27 @@ class kaggle_ellipse_fit(kaggle_base):
 
         CATEGORISED = False  # FXME has to be implemented
 
-        output_layer_norm = Lambda(function=OptimisedDivGalaxyOutput,
-                                   output_shape=lambda x: x,
-                                   arguments={'normalised': True,
-                                              'categorised': CATEGORISED})(
-                                                  model_seq)
-        output_layer_noNorm = Lambda(function=OptimisedDivGalaxyOutput,
-                                     output_shape=lambda x: x,
-                                     arguments={'normalised': False,
-                                                'categorised': CATEGORISED})(
-                                                    model_seq)
+        if output_shape == 37:
+            output_layer_norm = Lambda(function=OptimisedDivGalaxyOutput,
+                                       output_shape=lambda x: x,
+                                       arguments={'normalised': True,
+                                                  'categorised': CATEGORISED})(
+                                                      model_seq)
+            output_layer_noNorm = Lambda(function=OptimisedDivGalaxyOutput,
+                                         output_shape=lambda x: x,
+                                         arguments={'normalised': False,
+                                                    'categorised': CATEGORISED})(
+                                                        model_seq)
+        else:
+                    # schould not matter due to softmax activation in last
+                    # layer
+            output_layer_norm = Lambda(function=lambda x: (x - T.min(x)) / (T.max(x) - T.min(x)),
+                                       output_shape=lambda x: x,
+                                       )(model_seq)
+
+            output_layer_noNorm = Lambda(function=lambda x: x,
+                                         output_shape=lambda x: x,
+                                         )(model_seq)
 
         model_norm = Model(
             inputs=[input_tensor], outputs=output_layer_norm,
