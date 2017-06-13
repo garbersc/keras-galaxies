@@ -8,6 +8,7 @@ import json
 from custom_for_keras import input_generator
 from datetime import datetime, timedelta
 from custom_keras_model_x_cat import kaggle_x_cat
+from keras.optimizers import Adam
 
 start_time = time.time()
 
@@ -37,15 +38,15 @@ VALIDATE_EVERY = 5  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 INCLUDE_FLIP = True
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_10cat.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_10cat_wMaxout.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_10cat.h5"
+WEIGHTS_PATH = "analysis/final/try_10cat_wMaxout.h5"
 
 CONV_WEIGHT_PATH = ''  # 'analysis/final/try_3cat_geometry_corr_geopics_next.h5'
 
 
 LEARNING_RATE_SCHEDULE = {
-    0: 0.005,
+    0: 0.002,
     # 2: 0.1,
     # 10: 0.05,
     # 40: 0.01,

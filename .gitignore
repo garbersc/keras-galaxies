@@ -70,13 +70,13 @@ init_pred/
 img_example/
 best*.txt
 bla*
-loss_3cat*.txt
 *.gif
 *.mp4
 img_weight_hist/
 *.json
 *.eps
 trainingLoss_different_*.txt
+loss_*.txt
 
 # emacs autosave files and hidden files
 \#*

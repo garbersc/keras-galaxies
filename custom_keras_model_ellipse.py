@@ -1,5 +1,6 @@
 from custom_keras_model_base import kaggle_base
 
+import keras.backend as T
 from keras.models import Sequential, Model
 from keras.layers import Dense, Dropout, Input
 from keras.layers.core import Lambda
@@ -46,8 +47,8 @@ class kaggle_ellipse_fit(kaggle_base):
     initilises loss histories
     '''
 
-    def _compile_models(self, postfix='_ellipse'):
-        return super(kaggle_ellipse_fit, self)._compile_models(postfix=postfix)
+    def _compile_models(self, postfix='_ellipse', loss='mean_squared_error'):
+        return super(kaggle_ellipse_fit, self)._compile_models(postfix=postfix, loss=loss)
 
     '''
     initiates models according to the kaggle galaxies winning solution
@@ -56,7 +57,7 @@ class kaggle_ellipse_fit(kaggle_base):
     dictinary with the model without normalisation, with normalisation and with normalisation and extra metrics for validation
     '''
 
-    def init_models(self, input_shape=3):
+    def init_models(self, input_shape=3, output_shape=37, final_activation='relu', loss='mean_squared_error'):
         print "init model"
         input_tensor = Input(batch_shape=(self.BATCH_SIZE,
                                           input_shape),
@@ -77,7 +78,7 @@ class kaggle_ellipse_fit(kaggle_base):
                               name='maxout_1'))
 
         model.add(Dropout(0.5))
-        model.add(Dense(units=37, activation='relu',
+        model.add(Dense(units=output_shape, activation=final_activation,
                         kernel_initializer=initializers.RandomNormal(
                             stddev=0.01),
                         bias_initializer=initializers.Constant(value=0.1),
@@ -87,16 +88,27 @@ class kaggle_ellipse_fit(kaggle_base):
 
         CATEGORISED = False  # FXME has to be implemented
 
-        output_layer_norm = Lambda(function=OptimisedDivGalaxyOutput,
-                                   output_shape=lambda x: x,
-                                   arguments={'normalised': True,
-                                              'categorised': CATEGORISED})(
-                                                  model_seq)
-        output_layer_noNorm = Lambda(function=OptimisedDivGalaxyOutput,
-                                     output_shape=lambda x: x,
-                                     arguments={'normalised': False,
-                                                'categorised': CATEGORISED})(
-                                                    model_seq)
+        if output_shape == 37:
+            output_layer_norm = Lambda(function=OptimisedDivGalaxyOutput,
+                                       output_shape=lambda x: x,
+                                       arguments={'normalised': True,
+                                                  'categorised': CATEGORISED})(
+                                                      model_seq)
+            output_layer_noNorm = Lambda(function=OptimisedDivGalaxyOutput,
+                                         output_shape=lambda x: x,
+                                         arguments={'normalised': False,
+                                                    'categorised': CATEGORISED})(
+                                                        model_seq)
+        else:
+                    # schould not matter due to softmax activation in last
+                    # layer
+            output_layer_norm = Lambda(function=lambda x: (x - T.min(x)) / (T.max(x) - T.min(x)),
+                                       output_shape=lambda x: x,
+                                       )(model_seq)
+
+            output_layer_noNorm = Lambda(function=lambda x: x,
+                                         output_shape=lambda x: x,
+                                         )(model_seq)
 
         model_norm = Model(
             inputs=[input_tensor], outputs=output_layer_norm,
@@ -112,7 +124,7 @@ class kaggle_ellipse_fit(kaggle_base):
                        'model_norm_metrics_ellipse': model_norm_metrics,
                        'model_noNorm_ellipse': model_noNorm}
 
-        self._compile_models(postfix='_ellipse')
+        self._compile_models(postfix='_ellipse', loss=loss)
 
         return self.models
 
