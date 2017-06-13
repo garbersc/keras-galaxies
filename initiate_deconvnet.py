@@ -385,7 +385,7 @@ def reshape_output(x):
     return x
 
 
-def print_output(nr_images=5, plots=False, combined_rgb=True, wall_variations=True, wall_output=True, norm_single_img=False):
+def print_output(nr_images=5, plots=False, combined_rgb=True, wall_variations=True, wall_output=False, norm_single_img=False):
     if debug:
         print 'Checking save directory...'
     if not os.path.isdir(IMAGE_OUTPUT_PATH):
@@ -398,8 +398,12 @@ def print_output(nr_images=5, plots=False, combined_rgb=True, wall_variations=Tr
 
     print 'Collecting output from Deconvnet... this may take a while...'
 
+    valid_data_crop = []
+    for img in validation_data[0][1]:
+        valid_data_crop.append(img[:, :45, :45])
+    valid_data_crop = [np.asarray(valid_data_crop)]
     output_deconv = deconv.predict(
-        x=validation_data[0], modelname='model_deconv')
+        x=valid_data_crop, modelname='model_deconv')
     output_deconv = reshape_output(output_deconv)
     if debug:
         print 'Deconv output shape:' + str(np.shape(output_deconv))

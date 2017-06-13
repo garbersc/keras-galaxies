@@ -103,6 +103,11 @@ class deconvnet(kaggle_winsol):
                                           self.input_sizes[0][0],
                                           self.input_sizes[0][1]),
                              dtype='float32', name='input_tensor')
+        sinput_tensor = Input(batch_shape=(self.BATCH_SIZE,
+                                           self.NUM_INPUT_FEATURES,
+                                           45,
+                                           45),
+                              dtype='float32', name='input_tensor')
 
         input_tensor_45 = Input(batch_shape=(self.BATCH_SIZE,
                                              self.NUM_INPUT_FEATURES,
@@ -124,7 +129,8 @@ class deconvnet(kaggle_winsol):
 
         smodel = Sequential(name='simple_mod')
 
-        smodel.add(fPermute((1, 2, 3, 0), mode=kaggle_input, name='sinput_perm'))
+        smodel.add(fPermute(
+            (1, 2, 3, 0), batch_input_shape=(self.BATCH_SIZE, self.NUM_INPUT_FEATURES, 45, 45),  name='sinput_perm'))
 
         smodel.add(kerasCudaConvnetConv2DLayer(
             n_filters=32, filter_size=6, untie_biases=True, name='sconv_0'))
@@ -195,7 +201,7 @@ class deconvnet(kaggle_winsol):
 
         model_seq = model([input_tensor, input_tensor_45])
 
-        smodel_seq = smodel([input_tensor, input_tensor_45])
+        smodel_seq = smodel(sinput_tensor)
 
         output_layer_norm = Lambda(function=lambda x: (x - T.min(x)) / (T.max(x) - T.min(x)),
                                    output_shape=lambda x: x,
@@ -248,9 +254,9 @@ class deconvnet(kaggle_winsol):
             inputs=[input_tensor, input_tensor_45], outputs=output_layer_norm, name='full_model_metrics')
         model_noNorm = Model(
             inputs=[input_tensor, input_tensor_45], outputs=output_layer_noNorm, name='full_model_noNorm')
-        model_deconv = Model(inputs=model.get_input_at(0), outputs=output_layer_deconv,
+        model_deconv = Model(inputs=smodel.get_input_at(0), outputs=output_layer_deconv,
                              name='deconv_1')
-        model_simple = Model([input_tensor, input_tensor_45],
+        model_simple = Model(sinput_tensor,
                              outputs=output_layer_smodel, name='simple_model')
 
         self.models = {'model_norm': model_norm,
