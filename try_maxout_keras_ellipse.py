@@ -25,7 +25,7 @@ get_winsol_weights = False
 # describtion
 DO_LSUV_INIT = True
 
-BATCH_SIZE = 256  # keep in mind
+BATCH_SIZE = 16  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
@@ -33,7 +33,6 @@ MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
 EPOCHS = 150
 VALIDATE_EVERY = 20  # 20 # 12 # 6 # 6 # 6 # 5 #
-NUM_EPOCHS_NONORM = 0.1
 # this should be only a few, just .1 hopefully suffices.
 
 NUM_ELLIPSE_PARAMS = 2
@@ -240,6 +239,12 @@ for x in xs_valid[0]:
 
 validation_data = (np.asarray(validation_data[0]), validation_data[1])
 
+print np.shape(validation_data[0])
+print validation_data[0]
+# for i in validation_data[0]:
+#     if i:
+#         print i
+
 t_val = (time.time() - start_time)
 print "  took %.2f seconds" % (t_val)
 
@@ -282,8 +287,8 @@ try:
     print ''
     print "losses without training on validation sample up front"
 
-    evalHist = winsol.evaluate(
-        validation_data[0], y_valid=y_valid, postfix='_ellipse')
+    # evalHist = winsol.evaluate(
+    #     validation_data[0], y_valid=y_valid, postfix='_ellipse')
 
     if debug:
         print("Free GPU Mem after validation check %s MiB " %
@@ -291,29 +296,12 @@ try:
                / 1024. / 1024.))
         print ''
 
-    print "Train %s epoch without norm" % NUM_EPOCHS_NONORM
-
-    time1 = time.time()
-
-    no_norm_events = int(NUM_EPOCHS_NONORM * N_TRAIN)
-
-    if no_norm_events:
-        hist = winsol.fit_gen(modelname='model_noNorm_ellipse',
-                              data_generator=input_gen,
-                              validation=validation_data,
-                              samples_per_epoch=no_norm_events)
-
     if debug:
         print("\nFree GPU Mem before train loop %s MiB " %
               (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0]
                / 1024. / 1024.))
 
     print 'starting main training'
-
-    if no_norm_events:
-        eta = (time.time() - time1) / NUM_EPOCHS_NONORM * EPOCHS
-        print 'rough ETA %s sec. -> finishes at %s' % (
-            int(eta), datetime.now() + timedelta(seconds=eta))
 
     winsol.full_fit(data_gen=input_gen,
                     validation=validation_data,
