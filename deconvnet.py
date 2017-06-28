@@ -18,7 +18,6 @@ from custom_for_keras import kaggle_MultiRotMergeLayer_output,  kaggle_input,\
 
 from keras.optimizers import SGD
 from custom_for_keras import rmse
-from deconv_fun import deconv_fun, deconv_fun_output_shape
 
 
 class deconvnet(kaggle_winsol):
@@ -85,12 +84,6 @@ class deconvnet(kaggle_winsol):
                 optimizer=optimizer)
         except KeyError:
             pass
-        try:
-            self.models['model_simple' + postfix].compile(
-                loss=loss,
-                optimizer=optimizer)
-        except KeyError:
-            pass
 
         self._init_hist_dics(self.models)
 
@@ -103,11 +96,6 @@ class deconvnet(kaggle_winsol):
                                           self.input_sizes[0][0],
                                           self.input_sizes[0][1]),
                              dtype='float32', name='input_tensor')
-        sinput_tensor = Input(batch_shape=(self.BATCH_SIZE,
-                                           self.NUM_INPUT_FEATURES,
-                                           45,
-                                           45),
-                              dtype='float32', name='input_tensor')
 
         input_tensor_45 = Input(batch_shape=(self.BATCH_SIZE,
                                              self.NUM_INPUT_FEATURES,
@@ -126,14 +114,6 @@ class deconvnet(kaggle_winsol):
             name='input_lay_seq_1')
 
         model = Sequential(name='main_seq')
-
-        smodel = Sequential(name='simple_mod')
-
-        smodel.add(fPermute(
-            (1, 2, 3, 0), batch_input_shape=(self.BATCH_SIZE, self.NUM_INPUT_FEATURES, 45, 45),  name='sinput_perm'))
-
-        smodel.add(kerasCudaConvnetConv2DLayer(
-            n_filters=32, filter_size=6, untie_biases=True, name='sconv_0'))
 
         N_INPUT_VARIATION = 2  # depends on the kaggle input settings
         include_flip = self.include_flip
@@ -201,8 +181,6 @@ class deconvnet(kaggle_winsol):
 
         model_seq = model([input_tensor, input_tensor_45])
 
-        smodel_seq = smodel(sinput_tensor)
-
         output_layer_norm = Lambda(function=lambda x: (x - T.min(x)) / (T.max(x) - T.min(x)),
                                    output_shape=lambda x: x,
                                    )(model_seq)
@@ -211,14 +189,10 @@ class deconvnet(kaggle_winsol):
                                      output_shape=lambda x: x,
                                      )(model_seq)
 
-        output_layer_smodel = Lambda(function=lambda x: x,
-                                     output_shape=lambda x: x,
-                                     )(smodel_seq)
-
         deconv_perm_layer = fPermute((3, 0, 1, 2), name='deconv_out_perm')
 
         deconv_perm_tensor = deconv_perm_layer(
-            smodel.get_layer('sconv_0').get_output_at(0))
+            model.get_layer('sconv_0').get_output_at(0))
 
         debias_layer = DeBias(nFilters=32, name='debias_layer')(
             deconv_perm_tensor)
@@ -254,16 +228,13 @@ class deconvnet(kaggle_winsol):
             inputs=[input_tensor, input_tensor_45], outputs=output_layer_norm, name='full_model_metrics')
         model_noNorm = Model(
             inputs=[input_tensor, input_tensor_45], outputs=output_layer_noNorm, name='full_model_noNorm')
-        model_deconv = Model(inputs=smodel.get_input_at(0), outputs=output_layer_deconv,
+        model_deconv = Model(inputs=model.get_input_at(0), outputs=output_layer_deconv,
                              name='deconv_1')
-        model_simple = Model(sinput_tensor,
-                             outputs=output_layer_smodel, name='simple_model')
 
         self.models = {'model_norm': model_norm,
                        'model_norm_metrics': model_norm_metrics,
                        'model_noNorm': model_noNorm,
                        'model_deconv': model_deconv,
-                       'model_simple': model_simple
                        }
 
         self._compile_models(loss='categorical_crossentropy')
