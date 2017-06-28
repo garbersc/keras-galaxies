@@ -245,9 +245,14 @@ class kaggle_base(object):
         modelname = modelname + postfix
         if not batch_size:
             batch_size = self.BATCH_SIZE
-        evalHist = self.models[modelname].evaluate(
-            x=x, y=y_valid, batch_size=batch_size,
-            verbose=verbose)
+        try:
+            evalHist = self.models[modelname].evaluate(
+                x=x, y=y_valid, batch_size=batch_size,
+                verbose=verbose)
+        except ValueError, e:
+            print 'Value Error during evaluation of model ' + modelname
+            print e
+            raise
 
         for i in range(len(self.models[modelname].metrics_names)):
             self.hists[modelname][self.models[modelname].metrics_names[i]]\
