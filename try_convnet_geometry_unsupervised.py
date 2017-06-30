@@ -6,11 +6,12 @@ import time
 import sys
 import json
 from custom_for_keras import input_generator
-from datetime import datetime, timedelta
-from keras.optimizers import Adam
+from datetime import timedelta
 
-from custom_keras_model_x_cat_x_maxout import kaggle_x_cat_x_maxout\
-    as kaggle_winsol
+from custom_for_keras import weight_history, simple_unsupervised_loss
+
+from custom_keras_model_x_cat_x_maxout import kaggle_x_cat_x_maxout \
+    as kaggle_x_cat
 
 start_time = time.time()
 
@@ -18,45 +19,38 @@ copy_to_ram_beforehand = False
 
 debug = True
 predict = False  # not implemented
-continueAnalysis = True
+continueAnalysis = False
 saveAtEveryValidation = True
-
-import_conv_weights = False
-
-get_winsol_weights = False
 
 # only relevant if not continued and not gets winsol weights, see http://arxiv.org/abs/1511.06422 for
 # describtion
 # for this to work, the batch size has to be something like 128, 256, 512,
 # ... reason not found
-DO_LSUV_INIT = True
+DO_LSUV_INIT = False
 
-BATCH_SIZE = 256  # keep in mind
+BATCH_SIZE = 16  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-EPOCHS = 200
-VALIDATE_EVERY = 5  # 20 # 12 # 6 # 6 # 6 # 5 #
-NUM_EPOCHS_NONORM = 0.
-# this should be only a few, just .1 hopefully suffices.
+EPOCHS = 150
+VALIDATE_EVERY = 10  # 20 # 12 # 6 # 6 # 6 # 5 #
 
-INCLUDE_FLIP = True
+INCLUDE_FLIP = False
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_started_adam_lsuv.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_geometry_unsupervised.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH='analysis/final/try_lsuv_adam_next.h5'
+WEIGHTS_PATH = "analysis/final/try_geometry_unsupervised.h5"
 
-CONV_WEIGHT_PATH = ""#analysis/final/try_started_with_3cat_noMaxout_next_next.h5"
+load_data.img_path = 'geometry_examples/%s.jpg'
 
 LEARNING_RATE_SCHEDULE = {
-    0: 0.005,
-    # 2: 0.1,
-    # 10: 0.05,
-    # 40: 0.01,
+    # 0: 0.1,
+    # 0: 0.05,
+    0: 0.0005,
     # 80: 0.005,
-     120: 0.001
+    # 120: 0.0005
     # 500: 0.04,
     # 0: 0.01,
     # 1800: 0.004,
@@ -67,20 +61,19 @@ LEARNING_RATE_SCHEDULE = {
     # 3200: 0.0008,
     # 4600: 0.0004,
 }
-if continueAnalysis or get_winsol_weights:
+if continueAnalysis:
     LEARNING_RATE_SCHEDULE = {
-        0: 0.005,
-        120: 0.001,
-        #40: 0.01,
-        #80: 0.005
+        0: 0.1,
+        20: 0.05,
+        40: 0.01,
+        80: 0.005
         # 0: 0.0001,
         # 500: 0.002,
         # 800: 0.0004,
         # 3200: 0.0002,
         # 4600: 0.0001,
     }
-    
-optimizer = None#Adam(lr=LEARNING_RATE_SCHEDULE[0])
+
 
 input_sizes = [(69, 69), (69, 69)]
 PART_SIZE = 45
@@ -90,7 +83,12 @@ N_INPUT_VARIATION = 2
 
 GEN_BUFFER_SIZE = 2
 
-y_train = np.load("data/solutions_train.npy")
+if copy_to_ram_beforehand:
+    ra.myLoadFrom_RAM = True
+    import copy_data_to_shm
+
+y_train = np.load("geometry_examples/solutions.npy")
+
 ra.y_train = y_train
 
 # split training data into training + a small validation set
@@ -100,16 +98,11 @@ ra.num_train = y_train.shape[0]
 ra.num_valid = ra.num_train // 10
 ra.num_train -= ra.num_valid
 
-
-# training num check for EV usage
-if ra.num_train != 55420:
-    print "num_train = %s not %s" % (ra.num_train, 55420)
-
 ra.y_valid = ra.y_train[ra.num_train:]
 ra.y_train = ra.y_train[:ra.num_train]
 
 load_data.num_train = y_train.shape[0]
-load_data.train_ids = np.load("data/train_ids.npy")
+load_data.train_ids = np.load("geometry_examples/ids.npy")
 
 ra.load_data.num_train = load_data.num_train
 ra.load_data.train_ids = load_data.train_ids
@@ -139,15 +132,15 @@ test_indices = np.arange(num_test)
 N_TRAIN = num_train
 N_VALID = num_valid
 
-
+if debug:
+    print np.shape(y_valid)
+    print y_valid[0]
+    print np.shape(y_train)
 print("The training sample contains %s , the validation sample contains %s images. \n" %
       (ra.num_train,  ra.num_valid))
-# train without normalisation for this fraction of the traininng sample, to get the weights in
-# the right 'zone'.
 
 # maybe put into class
 with open(TRAIN_LOSS_SF_PATH, 'a')as f:
-    f.write('#now with ADAM optimisation')
     if continueAnalysis:
         f.write('#continuing from ')
         f.write(WEIGHTS_PATH)
@@ -160,14 +153,14 @@ with open(TRAIN_LOSS_SF_PATH, 'a')as f:
     f.write('\n')
 
 print 'initiate winsol class'
-winsol = kaggle_winsol(BATCH_SIZE=BATCH_SIZE,
-                       NUM_INPUT_FEATURES=NUM_INPUT_FEATURES,
-                       PART_SIZE=PART_SIZE,
-                       input_sizes=input_sizes,
-                       LEARNING_RATE_SCHEDULE=LEARNING_RATE_SCHEDULE,
-                       MOMENTUM=MOMENTUM,
-                       LOSS_PATH=TRAIN_LOSS_SF_PATH,
-                       WEIGHTS_PATH=WEIGHTS_PATH, include_flip=INCLUDE_FLIP)
+winsol = kaggle_x_cat(BATCH_SIZE=BATCH_SIZE,
+                      NUM_INPUT_FEATURES=NUM_INPUT_FEATURES,
+                      PART_SIZE=PART_SIZE,
+                      input_sizes=input_sizes,
+                      LEARNING_RATE_SCHEDULE=LEARNING_RATE_SCHEDULE,
+                      MOMENTUM=MOMENTUM,
+                      LOSS_PATH=TRAIN_LOSS_SF_PATH,
+                      WEIGHTS_PATH=WEIGHTS_PATH, include_flip=INCLUDE_FLIP)
 
 print "Build model"
 
@@ -178,7 +171,10 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models(optimizer=Adam(lr=LEARNING_RATE_SCHEDULE[0]))
+winsol.init_models(loss=simple_unsupervised_loss)
+
+if debug:
+    print winsol.models['model_norm'].get_output_shape_at(0)
 
 if debug:
     winsol.print_summary()
@@ -198,7 +194,7 @@ num_input_representations = len(ds_transforms)
 augmentation_params = {
     'zoom_range': (1.0 / 1.3, 1.3),
     'rotation_range': (0, 360),
-    'shear_range': (0, 0),
+    'shear_range': (0, 5),
     'translation_range': (-4, 4),
     'do_flip': True,
 }
@@ -263,12 +259,6 @@ if continueAnalysis:
     print "Load model weights"
     winsol.load_weights(path=WEIGHTS_PATH)
     winsol.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
-elif get_winsol_weights:
-    print "import weights from run with original kaggle winner solution"
-    winsol.load_weights()
-elif import_conv_weights:
-    print 'Import convnet weights from training with geometric forms'
-    winsol.load_conv_layers(path=CONV_WEIGHT_PATH)
 elif DO_LSUV_INIT:
     start_time_lsuv = time.time()
     print 'Starting LSUV initialisation'
@@ -299,6 +289,9 @@ def save_exit():
 try:
     print ''
     print "losses without training on validation sample up front"
+    if debug:
+        print np.shape(y_valid)
+        print winsol.models.keys()
 
     evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
 
@@ -308,17 +301,7 @@ try:
                / 1024. / 1024.))
         print ''
 
-    print "Train %s epoch without norm" % NUM_EPOCHS_NONORM
-
     time1 = time.time()
-
-    no_norm_events = int(NUM_EPOCHS_NONORM * N_TRAIN)
-
-    if no_norm_events:
-        hist = winsol.fit_gen(modelname='model_noNorm',
-                              data_generator=input_gen,
-                              validation=validation_data,
-                              samples_per_epoch=no_norm_events)
 
     if debug:
         print("\nFree GPU Mem before train loop %s MiB " %
@@ -327,24 +310,34 @@ try:
 
     print 'starting main training'
 
-    if no_norm_events:
-        eta = (time.time() - time1) / NUM_EPOCHS_NONORM * EPOCHS
-        print 'rough ETA %s sec. -> finishes at %s' % (
-            int(eta), datetime.now() + timedelta(seconds=eta))
+    weight_hist_call1 = weight_history(layername='conv_1')
+    weight_hist_call2 = weight_history(layername='conv_2')
+    weight_hist_call3 = weight_history(
+        layername='conv_3')  # layername='conv_3')
 
     winsol.full_fit(data_gen=input_gen,
                     validation=validation_data,
                     samples_per_epoch=N_TRAIN,
                     validate_every=VALIDATE_EVERY,
                     nb_epochs=EPOCHS,
-                    data_gen_creator=create_data_gen)
+                    data_gen_creator=create_data_gen)  # ,
+#                    extracallbacks=[weight_hist_call1,
+ #                                   weight_hist_call2])#,
+#                                    weight_hist_call3])
 
 except KeyboardInterrupt:
     print "\ngot keyboard interuption"
     save_exit()
 except ValueError, e:
-    print "\ngot value error, could be the end of the generator in the fit"
+    print "\ngot value error"
+    if debug:
+        print '\t valid shape: %s' % str(np.shape(y_valid))
+        print '\t shape valid data: %s ' % str((np.shape(xs_valid[0]), np.shape(xs_valid[1])))
+        print '\t first valid result: %s' % y_valid[0]
+        print '\t first image row: %s' % xs_valid[0][0, 0, 0]
+    print ''
     print e
+
     save_exit()
 
 save_exit()

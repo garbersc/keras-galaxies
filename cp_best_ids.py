@@ -1,9 +1,9 @@
 import json
 from shutil import copyfile
 
-BEST_IDS_PATH = 'best_9_ids.txt'
+BEST_IDS_PATH = 'best_3_ids.txt'
 IMG_DIR = 'data/raw/images_train_rev1/'
-OUT_DIR = 'img_example/'
+OUT_DIR = 'img_example_10cat/'
 
 print 'reading...'
 f = open(BEST_IDS_PATH, "r")

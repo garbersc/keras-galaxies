@@ -100,7 +100,7 @@ ra.y_train = y_train
 ra.num_train = y_train.shape[0]
 
 # integer division, is defining validation size
-ra.num_valid = ra.num_train // 1
+ra.num_valid = ra.num_train // 10
 ra.num_train -= ra.num_valid
 
 ra.y_valid = ra.y_train[ra.num_train:]
@@ -762,15 +762,16 @@ def print_weights(norm=False):
 
 
 # x_category_precision(predictions=predictions, y_valid=y_valid)
+
 # print_weights(norm=True)
 # print_weights(norm=False)
-print_filters(0, norm=True)
-print_filters(1, norm=True)
-print_filters(4, norm=True)
-print_filters(2, norm=True)
-print_filters(3, norm=True)
-print_filters(5, norm=True)
+# print_filters(0, norm=True)
+# print_filters(1, norm=True)
+# print_filters(4, norm=True)
+# print_filters(2, norm=True)
+# print_filters(3, norm=True)
+# print_filters(5, norm=True)
 
-valid_scatter()
+# valid_scatter()
 
 save_exit()

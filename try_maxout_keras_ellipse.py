@@ -23,9 +23,9 @@ get_winsol_weights = False
 
 # only relevant if not continued and not gets winsol weights, see http://arxiv.org/abs/1511.06422 for
 # describtion
-DO_LSUV_INIT = False
+DO_LSUV_INIT = True
 
-BATCH_SIZE = 16  # 256  # keep in mind
+BATCH_SIZE = 16  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
@@ -33,45 +33,20 @@ MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
 EPOCHS = 150
 VALIDATE_EVERY = 20  # 20 # 12 # 6 # 6 # 6 # 5 #
-NUM_EPOCHS_NONORM = 0.1
 # this should be only a few, just .1 hopefully suffices.
 
 NUM_ELLIPSE_PARAMS = 2
 
 TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_ellipseOnly_" + \
-    str(NUM_ELLIPSE_PARAMS) + "param_test.txt"
-# TARGET_PATH = "predictions/final/try_convnet.csv"
+    str(NUM_ELLIPSE_PARAMS) + "_10cat.txt"
 WEIGHTS_PATH = "analysis/final/try_ellipseOnly_" + \
-    str(NUM_ELLIPSE_PARAMS) + "param_test.h5"
+    str(NUM_ELLIPSE_PARAMS) + "_10cat.h5"
 
 LEARNING_RATE_SCHEDULE = {
-    0: 0.4,
-    2: 0.1,
-    10: 0.05,
-    40: 0.01,
-    80: 0.005,
-    120: 0.0005
-    # 500: 0.04,
-    # 0: 0.01,
-    # 1800: 0.004,
-    # 2300: 0.0004,
-    # 0: 0.08,
-    # 50: 0.04,
-    # 2000: 0.008,
-    # 3200: 0.0008,
-    # 4600: 0.0004,
+    0: 0.002,
 }
 if continueAnalysis or get_winsol_weights:
     LEARNING_RATE_SCHEDULE = {
-        0: 0.1,
-        20: 0.05,
-        40: 0.01,
-        80: 0.005
-        # 0: 0.0001,
-        # 500: 0.002,
-        # 800: 0.0004,
-        # 3200: 0.0002,
-        # 4600: 0.0001,
     }
 
 
@@ -83,7 +58,7 @@ N_INPUT_VARIATION = 2
 
 GEN_BUFFER_SIZE = 2
 
-y_train = np.load("data/solutions_train.npy")
+y_train = np.load("data/solutions_train_10cat.npy")
 ra.y_train = y_train
 
 # split training data into training + a small validation set
@@ -170,7 +145,9 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models(input_shape=NUM_ELLIPSE_PARAMS)
+winsol.init_models(input_shape=NUM_ELLIPSE_PARAMS, output_shape=10,
+                   final_activation='softmax',
+                   loss='categorical_crossentropy')
 
 if debug:
     winsol.print_summary(modelname='model_norm_ellipse', postfix='')
@@ -262,6 +239,12 @@ for x in xs_valid[0]:
 
 validation_data = (np.asarray(validation_data[0]), validation_data[1])
 
+print np.shape(validation_data[0])
+print validation_data[0]
+# for i in validation_data[0]:
+#     if i:
+#         print i
+
 t_val = (time.time() - start_time)
 print "  took %.2f seconds" % (t_val)
 
@@ -304,8 +287,8 @@ try:
     print ''
     print "losses without training on validation sample up front"
 
-    evalHist = winsol.evaluate(
-        validation_data[0], y_valid=y_valid, postfix='_ellipse')
+    # evalHist = winsol.evaluate(
+    #     validation_data[0], y_valid=y_valid, postfix='_ellipse')
 
     if debug:
         print("Free GPU Mem after validation check %s MiB " %
@@ -313,29 +296,12 @@ try:
                / 1024. / 1024.))
         print ''
 
-    print "Train %s epoch without norm" % NUM_EPOCHS_NONORM
-
-    time1 = time.time()
-
-    no_norm_events = int(NUM_EPOCHS_NONORM * N_TRAIN)
-
-    if no_norm_events:
-        hist = winsol.fit_gen(modelname='model_noNorm_ellipse',
-                              data_generator=input_gen,
-                              validation=validation_data,
-                              samples_per_epoch=no_norm_events)
-
     if debug:
         print("\nFree GPU Mem before train loop %s MiB " %
               (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0]
                / 1024. / 1024.))
 
     print 'starting main training'
-
-    if no_norm_events:
-        eta = (time.time() - time1) / NUM_EPOCHS_NONORM * EPOCHS
-        print 'rough ETA %s sec. -> finishes at %s' % (
-            int(eta), datetime.now() + timedelta(seconds=eta))
 
     winsol.full_fit(data_gen=input_gen,
                     validation=validation_data,

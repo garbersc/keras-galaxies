@@ -70,6 +70,9 @@ for path in predictions_valid_paths:
 print "Loading validation set predictions"
 predictions_list = [load_data.load_gz(path)
                     for path in predictions_valid_paths]
+print len(predictions_list)
+print len(predictions_list[0])
+print len(predictions_list[1])
 predictions_stack = np.array(predictions_list, dtype='float64')
 del predictions_list
 print

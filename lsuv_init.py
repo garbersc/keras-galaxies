@@ -2,8 +2,8 @@ from __future__ import print_function
 import numpy as np
 from keras.models import Model
 from keras import backend as K
-from keras.layers import Dense, Convolution2D, MaxoutDense
-from keras_extra_layers import kerasCudaConvnetConv2DLayer
+from keras.layers import Dense, Convolution2D
+from keras_extra_layers import kerasCudaConvnetConv2DLayer, MaxoutDense
 
 # Orthonorm init code is taked from Lasagne
 # https://github.com/Lasagne/Lasagne/blob/master/lasagne/init.py

@@ -1,7 +1,7 @@
 '''
 Author: Christoph Garbers
 keras layers that are needed if no CuDNN speed up is available
-and layer that fell out of faver in keras2
+and layers that fell out of favor in keras2
 '''
 from keras import backend as K
 from keras.engine.topology import Layer, InputSpec
@@ -9,6 +9,7 @@ import numpy as np
 import copy
 import warnings
 
+from keras.layers import Conv2DTranspose
 from keras import initializers
 from keras import activations
 from keras import regularizers
@@ -49,7 +50,99 @@ class MyLayer(Layer):
         return (input_shape[0], self.output_dim)
 
 
+class DeConv(Conv2DTranspose):
+    # Adds a scaling of the edges to the Conv2DTranspose layer to avoid
+    # artifacts in the stride=(1,1) case
+    def __init__(self, filters,
+                 kernel_size,
+                 strides=(1, 1),
+                 padding='valid',
+                 data_format=None,
+                 activation=None,
+                 use_bias=True,
+                 kernel_initializer='glorot_uniform',
+                 bias_initializer='zeros',
+                 kernel_regularizer=None,
+                 bias_regularizer=None,
+                 activity_regularizer=None,
+                 kernel_constraint=None,
+                 bias_constraint=None,
+                 **kwargs):
+        # if type(kernel_size) == 'int':
+        #     self.kernel_size = (kernel_size, kernel_size)
+        # else:
+        #     self.kernel_size = kernel_size
+        if strides != (1, 1) or padding != 'valid':
+            warnings.warn(
+                'Layer DeConv was not build for this stride and/or padding option!')
+        super(DeConv, self).__init__(
+            filters,
+            kernel_size,
+            strides=strides,
+            padding=padding,
+            data_format=data_format,
+            activation=activation,
+            use_bias=use_bias,
+            kernel_initializer=kernel_initializer,
+            bias_initializer=bias_initializer,
+            kernel_regularizer=kernel_regularizer,
+            bias_regularizer=bias_regularizer,
+            activity_regularizer=activity_regularizer,
+            kernel_constraint=kernel_constraint,
+            bias_constraint=bias_constraint,
+            **kwargs)
+
+    def build(self, input_shape):
+        super(DeConv, self).build(input_shape)
+
+        shape = super(DeConv, self).compute_output_shape(input_shape)
+
+        a = np.zeros(shape)
+        for i in range(shape[2]):
+            for j in range(shape[3]):
+                a[:, :, i, j] = float(np.prod(self.kernel_size))\
+                    / min(float(i + 1), self.kernel_size[0])\
+                    / min(float(j + 1), self.kernel_size[1])
+
+        self.edge_scale = K.variable(value=a)
+
+    def call(self, inputs):
+        outputs = super(DeConv, self).call(inputs)
+
+        outputs = outputs * self.edge_scale
+
+        return outputs
+
+
+class DeBias(Layer):
+    def __init__(self, nFilters, **kwargs):
+        self.nFilters = nFilters
+        super(DeBias, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        # Create a trainable weight variable for this layer.
+        self.b = self.add_weight(shape=(input_shape[1:]),
+                                 initializer='constant',
+                                 trainable=True,
+                                 name='{}_b'.format(self.name))
+        self.built = True
+        # Be sure to call this somewhere!
+        super(DeBias, self).build(input_shape)
+
+    def call(self, x, mask=None):
+        output = x
+        output -= self.b.dimshuffle('x', 0, 1, 2)
+        return output
+
+    def get_output_shape_for(self, input_shape):
+        return input_shape
+
+    def compute_output_shape(self, input_shape):
+        return self.get_output_shape_for(input_shape)
+
 # not neede anymore, available in keras 2
+
+
 def constant(shape, scale=1., name=None):
     constant = scale
     for i in shape[::-1]:
@@ -85,6 +178,55 @@ class fPermute(Layer):
         config = {'dims': self.dims}
         base_config = super(fPermute, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
+
+
+class DePool(Layer):
+    def __init__(self,  model,
+                 pool_layer_origin=['pool_0'], stride=(2, 2),
+                 **kwargs):
+
+        self.stride = stride
+        self.model = model
+        self.pool_layer_origin = pool_layer_origin
+        super(DePool, self).__init__(**kwargs)
+
+    def _get_pool_flags(self, pool):
+        # permutation needed if the layer is in the 'normal' not the pylearn
+        # order, maybe make a switch for that and the channel order
+        input_ = K.permute_dimensions(pool.get_input_at(0), (3, 0, 1, 2))
+        pooled = K.permute_dimensions(pool.get_output_at(0), (3, 0, 1, 2))
+
+        pooled = K.repeat_elements(pooled, self.stride[0], axis=-2)
+        pooled = K.repeat_elements(pooled, self.stride[1], axis=-1)
+
+        print 'shapes before k.equal %s \t %s' % (K.int_shape(input_),
+                                                  K.int_shape(
+            pooled))
+
+        return K.equal(input_, pooled)
+
+    def call(self, x):
+        pool = self.model
+        for name in self.pool_layer_origin:
+            pool = pool.get_layer(name)
+        flags = self._get_pool_flags(pool)
+
+        x_up = K.repeat_elements(x, self.stride[0], axis=-2)
+        x_up = K.repeat_elements(x_up, self.stride[1], axis=-1)
+
+        print 'shapes before * %s ' % str(K.int_shape(x_up))
+
+        x_up = x_up * K.cast(flags, 'float32')
+
+        return x_up
+
+    def get_output_shape_for(self, input_shape):
+        m_b,  l, w, h = input_shape
+
+        return (m_b, l, self.stride[0] * w, self.stride[1] * h)
+
+    def compute_output_shape(self, input_shape):
+        return self.get_output_shape_for(input_shape)
 
 
 class kerasCudaConvnetPooling2DLayer(Layer):

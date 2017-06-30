@@ -20,13 +20,13 @@ import functools
 from custom_for_keras import sliced_accuracy_mean, sliced_accuracy_std, rmse,\
     lr_function
 from ellipse_fit import get_ellipse_kaggle_par
-from custom_keras_model_and_fit_capsels import kaggle_winsol
-# from custom_keras_model_x_cat_x_maxout import kaggle_x_cat_x_maxout\
-#     as kaggle_winsol
+# from custom_keras_model_and_fit_capsels import kaggle_winsol
+from custom_keras_model_ellipse import kaggle_ellipse_fit\
+    as kaggle_winsol
 
 starting_time = time.time()
 
-cut_fraktion = 0.8
+cut_fraktion = 0.9
 
 copy_to_ram_beforehand = False
 
@@ -38,7 +38,7 @@ BATCH_SIZE = 16  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
-included_flipped = False
+included_flipped = True
 
 USE_BLENDED_PREDICTIONS = False
 PRED_BLENDED_PATH = 'predictions/final/blended/blended_predictions.npy.gz'
@@ -46,21 +46,21 @@ if debug:
     print os.path.isfile(PRED_BLENDED_PATH)
 
 
-TRAIN_LOSS_SF_PATH = 'try_test.txt'
+TRAIN_LOSS_SF_PATH = 'loss_ellipse_10cat.txt'
 # TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-# WEIGHTS_PATH = "analysis/final/try_goodWeights.h5"
-# "try_convent_gpu1_win_sol_net_on_0p0775_validation.pkl"
-WEIGHTS_PATH = "analysis/final/try_lsuv_adam_next.h5"
-TXT_OUTPUT_PATH = 'try_test.txt'
-IMAGE_OUTPUT_PATH = "img_wAdamG1"
+WEIGHTS_PATH = "analysis/final/try_ellipseOnly_2_10cat.h5"
+TXT_OUTPUT_PATH = 'try_ellipse_10cat.txt'
+WRONG_CAT_IMGS_PATH = 'wrong_categorized_ellipse_10cat.json'
+IMAGE_OUTPUT_PATH = "img_ellipse_10cat"
+
 
 postfix = ''
 NUM_ELLIPSE_PARAMS = 2
-ELLIPSE_FIT = False
-# ELLIPSE_FIT = WEIGHTS_PATH.find('ellipse') >= 0
-# if ELLIPSE_FIT:
-#     postfix = '_ellipse'
+# ELLIPSE_FIT = False
+ELLIPSE_FIT = WEIGHTS_PATH.find('ellipse') >= 0
+if ELLIPSE_FIT:
+    postfix = '_ellipse'
 
 DONT_LOAD_WEIGHTS = False
 
@@ -77,56 +77,21 @@ REPREDICT_EVERYTIME = True
 DO_VALID = True  # disable this to not bother with the validation set evaluation
 DO_VALID_CORR = False  # not implemented yet
 
-VALID_CORR_OUTPUT_FILTER = np.ones((37))
-VALID_CORR_OUTPUT_FILTER[2] = 1  # star or artifact
-VALID_CORR_OUTPUT_FILTER[3] = 1  # edge on yes
-VALID_CORR_OUTPUT_FILTER[4] = 1  # edge on no
-# VALID_CORR_OUTPUT_FILTER[5] = 1  # bar feature yes
-VALID_CORR_OUTPUT_FILTER[7] = 1  # spiral arms yes
-# VALID_CORR_OUTPUT_FILTER[14] = 1  # anything odd? no
-# VALID_CORR_OUTPUT_FILTER[18] = 1  # ring
-# VALID_CORR_OUTPUT_FILTER[19] = 1  # lence
-# VALID_CORR_OUTPUT_FILTER[20] = 1  # disturbed
-# VALID_CORR_OUTPUT_FILTER[21] = 1  # irregular
-# VALID_CORR_OUTPUT_FILTER[22] = 1  # other
-# VALID_CORR_OUTPUT_FILTER[23] = 1  # merger
-# VALID_CORR_OUTPUT_FILTER[24] = 1  # dust lane
-
-N_Corr_Filter_Images = np.sum(VALID_CORR_OUTPUT_FILTER)
+# N_Corr_Filter_Images = np.sum(VALID_CORR_OUTPUT_FILTER)
 
 DO_VALIDSTUFF_ON_TRAIN = True
 
 DO_TEST = False  # disable this to not generate predictions on the testset
 
+VALID_CORR_OUTPUT_FILTER = np.zeros((10))
 
-output_names = ["smooth", "featureOrdisk", "NoGalaxy",
-                "EdgeOnYes", "EdgeOnNo",
-                "BarYes", "BarNo",
-                "SpiralYes", "SpiralNo",
-                "BulgeNo", "BulgeJust", "BulgeObvious", "BulgDominant",
-                "OddYes", "OddNo",
-                "RoundCompletly", "RoundBetween", "RoundCigar",
-                "Ring", "Lense", "Disturbed", "Irregular", "Other", "Merger", "DustLane",
-                "BulgeRound", "BlulgeBoxy", "BulgeNo2",
-                "SpiralTight", "SpiralMedium", "SpiralLoose",
-                "Spiral1Arm", "Spiral2Arm", "Spiral3Arm", "Spiral4Arm", "SpiralMoreArms", "SpiralCantTell"]
+DO_TEST = False  # disable this to not generate predictions on the testset
 
-question_slices = [slice(0, 3), slice(3, 5), slice(5, 7), slice(7, 9),
-                   slice(9, 13), slice(13, 15), slice(15, 18), slice(18, 25),
-                   slice(25, 28), slice(28, 31), slice(31, 37)]
 
-question_requierement = [None] * len(question_slices)
-question_requierement[1] = question_slices[0].start + 1
-question_requierement[2] = question_slices[1].start + 1
-question_requierement[3] = question_slices[1].start + 1
-question_requierement[4] = question_slices[1].start + 1
-question_requierement[6] = question_slices[0].start
-question_requierement[9] = question_slices[4].start
-question_requierement[10] = question_slices[4].start
-
-print 'Question requirements: %s' % question_requierement
-
-spiral_or_ellipse_cat = [[(0, 1), (1, 1), (3, 0)], [(0, 1), (1, 0)]]
+output_names = ['round', 'broad_ellipse', 'small_ellipse', 'edge_bulg',
+                'edge_no_bulge', 'disc', 'spiral_1_arm', 'spiral_2_arm',
+                'spiral_other', 'other']
+question_slices = [slice(0, 10)]
 
 target_filename = os.path.basename(WEIGHTS_PATH).replace(".h5", ".npy.gz")
 if get_winsol_weights:
@@ -141,7 +106,8 @@ if copy_to_ram_beforehand:
     ra.myLoadFrom_RAM = True
     import copy_data_to_shm
 
-y_train = np.load("data/solutions_train.npy")
+y_train = np.load("data/solutions_train_10cat.npy")
+
 ra.y_train = y_train
 
 # split training data into training + a small validation set
@@ -183,13 +149,13 @@ y_train = ra.y_train
 valid_ids = ra.valid_ids
 train_ids = ra.train_ids
 
-train_indices = np.arange(num_train)
+train_indices = np.arange(num_train
+                          )
 valid_indices = np.arange(num_train, num_train + num_valid)
 test_indices = np.arange(num_test)
 
 N_TRAIN = num_train
 N_VALID = num_valid
-
 
 print("validation sample contains %s images. \n" %
       (ra.num_valid))
@@ -215,13 +181,10 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-if ELLIPSE_FIT:
-    winsol.init_models_ellipse(input_shape=NUM_ELLIPSE_PARAMS)
-else:
-    # winsol.init_models(final_units=37, loss='mean_squared_error',
-    #                    extra_metrics=[
-    #                        sliced_accuracy_mean, sliced_accuracy_std])
-    winsol.init_models()
+winsol.init_models(input_shape=NUM_ELLIPSE_PARAMS,
+                   output_shape=10,
+                   final_activation='softmax',
+                   loss='categorical_crossentropy')
 
 if debug:
     winsol.print_summary(postfix=postfix)
@@ -283,18 +246,28 @@ xs_valid = [np.vstack(x_valid) for x_valid in xs_valid]
 xs_valid = [x_valid.transpose(0, 3, 1, 2) for x_valid in xs_valid]
 
 
-if ELLIPSE_FIT:
-    validation_data = ([], y_valid)
-    for x in xs_valid[0]:
+# validation_data = (
+#     [xs_valid[0], xs_valid[1]], y_valid)
+# validation_data = (
+#     [np.asarray(xs_valid[0]), np.asarray(xs_valid[1])], validation_data[1])
+
+from numpy.linalg.linalg import LinAlgError
+
+validation_data = ([], y_valid)
+c = 0
+for x in xs_valid[0]:
+    try:
         validation_data[0].append(
             get_ellipse_kaggle_par(x, num_par=NUM_ELLIPSE_PARAMS)
         )
-    validation_data = (np.asarray(validation_data[0]), validation_data[1])
-else:
-    validation_data = (
-        [xs_valid[0], xs_valid[1]], y_valid)
-    validation_data = (
-        [np.asarray(xs_valid[0]), np.asarray(xs_valid[1])], validation_data[1])
+    except LinAlgError, e:
+        print 'try_conv'
+        print c
+        raise LinAlgError(e)
+    c += 1
+
+validation_data = (np.asarray(validation_data[0]), validation_data[1])
+
 
 t_val = (time.time() - start_time)
 print "  took %.2f seconds" % (t_val)
@@ -319,7 +292,6 @@ if USE_BLENDED_PREDICTIONS:
         print os.path.isfile(PRED_BLENDED_PATH)
         print type(predictions)
         print predictions
-        # print len(predictions)
         print np.shape(predictions)
 elif not REPREDICT_EVERYTIME and os.path.isfile(
         target_path_valid) and os.path.isfile(TRAIN_LOSS_SF_PATH):
@@ -333,9 +305,10 @@ else:
 
         if DO_VALID:
             evalHist = winsol.evaluate(
-                [xs_valid[0], xs_valid[1]], y_valid=y_valid, postfix='')
+                validation_data[0], y_valid=y_valid, postfix=postfix)
             # validation_data[0], y_valid=y_valid, postfix=postfix)
-            winsol.save_loss(modelname='model_norm_metrics', postfix=postfix)
+            winsol.save_loss(modelname='model_norm_metrics',
+                             postfix=postfix)
             evalHist = winsol.load_loss(
                 modelname='model_norm_metrics', postfix=postfix)
 
@@ -356,6 +329,8 @@ else:
 
 evalHist = winsol.load_loss(modelname='model_norm_metrics', postfix=postfix)
 
+print evalHist.keys
+
 if np.shape(predictions) != np.shape(y_valid):
     raise ValueError('prediction and validation set have different shapes, %s to %s ' % (
         np.shape(predictions), np.shape(y_valid)))
@@ -370,14 +345,18 @@ n_sliced_cat_pred = [0] * len(output_names)
 n_sliced_cat_valid = [0] * len(output_names)
 n_sliced_cat_agrement = [0] * len(output_names)
 
-n_sliced_cat_pred_wreq = [0] * len(output_names)
-n_sliced_cat_valid_wreq = [0] * len(output_names)
-n_sliced_cat_agrement_wreq = [0] * len(output_names)
-
 n_sliced_cat_pred_wcut = [0] * len(output_names)
 n_sliced_cat_valid_wcut = [0] * len(output_names)
 n_sliced_cat_agrement_wcut = [0] * len(output_names)
 
+wrong_cat_cutted = []
+
+categories = np.zeros((10, 10))
+val_l = []
+pred_l = []
+
+val_l_cutted = []
+pred_l_cutted = []
 
 for i in range(len(predictions)):
     argpred = np.argmax(predictions[i])
@@ -387,49 +366,94 @@ for i in range(len(predictions)):
     if argval == argpred:
         n_global_cat_agrement[argval] += 1
 
+    categories[argval, argpred] += 1.
+    val_l.append(argval)
+    pred_l.append(argpred)
     c = 0
-    last_pred = [None]
-    last_val = [None]
     for slice in question_slices:
         sargpred = np.argmax(predictions[i][slice])
-        cutpred = predictions[i][slice][sargpred] / \
+        cutpred = predictions[i][slice][sargpred] /\
             sum(predictions[i][slice]) > cut_fraktion
         sargval = np.argmax(y_valid[i][slice])
-        cutval = y_valid[i][slice][sargval] / \
-            sum(y_valid[i][slice]) > cut_fraktion
         n_sliced_cat_pred[sargpred + slice.start] += 1
+
         if cutpred:
             n_sliced_cat_pred_wcut[sargpred + slice.start] += 1
-        n_sliced_cat_valid[sargval + slice.start] += 1
-        if cutval:
             n_sliced_cat_valid_wcut[sargval + slice.start] += 1
+            val_l_cutted.append(argval)
+            pred_l_cutted.append(argpred)
+            if sargval != sargpred:
+                # print '%sto%s' % (str(argval), str(argpred))
+                # print valid_ids[i]
+                wrong_cat_cutted.append(('%sto%s' % (str(argval),
+                                                     str(argpred)),
+                                         i))
+
+        n_sliced_cat_valid[sargval + slice.start] += 1
+
         if sargval == sargpred:
             n_sliced_cat_agrement[sargval + slice.start] += 1
             if cutpred:
                 n_sliced_cat_agrement_wcut[sargval + slice.start] += 1
 
-        if slice == question_slices[0]:
-            n_sliced_cat_pred_wreq[sargpred + slice.start] += 1
-            n_sliced_cat_valid_wreq[sargval + slice.start] += 1
-            last_pred += [sargpred + slice.start]
-            last_val += [sargval + slice.start]
-            if sargval == sargpred:
-                n_sliced_cat_agrement_wreq[sargval + slice.start] += 1
-        else:
-            sargpred_req = None
-            sargval_req = None
-            if not np.argmax(predictions[i][0:3]) == 2:
-                if question_requierement[c] in last_pred:
-                    sargpred_req = sargpred
-                    n_sliced_cat_pred_wreq[sargpred + slice.start] += 1
-                    last_pred += [sargpred + slice.start]
-                if question_requierement[c] in last_val:
-                    sargval_req = sargval
-                    n_sliced_cat_valid_wreq[sargval + slice.start] += 1
-                    last_val += [sargval + slice.start]
-                if sargpred_req == sargval_req and sargpred_req != None:
-                    n_sliced_cat_agrement_wreq[sargval_req + slice.start] += 1
         c += 1
+
+
+def pred_to_val_hist(path=IMAGE_OUTPUT_PATH, also_cutted=True):
+    weights_l = []
+
+    for p, v in zip(pred_l, val_l):
+        weights_l.append(1. / float(n_global_cat_valid[v]))
+
+    # print categories
+
+    plt.hist2d(pred_l, val_l, bins=10, range=[[0., 10.], [0., 10.]])
+    cb = plt.colorbar()
+    cb.set_label('# categorised')
+    plt.xlabel('predicted category')
+    plt.ylabel('validation category')
+    plt.xticks([a + 0.5 for a in range(10)], output_names, rotation=90)
+    plt.yticks([a + 0.5 for a in range(10)], output_names)
+    plt.tight_layout()
+    plt.savefig(path + '/categories.eps')
+    cb.remove()
+
+    plt.hist2d(pred_l, val_l, bins=10, weights=weights_l,
+               range=[[0., 10.], [0., 10.]])
+    cb = plt.colorbar()
+    cb.set_label('# categorised / # validation in this category')
+    plt.xlabel('predicted category')
+    plt.ylabel('validation category')
+    plt.tight_layout()
+    plt.savefig(path + '/categories_normToVal.eps')
+    cb.remove()
+
+    weights_l_cutted = []
+
+    for p, v in zip(pred_l_cutted, val_l_cutted):
+        weights_l_cutted.append(1. / float(n_sliced_cat_valid_wcut[v]))
+
+        # print categories
+
+    plt.hist2d(pred_l_cutted, val_l_cutted, bins=10,
+               range=[[0., 10.], [0., 10.]])
+    cb = plt.colorbar()
+    cb.set_label('# categorised')
+    plt.xlabel('predicted category')
+    plt.ylabel('validation category')
+    plt.tight_layout()
+    plt.savefig(path + '/categories_cutted.eps')
+    cb.remove()
+
+    plt.hist2d(pred_l_cutted, val_l_cutted, bins=10, weights=weights_l_cutted,
+               range=[[0., 10.], [0., 10.]])
+    cb = plt.colorbar()
+    cb.set_label('# categorised / # validation in this category')
+    plt.xlabel('predicted category')
+    plt.ylabel('validation category')
+    plt.tight_layout()
+    plt.savefig(path + '/categories_normToVal_cutted.eps')
+    cb.remove()
 
 
 def P_base(n_pred, n_agree):
@@ -499,45 +523,19 @@ def R_wcut(i):
                 n_sliced_cat_agrement_wcut[i] + false_neg) else 0.
 
 
-def P_wreq(i):
-    return (float(n_sliced_cat_agrement_wreq[i]) / float(
-        n_sliced_cat_pred_wreq[i])) if n_sliced_cat_pred_wreq[i] else 0.
-
-
-def R_wreq(i):
-    for slice in question_slices:
-        if i >= slice.start and i < slice.stop:
-            false_neg = sum(n_sliced_cat_pred_wreq[slice]) -\
-                n_sliced_cat_pred_wreq[i] - (
-                sum(n_sliced_cat_agrement_wreq[slice]) -
-                n_sliced_cat_agrement_wreq[i])
-            return float(n_sliced_cat_agrement_wreq[i]) / float(
-                n_sliced_cat_agrement_wreq[i] + false_neg) if (
-                n_sliced_cat_agrement_wreq[i] + false_neg) else 0.
-
-
 output_dic = {}
 output_dic_short_hand_names = {'rmse': 'rmse',
                                'rmse/mean': 'rmse/mean',
-                               # 'global categorized prediction': 'pred',
-                               # 'global categorized valid': 'val',
-                               # 'global categorized agree': 'agree',
                                'slice categorized prediction': 'qPred',
                                'slice categorized valid': 'qVal',
                                'slice categorized agree': 'qAgree',
                                'precision': 'P',
                                'recall': 'R',
-                               # 'slice categorized prediction including tree requierement': 'qPred_req',
-                               # 'slice categorized valid including tree requieremnet': 'qVal_req',
-                               # 'slice categorized agree including tree requirement': 'qAgree_req',
-                               # 'precision including tree requierement': 'P_req',
-                               # 'recall including tree requierement': 'R_req'
                                }
 
 rmse_valid = evalHist['rmse'][-1]
 rmse_augmented = np.sqrt(np.mean((y_valid - predictions)**2))
 print "  MSE (last iteration):\t%.6f" % float(rmse_valid)
-print '  sliced acc. (last iteration):\t%.4f' % float(evalHist['sliced_accuracy_mean'][-1])
 print '  categorical acc. (last iteration):\t%.4f' % float(evalHist['categorical_accuracy'][-1])
 print "  MSE (augmented):\t%.6f  RMSE/mean: %.2f " % (float(rmse_augmented),
                                                       float(rmse_augmented) / float(np.mean(
@@ -585,19 +583,11 @@ for i in xrange(0, VALID_CORR_OUTPUT_FILTER.shape[0]):
         output_dic[str(qsc)] = {}
     output_dic[str(qsc)][output_names[i]] = {'rmse': float(oneMSE),
                                              'rmse/mean': float(oneMSE / np.mean(y_valid.T[i])),
-                                             # 'global categorized prediction': n_global_cat_pred[i],
-                                             # 'global categorized valid': n_global_cat_valid[i],
-                                             # 'global categorized agree': n_global_cat_agrement[i],
                                              'slice categorized prediction': n_sliced_cat_pred[i],
                                              'slice categorized valid': n_sliced_cat_valid[i],
                                              'slice categorized agree': n_sliced_cat_agrement[i],
                                              'precision': P(i),
                                              'recall': R(i),
-                                             # 'slice categorized prediction including tree requierement': n_sliced_cat_pred_wreq[i],
-                                             # 'slice categorized valid including tree requieremnet': n_sliced_cat_valid_wreq[i],
-                                             # 'slice categorized agree including tree requirement': n_sliced_cat_agrement_wreq[i],
-                                             # 'precision including tree requierement': P_wreq(i),
-                                             # 'recall including tree requierement': R_wreq(i)
                                              }
     if i in [slice.start for slice in question_slices]:
         print '----------------------------------------------------'
@@ -636,8 +626,6 @@ for i in xrange(0, VALID_CORR_OUTPUT_FILTER.shape[0]):
     else:
         print ("    output % s ( % s): \t%.6f  RMSE/mean: % .2f \t  N sliced pred., valid, agree % i, % i, % i, P % .3f, R % .3f, wCut(eff.%.2f): pred., valid, agree % i, % i, % i, P % .3f, R % .3f " %
                (output_names[i], i, oneMSE, oneMSE / np.mean(y_valid.T[i]),
-                # n_global_cat_pred[i], n_global_cat_valid[i],
-                # n_global_cat_agrement[i],
                 n_sliced_cat_pred[i], n_sliced_cat_valid[i],
                 n_sliced_cat_agrement[i],
                 P(i), R(i),
@@ -683,14 +671,11 @@ def try_different_cut_fraktion(cut_fraktions=map(lambda x: float(x) / 20.,
             q_frak_pred = predictions[i][slic][sargpred] / \
                 sum(predictions[i][slic])
             sargval = np.argmax(y_valid[i][slic])
-            q_frak_valid = y_valid[i][slic][sargval] / \
-                sum(y_valid[i][slic])
 
             for j, cut_val in enumerate(cut_fraktions):
-                if q_frak_valid > cut_val:
-                    n_wcut_valid[j][sargpred + slic.start] += 1
                 if q_frak_pred > cut_val:
                     n_wcut_pred[j][sargval + slic.start] += 1
+                    n_wcut_valid[j][sargpred + slic.start] += 1
                     if sargval == sargpred:
                         n_wcut_agree[j][sargval + slic.start] += 1
 
@@ -946,57 +931,6 @@ def pixel_correlations(useTruth=False, dirname='InOutCorr'):
     os.chdir("../..")
 
 
-def x_category_precision(predictions=predictions, y_valid=y_valid,
-                         conditions=spiral_or_ellipse_cat):
-    counts = [[0, 0, 0]]
-    for _ in conditions:
-        counts += [[0, 0, 0]]
-    # if debug:
-    #     print np.shape(counts)
-    for i, p in enumerate(predictions):
-        predicted = [True] * (len(conditions) + 1)
-        valid = [True] * (len(conditions) + 1)
-        for j, cond in enumerate(conditions):
-            for sup_cond in cond:
-                predicted[j] *= (np.argmax(
-                    p[question_slices[sup_cond[0]]]) == sup_cond[1])
-                valid[j] *= (np.argmax(
-                    y_valid[i][question_slices[sup_cond[0]]]) == sup_cond[1])
-            if predicted[j]:
-                counts[j][0] += 1
-            if valid[j]:
-                counts[j][1] += 1
-            if predicted[j] and valid[j]:
-                counts[j][2] += 1
-        predicted[-1] = (np.sum(predicted[0:-1]) == 0)
-        valid[-1] = (np.sum(valid[0:-1]) == 0)
-        if predicted[-1]:
-            counts[-1][0] += 1
-        if valid[-1]:
-            counts[-1][1] += 1
-        if predicted[-1] and valid[-1]:
-            counts[-1][2] += 1
-        if np.sum(predicted) != 1 or np.sum(valid) != 1:
-            raise UserWarning(
-                'conditions in x_category_precision were not exclusive for image %s') % i
-        # if debug and not i % 1000:
-        #     print predicted
-        #     print valid
-        #     print counts
-
-    # if debug:
-    #     print counts
-    P_s = [(float(c[2]) / c[0]) for c in counts]
-    R_s = [(float(c[2]) / (2 * c[2] + sum(
-        [d[0] - d[2] for d in counts]) - c[0]))for c in counts]
-    print
-    print 'mean P:\t %.3f' % np.mean(P_s)
-    print 'mean R:\t %.3f' % np.mean(R_s)
-    for i, c in enumerate(counts):
-        print 'condition %s: \t pred,val,agree: %.3f \t P: %.3f R: %.3f' % (
-            i, c, P_s[i], R_s[i])
-
-
 def valid_scatter():
     print 'Do scatter plots'
     print '  they will be saved in the folder %s ' % IMAGE_OUTPUT_PATH
@@ -1229,7 +1163,8 @@ def print_filters(image_nr=0, norm=False):
             skimage.io.imsave('output_fig_%s_%s_small.jpg' %
                               (image_nr, n), _img_wall(
                                   intermediate_outputs[n], norm) /
-                              np.max())
+                              np.max(_img_wall(
+                                  intermediate_outputs[n], norm)))
 
         else:
             imshow_g(normalize_img(
@@ -1318,12 +1253,27 @@ def get_best_id(category_name, n=1):
             -1 - n: len(predictions_dtyped['img_nr'])]
 
 
-# x_category_precision(predictions=predictions, y_valid=y_valid)
-# # print_weights(norm=True)
- # print_weights(norm=True)
+def save_wrong_cat_cutted():
+    if not os.path.isdir(IMAGE_OUTPUT_PATH + '/wrong_cat'):
+        os.mkdir(IMAGE_OUTPUT_PATH + '/wrong_cat/')
+    for i in wrong_cat_cutted:
+        plt.imsave(IMAGE_OUTPUT_PATH + '/wrong_cat/' +
+                   i[0] + '_' + str(valid_ids[i[1]]) + '.jpg',
+                   np.transpose(validation_data[0][0][i[1]], (1, 2, 0)))
+
+
+pred_to_val_hist()
+
+# save_wrong_cat_cutted()
+
+# print_weights(norm=True)
+# print_weights(norm=True)
+
 # valid_scatter()
+
 # print_filters(2, norm=True)
-# #print_filters(3, norm=True)
+# print_filters(3, norm=True)
+
 # highest_conv_activation(img_id=get_best_id('RoundCigar'))
 # highest_conv_activation(img_id=get_best_id('Spiral2Arm'))
 # highest_conv_activation(img_id=get_best_id('Lense'))
@@ -1348,7 +1298,8 @@ def get_best_id(category_name, n=1):
 #     highest_conv_activation(img_id=id)
 #     print
 
-try_different_cut_fraktion(figname='cuts_wAdamG1.eps')
+try_different_cut_fraktion(cut_fraktions=map(lambda x: float(
+    x) / 80., range(32, 80)), figname=IMAGE_OUTPUT_PATH + '/10_cat.eps')
 
 # pixel_correlations(True)
 # pixel_correlations()

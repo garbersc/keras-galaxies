@@ -91,7 +91,17 @@ class kaggle_base(object):
     def _compile_models(self,
                         optimizer=None,
                         loss='mean_squared_error',
-                        postfix=''):
+                        postfix='',
+                        metrics=[rmse,
+                         'categorical_accuracy',
+                         sliced_accuracy_mean,
+                         sliced_accuracy_std]):
+
+        if 'rmse' in metrics:
+            metrics=metrics
+            metrics.remove('rmse')
+            metrics.append(rmse)
+            
         if not self.models:
             raise ValueError('Did not find any models to compile')
 
@@ -116,10 +126,7 @@ class kaggle_base(object):
             self.models['model_norm_metrics' + postfix].compile(
                 loss=loss,
                 optimizer=optimizer,
-                metrics=[rmse,
-                         'categorical_accuracy',
-                         sliced_accuracy_mean,
-                         sliced_accuracy_std])
+                metrics=metrics)
 
         except KeyError:
             pass
@@ -245,9 +252,14 @@ class kaggle_base(object):
         modelname = modelname + postfix
         if not batch_size:
             batch_size = self.BATCH_SIZE
-        evalHist = self.models[modelname].evaluate(
-            x=x, y=y_valid, batch_size=batch_size,
-            verbose=verbose)
+        try:
+            evalHist = self.models[modelname].evaluate(
+                x=x, y=y_valid, batch_size=batch_size,
+                verbose=verbose)
+        except ValueError, e:
+            print 'Value Error during evaluation of model ' + modelname
+            print e
+            raise
 
         for i in range(len(self.models[modelname].metrics_names)):
             self.hists[modelname][self.models[modelname].metrics_names[i]]\
@@ -477,15 +489,15 @@ class kaggle_base(object):
     def save(self, option_string=None, postfix=''):
         if not option_string:
             self.save_weights(postfix=postfix)
-            self.save_loss(modelname='model_norm_metrics' + postfix)
-            self.save_loss(modelname='model_norm' + postfix)
+            self.save_loss(modelname='model_norm_metrics',  postfix=postfix)
+            self.save_loss(modelname='model_norm', postfix=postfix)
         elif option_string == 'interrupt':
             self.save_weights(path=self.WEIGHTS_PATH +
                               '_interrupted.h5', postfix=postfix)
             self.save_loss(path=self.LOSS_PATH + '_interrupted.txt',
-                           modelname='model_norm_metrics' + postfix)
+                           modelname='model_norm_metrics', postfix=postfix)
             self.save_loss(path=self.LOSS_PATH + '_interrupted.txt',
-                           modelname='model_norm' + postfix)
+                           modelname='model_norm', postfix=postfix)
         else:
             print 'WARNING: unknown saving opotion *' + option_string + '*'
             self.save(postfix=postfix)

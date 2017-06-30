@@ -1,7 +1,61 @@
+import warnings
 import numpy as np
 import keras.backend as T
 from keras.metrics import categorical_accuracy, mean_squared_error
 from ellipse_fit import get_ellipse_kaggle_par
+from keras.callbacks import Callback
+import os
+
+
+def get_pool_flags(pooled, unpooled):
+    warnings.warn(
+        'at the moment only implemented for (2,2) pool layers')
+    pooled = np.concatenate((pooled, pooled), axis=3)
+    pooled = np.concatenate((pooled, pooled), axis=4)
+
+    return np.equal(unpooled, pooled)
+
+
+def get_maxout_flags(mo_output, mo_input, weights):
+    warnings.warn(
+        'at the moment only implemented for maxout with 2 dense layers')
+
+    w, b = weights
+
+    input_ = np.dot(mo_input, w) + b
+
+    pooled = np.reshape(np.concatenate(
+        (mo_output, mo_output), axis=-1), newshape=input_.shape)
+    return np.equal(input_, pooled)
+
+
+class weight_history(Callback):
+    def __init__(self, layername='conv_0', submodelname='main_seq',
+                 path='weight_history', **kwargs):
+        self.layername = layername
+        self.submodelname = submodelname
+        self.path = path
+        if not os.path.isdir(self.path):
+            os.mkdir(self.path)
+        super(weight_history, self).__init__(**kwargs)
+
+    def save(self):
+        layer = self.model.get_layer(
+            self.submodelname).get_layer(self.layername)
+        weight = layer.get_weights()
+        np.save(self.path + '/weights_of_' +
+                self.layername + '_' + str(self.counter) + '.npy', weight)
+        self.counter += 1
+
+        del weight
+        del layer
+
+    def on_train_begin(self, logs={}):
+        self.counter = 0
+        self.save()
+
+    def on_batch_end(self, batch, logs={}):
+        self.save()
 
 
 def lr_function(e, lrs):
@@ -86,11 +140,22 @@ def rmse(y_true, y_pred):
     return T.sqrt(mean_squared_error(y_true, y_pred))
 
 
+def simple_unsupervised_loss(y_true, y_pred):
+    warnings.warn('Do not use this unsupervised loss.')
+    predmax = T.max(y_pred, axis=-1, keepdims=True)
+    unsupervised_y = T.cast(T.equal(y_pred, predmax),
+                            T.floatx())
+    unsupervised_y = T.softmax(unsupervised_y)
+
+    return mse(unsupervised_y, y_pred)
+
+
 # in keras 2 weights cant be set directly on layer creation. constant
 # initilizer are now available. orth_style will need custom initilizer
 
 
-def dense_weight_init_values(n_inputs, n_outputs, nb_feature=None, w_std=0.001, b_init_val=0.01, orth_style=False):
+def dense_weight_init_values(n_inputs, n_outputs, nb_feature=None, w_std=0.001,
+                             b_init_val=0.01, orth_style=False):
     if type(n_inputs) != tuple and type(n_inputs) == int:
         n_inputs = (n_inputs,)
     if type(n_outputs) != tuple and type(n_outputs) == int:
@@ -190,14 +255,16 @@ def weighted_answer_probabilities(input_layer, normalisation_mask, categorised, 
     output = []
     output.append(probs[:, 0:3])
     if not categorised:
-        #prob_scale = T.ones(T.shape(probs))
+        # prob_scale = T.ones(T.shape(probs))
         for probs_slice, scale_idx in scaling_sequence:
-           #probs = T.set_subtensor(probs[:, probs_slice], probs[:, probs_slice] * probs[:, scale_idx].dimshuffle(0, 'x'))
+           # probs = T.set_subtensor(probs[:, probs_slice], probs[:,
+           # probs_slice] * probs[:, scale_idx].dimshuffle(0, 'x'))
             output.append(probs[:, probs_slice] *
                           probs[:, scale_idx].dimshuffle(0, 'x'))
             if probs_slice == slice(5, 13):
                 output.append(probs[:, 13:15])
-            #T.batch_set_value(probs[:, probs_slice], probs[:, probs_slice] * probs[:, scale_idx].dimshuffle(0, 'x'))
+            # T.batch_set_value(probs[:, probs_slice], probs[:, probs_slice] *
+            # probs[:, scale_idx].dimshuffle(0, 'x'))
         output = T.concatenate(output)
     else:
         output = probs
@@ -247,31 +314,31 @@ def answer_probabilities(x, normalisation_mask, categorised, mb_size, *args, **k
 			for j in xrange(0,len(input_q)):
 				z_v.append(z)
 		    output.append(T.dot(input_normalised[k],z))
-		#print output
+		# print output
 		return output
-		#input_normaised = sum(input_q,[]) #flattens lists of lists
-		#input_normalised[0:3]=input_q[0]
-    		#input_normalised[3:5]=input_q[1]
-    		#input_normalised[5:7]=input_q[2]
-    		#input_normalised[7:9]=input_q[3]
-    		#input_normalised[9:13]=input_q[4]
-    		#input_normalised[13:15]=input_q[5]
-    		#input_normalised[15:18]=input_q[6]
-    		#input_normalised[18:25]=input_q[7]
-    		#input_normalised[25:28]=input_q[8]
-    		#input_normalised[28:31]=input_q[9]
-    		#input_normalised[31:37]=input_q[10]
+		# input_normaised = sum(input_q,[]) #flattens lists of lists
+		# input_normalised[0:3]=input_q[0]
+    		# input_normalised[3:5]=input_q[1]
+    		# input_normalised[5:7]=input_q[2]
+    		# input_normalised[7:9]=input_q[3]
+    		# input_normalised[9:13]=input_q[4]
+    		# input_normalised[13:15]=input_q[5]
+    		# input_normalised[15:18]=input_q[6]
+    		# input_normalised[18:25]=input_q[7]
+    		# input_normalised[25:28]=input_q[8]
+    		# input_normalised[28:31]=input_q[9]
+    		# input_normalised[31:37]=input_q[10]
 	'''
     return input_normalised
     # return [input_normalised[:, s] for s in self.question_slices]
 
 
 '''
-#not original, not in use 
+# not original, not in use
 def sqrtError(self, normalisation=True, *args, **kwargs):
 	return  T.sqrt(self.error(normalisation=True, *args, **kwargs))
 
-#not original
+# not original
 
 def error_weighted(self,weight, normalisation=True, *args, **kwargs):
         if normalisation:
@@ -280,8 +347,8 @@ def error_weighted(self,weight, normalisation=True, *args, **kwargs):
             predictions = self.predictions_no_normalisation(*args, **kwargs)
         error = T.mean(((predictions - self.target_var)*weight) ** 2)
         return error
-#not original
-#not quadratic like the error!
+# not original
+# not quadratic like the error!
 def ll_error(self, normalisation=True, *args, **kwargs):
 	if normalisation:
             predictions = self.predictions(*args, **kwargs)
