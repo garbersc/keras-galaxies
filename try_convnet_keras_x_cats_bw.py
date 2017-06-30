@@ -30,7 +30,7 @@ DO_LSUV_INIT = True
 
 BATCH_SIZE = 256  # keep in mind
 
-NUM_INPUT_FEATURES = 3
+NUM_INPUT_FEATURES = 1
 
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
@@ -39,9 +39,11 @@ VALIDATE_EVERY = 5  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 INCLUDE_FLIP = True
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_10cat_wConfidence.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_10cat_wConfidence_bw.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_10cat_wConfidence.h5"
+WEIGHTS_PATH = "analysis/final/try_10cat_wConfidence_bw.h5"
+
+load_data.img_path = 'geometry_examples/%s.jpg'
 
 CONV_WEIGHT_PATH = ''  # 'analysis/final/try_3cat_geometry_corr_geopics_next.h5'
 
