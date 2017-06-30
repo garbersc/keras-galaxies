@@ -4,6 +4,7 @@ import warnings
 import time
 from datetime import datetime, timedelta
 import functools
+import warnings
 
 import h5py
 
@@ -156,6 +157,8 @@ class kaggle_base(object):
             layername_source = [layername_source]
         if not layername_this:
             layername_this = layername_source
+        elif not type(layername_this) == list:
+            layername_this == [layername_source]
 
         file_ = h5py.File(path, 'r')
 
@@ -247,8 +250,28 @@ class kaggle_base(object):
             verbose=verbose)
 
         for i in range(len(self.models[modelname].metrics_names)):
-            self.hists[modelname][self.models[modelname].metrics_names[i]].append(
-                evalHist[i])
+            self.hists[modelname][self.models[modelname].metrics_names[i]]\
+                .append(evalHist[i])
+
+        if verbose:
+            self.print_last_hist(postfix=postfix)
+
+        return evalHist
+
+    def evaluate_gen(self, x, num_events, batch_size=None,
+                     modelname='model_norm_metrics', verbose=1, postfix='',
+                     max_q_size=1, workers=1):
+        modelname = modelname + postfix
+        if not batch_size:
+            batch_size = self.BATCH_SIZE
+        evalHist = self.models[modelname].evaluate_generator(
+            x, steps=num_events / batch_size, max_q_size=max_q_size,
+            workers=workers, pickle_safe=False,
+        )
+
+        for i in range(len(self.models[modelname].metrics_names)):
+            self.hists[modelname][self.models[modelname].metrics_names[i]]\
+                .append(evalHist[i])
 
         if verbose:
             self.print_last_hist(postfix=postfix)
@@ -262,6 +285,20 @@ class kaggle_base(object):
             batch_size = self.BATCH_SIZE
         predictions = self.models[modelname].predict(
             x=x, batch_size=batch_size,
+            verbose=verbose)
+
+        return predictions
+
+    def predict_gen(self, x, num_events, batch_size=None,
+                    modelname='model_norm_metrics',
+                    verbose=1, postfix='',
+                    max_q_size=1, workers=1):
+        modelname += postfix
+        if not batch_size:
+            batch_size = self.BATCH_SIZE
+        predictions = self.models[modelname].predict_generator(
+            x, steps=num_events / batch_size, max_q_size=max_q_size,
+            workers=workers, pickle_safe=False,
             verbose=verbose)
 
         return predictions
@@ -470,7 +507,7 @@ class kaggle_base(object):
     def full_fit(self, data_gen, validation, samples_per_epoch,
                  validate_every,
                  nb_epochs, verbose=1, save_at_every_validation=True,
-                 data_gen_creator=None, postfix=''):
+                 data_gen_creator=None, postfix='', extracallbacks=None):
         if verbose:
             timedeltas = []
         epochs_run = 0
@@ -479,6 +516,12 @@ class kaggle_base(object):
         # FIXME think about how to handle the missing samples%batch_size
         # samples
         steps_per_epoch = samples_per_epoch // self.BATCH_SIZE
+
+        callbacks_ = [LearningRateScheduler(self._make_lrs_fct())]
+        if extracallbacks:
+            if not type(extracallbacks) == list:
+                extracallbacks = [extracallbacks]
+            callbacks_ += extracallbacks
 
         for i in range(nb_epochs / validate_every if not nb_epochs
                        % validate_every else nb_epochs / validate_every + 1):
@@ -496,7 +539,7 @@ class kaggle_base(object):
                     nb_epoch=np.min([
                         epoch_togo, validate_every]) + epochs_run,
                     initial_epoch=epochs_run, verbose=1,
-                    callbacks=[LearningRateScheduler(self._make_lrs_fct())],
+                    callbacks=callbacks_,
                     data_gen_creator=data_gen_creator, postfix=postfix):
                 try:
                     hist = self.models['model_norm' + postfix].fit_generator(
@@ -506,16 +549,18 @@ class kaggle_base(object):
                         initial_epoch=initial_epoch, verbose=verbose,
                         callbacks=callbacks)
                     self._save_hist(hist.history, postfix=postfix)
-                except ValueError:
+                except ValueError, e:
                     warnings.warn(
-                        'Value Error in the main fit. Generator will be reinitialised.')
+                        'Value Error in the main fit. Generator will be reinitialised. \n %s'
+                        % e)
                     print 'saving'
                     self.save(postfix=postfix)
                     if data_gen_creator:
                         _main_fit(self, data_gen=data_gen_creator())
                     else:
-                        raise ValueError(
-                            'no reinitilizer of the data generator defined')
+                        warnings.warn(
+                            'No reinitilizer of the data generator defined')
+                        raise ValueError(e)
 
             _main_fit(self, data_gen)
 
@@ -542,7 +587,8 @@ class kaggle_base(object):
             if save_at_every_validation:
                 self.save(postfix=postfix)
 
-    def LSUV_init(self, train_batch, batch_size=None, modelname='model_norm', postfix='',
+    def LSUV_init(self, train_batch, batch_size=None, modelname='model_norm',
+                  postfix='',
                   sub_modelname='main_seq'):
         modelname = modelname + postfix
         if not batch_size:
@@ -550,7 +596,7 @@ class kaggle_base(object):
         LSUVinit(self.models[modelname].get_layer(sub_modelname),
                  train_batch, batch_size=batch_size)
 
-    def reinit(self, WEIGHTS_PATH=None, LOSS_PATH=None):
+    def reinit(self, WEIGHTS_PATH=None, LOSS_PATH=None, **kwargs):
         self.reinit_counter += 1
         if WEIGHTS_PATH:
             self.WEIGHTS_PATH = WEIGHTS_PATH
@@ -566,7 +612,7 @@ class kaggle_base(object):
 
         self.first_loss_save = True
 
-        self.init_models()
+        self.init_models(**kwargs)
 
         return True
 
@@ -574,6 +620,7 @@ class kaggle_base(object):
                          main_layer='main_seq', prediction_batch_size=1,
                          postfix=''):
         modelname += postfix
+
         _layer = self.models[modelname].get_layer(main_layer).get_layer(
             layer)
 
@@ -581,7 +628,7 @@ class kaggle_base(object):
             input_ = [np.ones(shape=(prediction_batch_size,) + i[1:])
                       for i in self.models[modelname].get_layer(main_layer).input_shape]
 
-        if self.layer_formats[layer] > 0:
+        if self.layer_formats[layer] > 0 and self.layer_formats[layer] < 4:
             output_layer = fPermute((3, 0, 1, 2))(_layer.output)
             output_layer = Lambda(lambda x: T.reshape(x[0], (
                 prediction_batch_size,) + tuple(T.shape(output_layer)[1:])),
@@ -596,11 +643,26 @@ class kaggle_base(object):
                 print _layer
                 raise AttributeError(e)
 
+        if self.layer_formats[layer] == 4:
+            def reshape_output(x, BATCH_SIZE=self.BATCH_SIZE):
+                input_shape = T.shape(x)
+                input_ = x
+                new_input_shape = (
+                    prediction_batch_size, input_shape[1], input_shape[2] * input_shape[0] / prediction_batch_size, input_shape[3])
+                input_ = input_.reshape(new_input_shape)
+                return input_
+
+            output_lambda = Lambda(function=reshape_output, output_shape=lambda input_shape: (
+                prediction_batch_size, input_shape[1], input_shape[2] * input_shape[0] / prediction_batch_size, input_shape[3]))
+            output_layer = output_lambda(output_layer)
+
         intermediate_layer_model = Model(inputs=self.models[modelname]
-                                         .get_layer(main_layer).get_input_at(0),
+                                         .get_layer(main_layer)
+                                         .get_input_at(0),
                                          outputs=output_layer)
-        return intermediate_layer_model.predict(input_,
-                                                batch_size=prediction_batch_size)
+
+        return intermediate_layer_model.predict(
+            input_, batch_size=prediction_batch_size)
 
     def get_layer_weights(self, layer,  modelname='model_norm',
                           main_layer='main_seq', postfix=''):
