@@ -77,6 +77,7 @@ img_weight_hist/
 *.eps
 trainingLoss_different_*.txt
 loss_*.txt
+*.h5
 
 # emacs autosave files and hidden files
 \#*
