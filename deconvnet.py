@@ -18,7 +18,6 @@ from custom_for_keras import kaggle_MultiRotMergeLayer_output,  kaggle_input,\
 
 from keras.optimizers import SGD
 from custom_for_keras import rmse
-from deconv_fun import deconv_fun, deconv_fun_output_shape
 
 
 class deconvnet(kaggle_winsol):
@@ -85,6 +84,7 @@ class deconvnet(kaggle_winsol):
                 optimizer=optimizer)
         except KeyError:
             pass
+
         self._init_hist_dics(self.models)
 
         return True
@@ -192,7 +192,7 @@ class deconvnet(kaggle_winsol):
         deconv_perm_layer = fPermute((3, 0, 1, 2), name='deconv_out_perm')
 
         deconv_perm_tensor = deconv_perm_layer(
-            model.get_layer('conv_0').get_output_at(0))
+            model.get_layer('sconv_0').get_output_at(0))
 
         debias_layer = DeBias(nFilters=32, name='debias_layer')(
             deconv_perm_tensor)
@@ -234,7 +234,7 @@ class deconvnet(kaggle_winsol):
         self.models = {'model_norm': model_norm,
                        'model_norm_metrics': model_norm_metrics,
                        'model_noNorm': model_noNorm,
-                       'model_deconv': model_deconv
+                       'model_deconv': model_deconv,
                        }
 
         self._compile_models(loss='categorical_crossentropy')

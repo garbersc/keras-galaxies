@@ -6,9 +6,8 @@ import realtime_augmentation as ra
 import load_data
 import functools
 import time
-import sys
-import json
 import os
+import skimage.io
 
 from termcolor import colored
 from datetime import datetime, timedelta
@@ -35,7 +34,7 @@ if debug:
 TRAIN_LOSS_SF_PATH = 'try_ellipseOnly_2param.txt'
 # TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = 'analysis/final/try_goodWeights.h5'
+WEIGHTS_PATH = 'analysis/final/try_10cat_wMaxout_next_next_next_next.h5'
 TXT_OUTPUT_PATH = '_'
 ELLIPSE_FIT = WEIGHTS_PATH.find('ellipse') >= 0
 if ELLIPSE_FIT:
@@ -56,23 +55,28 @@ TEST = False  # disable this to not generate predictions on the testset
 # main
 ##############################################
 
-output_names = ["smooth", "featureOrdisk", "NoGalaxy", "EdgeOnYes", "EdgeOnNo", "BarYes", "BarNo", "SpiralYes", "SpiralNo", "BulgeNo", "BulgeJust", "BulgeObvious", "BulgDominant", "OddYes", "OddNo", "RoundCompletly", "RoundBetween", "RoundCigar",
-                "Ring", "Lense", "Disturbed", "Irregular", "Other", "Merger", "DustLane", "BulgeRound", "BlulgeBoxy", "BulgeNo2", "SpiralTight", "SpiralMedium", "SpiralLoose", "Spiral1Arm", "Spiral2Arm", "Spiral3Arm", "Spiral4Arm", "SpiralMoreArms", "SpiralCantTell"]
+# output_names = ["smooth", "featureOrdisk", "NoGalaxy", "EdgeOnYes", "EdgeOnNo", "BarYes", "BarNo", "SpiralYes", "SpiralNo", "BulgeNo", "BulgeJust", "BulgeObvious", "BulgDominant", "OddYes", "OddNo", "RoundCompletly", "RoundBetween", "RoundCigar",
+#                 "Ring", "Lense", "Disturbed", "Irregular", "Other", "Merger", "DustLane", "BulgeRound", "BlulgeBoxy", "BulgeNo2", "SpiralTight", "SpiralMedium", "SpiralLoose", "Spiral1Arm", "Spiral2Arm", "Spiral3Arm", "Spiral4Arm", "SpiralMoreArms", "SpiralCantTell"]
 
-question_slices = [slice(0, 3), slice(3, 5), slice(5, 7), slice(7, 9),
-                   slice(9, 13), slice(13, 15), slice(15, 18), slice(18, 25),
-                   slice(25, 28), slice(28, 31), slice(31, 37)]
+# question_slices = [slice(0, 3), slice(3, 5), slice(5, 7), slice(7, 9),
+#                    slice(9, 13), slice(13, 15), slice(15, 18), slice(18, 25),
+#                    slice(25, 28), slice(28, 31), slice(31, 37)]
 
-question_requierement = [None] * len(question_slices)
-question_requierement[1] = question_slices[0].start + 1
-question_requierement[2] = question_slices[1].start + 1
-question_requierement[3] = question_slices[1].start + 1
-question_requierement[4] = question_slices[1].start + 1
-question_requierement[6] = question_slices[0].start
-question_requierement[9] = question_slices[4].start
-question_requierement[10] = question_slices[4].start
+output_names = ['round', 'broad_ellipse', 'small_ellipse', 'edge_bulg',
+                'edge_no_bulge', 'disc', 'spiral_1_arm', 'spiral_2_arm',
+                'spiral_other', 'other']
+question_slices = [slice(0, 10)]
 
-print 'Question requirements: %s' % question_requierement
+# question_requierement = [None] * len(question_slices)
+# question_requierement[1] = question_slices[0].start + 1
+# question_requierement[2] = question_slices[1].start + 1
+# question_requierement[3] = question_slices[1].start + 1
+# question_requierement[4] = question_slices[1].start + 1
+# question_requierement[6] = question_slices[0].start
+# question_requierement[9] = question_slices[4].start
+# question_requierement[10] = question_slices[4].start
+
+# print 'Question requirements: %s' % question_requierement
 
 spiral_or_ellipse_cat = [[(0, 1), (1, 1), (3, 0)], [(0, 1), (1, 0)]]
 
@@ -89,7 +93,7 @@ if copy_to_ram_beforehand:
     ra.myLoadFrom_RAM = True
     import copy_data_to_shm
 
-y_train = np.load("data/solutions_train.npy")
+y_train = np.load("data/solutions_train_10cat.npy")
 ra.y_train = y_train
 
 # split training data into training + a small validation set
@@ -170,32 +174,15 @@ if debug:
     deconv.print_summary(postfix=postfix)
 
 
-def get_inverse_layer_weights(layer, model='model_deconv'):
-    print "Inverting weights..."
-    conv_weights, conv_bias = deconv.get_layer_weights(layer, postfix=postfix)
-    if debug:
-        print 'shape of conv_weights: ' + str(np.shape(conv_weights))
-
-    deconv_weights = conv_weights.T
-    deconv_weights = np.flip(deconv_weights, 1)
-    deconv_weights = np.flip(deconv_weights, 2)
-    deconv_weights = deconv_weights.transpose(1, 2, 3, 0)
-
-    if debug:
-        print 'shape of deconv_weights: ' + str(np.shape(deconv_weights))
-    deconv_bias = conv_bias * (-1)
-
-    x = [deconv_weights, deconv_bias]
-
-    return x
-
-
 print "Load model weights..."
 deconv.load_weights(path=WEIGHTS_PATH, postfix=postfix)
 deconv.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
-deconv_weight, conv_bias = get_inverse_layer_weights('conv_0')
-deconv.models['model_deconv'].get_layer('deconv_layer').set_weights(
-    [deconv_weight, ])
+# c, y, x, filter
+# y, x, c, filter
+deconv_weight, conv_bias = deconv.get_layer_weights(layer='conv_0')
+deconv_weight = np.transpose(deconv_weight, (1, 2, 0, 3))
+deconv.models['model_deconv'].get_layer(
+    'deconv_layer').set_weights([deconv_weight, ])
 deconv.models['model_deconv'].get_layer('debias_layer').set_weights(
     [conv_bias, ])
 
@@ -403,7 +390,7 @@ def reshape_output(x):
     return x
 
 
-def print_output(nr_images=2, plots=False, combined_rgb=True):
+def print_output(nr_images=5, plots=False, combined_rgb=True, wall_variations=True, wall_output=False, norm_single_img=False):
     if debug:
         print 'Checking save directory...'
     if not os.path.isdir(IMAGE_OUTPUT_PATH):
@@ -416,9 +403,13 @@ def print_output(nr_images=2, plots=False, combined_rgb=True):
 
     print 'Collecting output from Deconvnet... this may take a while...'
 
+    valid_data_crop = []
+    for img in validation_data[0][1]:
+        valid_data_crop.append(img[:, :45, :45])
+    valid_data_crop = [np.asarray(valid_data_crop)]
     output_deconv = deconv.predict(
-        x=validation_data[0], modelname='model_deconv')
-    output_deconv = reshape_output(output_deconv)
+        x=valid_data_crop, modelname='model_simple')
+    #output_deconv = reshape_output(output_deconv)
     if debug:
         print 'Deconv output shape:' + str(np.shape(output_deconv))
         print 'Ids of input images are: ' + str(valid_ids[0:nr_images])
@@ -426,43 +417,90 @@ def print_output(nr_images=2, plots=False, combined_rgb=True):
 
     for i, img in enumerate(output_deconv[0:nr_images]):
         image_nr = i
+        if not norm_single_img:
+            img -= np.min(img)
+            img = img / np.max(img)
+
         if type(image_nr) == int:
             input_img = [np.asarray([validation_data[0][0][image_nr]]),
                          np.asarray([validation_data[0][1][image_nr]])]
+#        if debug:
+        #     print 'Collecting output from merge layer...'
+        # intermediate_outputs = {}
+        # intermediate_outputs['input_merge'] = np.asarray(deconv.get_layer_output(
+        #     'input_merge', input_=input_img))
+        # intermediate_outputs['input_merge'] = reshape_output(
+        #     intermediate_outputs['input_merge'])
         if debug:
-            print 'Collecting output from merge layer...'
-        intermediate_outputs = {}
-        intermediate_outputs['input_merge'] = np.asarray(deconv.get_layer_output(
-            'input_merge', input_=input_img))
-        intermediate_outputs['input_merge'] = reshape_output(
-            intermediate_outputs['input_merge'])
-        if debug:
-            print 'Shape of intermediate outputs: ' + str(np.shape(intermediate_outputs['input_merge']))
+            # print 'Shape of intermediate outputs: ' +
+            # str(np.shape(intermediate_outputs['input_merge']))
             print 'Shape of input image array: ' + str(np.shape(input_img[0][0]))
 
         if plots:
             print 'Creating plots for Image %s' % (valid_ids[i])
-            for j, channel in enumerate(img):
-                canvas, (im1, im2, im3) = plt.subplots(1, 3)
+            if wall_variations & wall_output:
+                canvas, (im1, im2) = plt.subplots(1, 2)
                 im1.imshow(np.transpose((input_img[0][0]), (1, 2, 0)),
                            interpolation='none')
                 im1.set_title('Input Image %s' % (valid_ids[i]))
 
-                im2.imshow(np.transpose(intermediate_outputs['input_merge'][0], (
-                    1, 2, 0)), interpolation='none', cmap=plt.get_cmap('gray'))
-                im2.set_title('Variation %s' % j)
+                # im2.imshow(
+                #     _img_wall(intermediate_outputs['input_merge']), interpolation='none')
+                # im2.set_title('Variations')
+                # im2.axis('off')
 
-                if combined_rgb:
-                    im3.imshow(np.transpose((channel),
-                                            (1, 2, 0)), interpolation='none')
-                    im3.set_title('Deconv Variation %s' % j)
-                else:
-                    im3.imshow(_img_wall(channel), interpolation='none',
-                               cmap=plt.get_cmap('gray'))
-                    im3.set_title('Deconv Variation %s' % j)
-                plt.savefig('image_%s_variation_%s.jpg' %
-                            (valid_ids[i], j), dpi=300)
+                im2.imshow(_img_wall(img))
+                im2.set_title('Deconv Variations')
+                im2.axis('off')
+
+                plt.savefig('image_%s_variations.jpg' %
+                            (valid_ids[i]), dpi=300)
                 plt.close()
+            else:
+                for j, channel in enumerate(img):
+                    if norm_single_img:
+                        channel -= np.min(channel)
+                        channel = channel / np.max(channel)
+
+                    canvas, (im1, im2, im3) = plt.subplots(1, 3)
+                    im1.imshow(np.transpose((input_img[0][0]), (1, 2, 0)),
+                               interpolation='none')
+                    im1.set_title('Input Image %s' % (valid_ids[i]))
+
+                    if wall_variations:  # not working yet
+                        im2.imshow(
+                            _img_wall(intermediate_outputs['input_merge']), interpolation='none')
+                        im2.set_title('Variation %s' % j)
+                        im2.axis('off')
+                    else:
+                        im2.imshow(np.transpose(intermediate_outputs['input_merge'][j], (
+                            1, 2, 0)), interpolation='none', cmap=plt.get_cmap('gray'))
+                        im2.set_title('Variation %s' % j)
+
+                    if wall_output:
+                        if combined_rgb:
+                            im3.imshow(_img_wall(img))
+                            im3.set_title('Deconv Variations')
+                            im3.axis('off')
+                        else:
+                            im3.imshow(_img_wall(channel), interpolation='none',
+                                       cmap=plt.get_cmap('gray'))
+                            im3.set_title('Deconv Variations')
+                            im3.axis('off')
+                    else:
+                        if combined_rgb:
+                            fpicture = np.transpose((channel),
+                                                    (2, 1, 0))
+                            im3.imshow(fpicture, interpolation='none')
+                            im3.set_title('Deconv Variation %s' % j)
+                        else:
+                            im3.imshow(_img_wall(channel), interpolation='none',
+                                       cmap=plt.get_cmap('gray'))
+                            im3.set_title('Deconv Variation %s' % j)
+                            im3.axis('off')
+                    plt.savefig('image_%s_variation_%s.jpg' %
+                                (valid_ids[i], j), dpi=300)
+                    plt.close()
 
         # for i, img in enumerate(output_deconv[0:5]):
         #     for j, channel in enumerate(img):
