@@ -43,7 +43,7 @@ TRAIN_LOSS_SF_PATH = "trainingNmbrs_10cat_wConfidence_bw.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
 WEIGHTS_PATH = "analysis/final/try_10cat_wConfidence_bw.h5"
 
-load_data.img_path = 'geometry_examples/%s.jpg'
+load_data.img_path = 'data/bw/images_train_rev1/%s.jpg'
 
 CONV_WEIGHT_PATH = ''  # 'analysis/final/try_3cat_geometry_corr_geopics_next.h5'
 
