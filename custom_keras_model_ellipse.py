@@ -48,7 +48,7 @@ class kaggle_ellipse_fit(kaggle_base):
     '''
 
     def _compile_models(self, postfix='_ellipse', loss='mean_squared_error'):
-        return super(kaggle_ellipse_fit, self)._compile_models(postfix=postfix, loss=loss)
+        return super(kaggle_ellipse_fit, self)._compile_models(postfix=postfix, loss=loss, metrics=['rmse','categorical_accuracy'])
 
     '''
     initiates models according to the kaggle galaxies winning solution

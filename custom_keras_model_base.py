@@ -91,7 +91,17 @@ class kaggle_base(object):
     def _compile_models(self,
                         optimizer=None,
                         loss='mean_squared_error',
-                        postfix=''):
+                        postfix='',
+                        metrics=[rmse,
+                         'categorical_accuracy',
+                         sliced_accuracy_mean,
+                         sliced_accuracy_std]):
+
+        if 'rmse' in metrics:
+            metrics=metrics
+            metrics.remove('rmse')
+            metrics.append(rmse)
+            
         if not self.models:
             raise ValueError('Did not find any models to compile')
 
@@ -116,10 +126,7 @@ class kaggle_base(object):
             self.models['model_norm_metrics' + postfix].compile(
                 loss=loss,
                 optimizer=optimizer,
-                metrics=[rmse,
-                         'categorical_accuracy',
-                         sliced_accuracy_mean,
-                         sliced_accuracy_std])
+                metrics=metrics)
 
         except KeyError:
             pass

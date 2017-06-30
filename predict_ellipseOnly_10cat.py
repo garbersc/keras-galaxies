@@ -71,7 +71,7 @@ N_INPUT_VARIATION = 2
 
 # set to True if the prediction and evaluation should be done when the
 # prediction file already exists
-REPREDICT_EVERYTIME = False
+REPREDICT_EVERYTIME = True
 
 # TODO built this as functions, not with the if's
 DO_VALID = True  # disable this to not bother with the validation set evaluation
@@ -246,10 +246,28 @@ xs_valid = [np.vstack(x_valid) for x_valid in xs_valid]
 xs_valid = [x_valid.transpose(0, 3, 1, 2) for x_valid in xs_valid]
 
 
-validation_data = (
-    [xs_valid[0], xs_valid[1]], y_valid)
-validation_data = (
-    [np.asarray(xs_valid[0]), np.asarray(xs_valid[1])], validation_data[1])
+# validation_data = (
+#     [xs_valid[0], xs_valid[1]], y_valid)
+# validation_data = (
+#     [np.asarray(xs_valid[0]), np.asarray(xs_valid[1])], validation_data[1])
+
+from numpy.linalg.linalg import LinAlgError
+
+validation_data = ([], y_valid)
+c = 0
+for x in xs_valid[0]:
+    try:
+        validation_data[0].append(
+            get_ellipse_kaggle_par(x, num_par=NUM_ELLIPSE_PARAMS)
+        )
+    except LinAlgError, e:
+        print 'try_conv'
+        print c
+        raise LinAlgError(e)
+    c += 1
+
+validation_data = (np.asarray(validation_data[0]), validation_data[1])
+
 
 t_val = (time.time() - start_time)
 print "  took %.2f seconds" % (t_val)
@@ -287,7 +305,7 @@ else:
 
         if DO_VALID:
             evalHist = winsol.evaluate(
-                [xs_valid[0], xs_valid[1]], y_valid=y_valid, postfix='')
+                validation_data[0], y_valid=y_valid, postfix=postfix)
             # validation_data[0], y_valid=y_valid, postfix=postfix)
             winsol.save_loss(modelname='model_norm_metrics',
                              postfix=postfix)

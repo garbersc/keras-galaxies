@@ -6,8 +6,8 @@ question_slices = [slice(0, 3), slice(3, 5), slice(5, 7), slice(7, 9),
                    slice(9, 13), slice(13, 15), slice(15, 18), slice(18, 25),
                    slice(25, 28), slice(28, 31), slice(31, 37)]
 
-cat_10_names = ['round', 'broad_ellipse', 'small_ellipse', 'edge_bulg',
-                'edge_no_bulge', 'disc', 'spiral_1_arm', 'spiral_2_arm', 'spiral_other', 'other']
+cat_10_names = ['round', 'broad_ellipse', 'small_ellipse', 'edge_no_bulge',
+                'edge_bulge', 'disc', 'spiral_1_arm', 'spiral_2_arm', 'spiral_other', 'other']
 
 cat_10 = [[(0, 0), (6, 0)],
           [(0, 0), (6, 1)],

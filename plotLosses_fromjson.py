@@ -76,7 +76,7 @@ validP = plt.plot(np.array(range(0, len(validLoss))) * len(trainLoss) /
 plt.legend([trainP, validP], ["train", "valid"])
 
 plt.xlabel('epochs',)  # fontsize=20)
-plt.ylabel('Mean Square Loss',)  # fontsize=20)
+plt.ylabel('categorical cross entropy',)  # fontsize=20)
 
 
 plt.show()
