@@ -57,6 +57,7 @@ docs/_build/
 data/
 *.pyc
 *~
+tf_for_poets/
 analysis/
 predictions/
 *.jpeg
@@ -71,6 +72,7 @@ img_example/
 best*.txt
 bla*
 loss_3cat*.txt
+*.h5
 
 # emacs autosave files and hidden files
 \#*
