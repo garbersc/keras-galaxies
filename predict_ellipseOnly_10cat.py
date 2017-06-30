@@ -1,3 +1,7 @@
+# at some point try
+# from keras.utils import plot_model
+# plot_model(model, to_file='model.png')
+
 import matplotlib.lines as mlines
 import warnings
 import theano.sandbox.cuda.basic_ops as sbcuda
@@ -17,9 +21,8 @@ from custom_for_keras import sliced_accuracy_mean, sliced_accuracy_std, rmse,\
     lr_function
 from ellipse_fit import get_ellipse_kaggle_par
 # from custom_keras_model_and_fit_capsels import kaggle_winsol
-from custom_keras_model_x_cat import kaggle_x_cat\
+from custom_keras_model_ellipse import kaggle_ellipse_fit\
     as kaggle_winsol
-import skimage
 
 starting_time = time.time()
 
@@ -43,21 +46,21 @@ if debug:
     print os.path.isfile(PRED_BLENDED_PATH)
 
 
-TRAIN_LOSS_SF_PATH = 'loss_10cat_bw.txt'
+TRAIN_LOSS_SF_PATH = 'loss_ellipse_10cat.txt'
 # TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_10cat_wMaxout_next_next_next_next.h5"
-TXT_OUTPUT_PATH = 'try_10cat_bw.txt'
-WRONG_CAT_IMGS_PATH = 'wrong_categorized_10cat_bw.json'
-IMAGE_OUTPUT_PATH = "img_10cat_bw"
+WEIGHTS_PATH = "analysis/final/try_ellipseOnly_2_10cat.h5"
+TXT_OUTPUT_PATH = 'try_ellipse_10cat.txt'
+WRONG_CAT_IMGS_PATH = 'wrong_categorized_ellipse_10cat.json'
+IMAGE_OUTPUT_PATH = "img_ellipse_10cat"
 
 
 postfix = ''
 NUM_ELLIPSE_PARAMS = 2
-ELLIPSE_FIT = False
-# ELLIPSE_FIT = WEIGHTS_PATH.find('ellipse') >= 0
-# if ELLIPSE_FIT:
-#     postfix = '_ellipse'
+# ELLIPSE_FIT = False
+ELLIPSE_FIT = WEIGHTS_PATH.find('ellipse') >= 0
+if ELLIPSE_FIT:
+    postfix = '_ellipse'
 
 DONT_LOAD_WEIGHTS = False
 
@@ -80,13 +83,13 @@ DO_VALIDSTUFF_ON_TRAIN = True
 
 DO_TEST = False  # disable this to not generate predictions on the testset
 
-VALID_CORR_OUTPUT_FILTER = np.ones((10))
+VALID_CORR_OUTPUT_FILTER = np.zeros((10))
 
 DO_TEST = False  # disable this to not generate predictions on the testset
 
 
-output_names = ['round', 'broad_ellipse', 'small_ellipse', 'edge_no_bulge',
-                'edge_bulge', 'disc', 'spiral_1_arm', 'spiral_2_arm',
+output_names = ['round', 'broad_ellipse', 'small_ellipse', 'edge_bulg',
+                'edge_no_bulge', 'disc', 'spiral_1_arm', 'spiral_2_arm',
                 'spiral_other', 'other']
 question_slices = [slice(0, 10)]
 
@@ -104,7 +107,6 @@ if copy_to_ram_beforehand:
     import copy_data_to_shm
 
 y_train = np.load("data/solutions_train_10cat.npy")
-y_train_cert = np.load('data/solution_certainties_train_10cat.npy')
 
 ra.y_train = y_train
 
@@ -144,8 +146,6 @@ num_valid = ra.num_valid
 y_valid = ra.y_valid
 y_train = ra.y_train
 
-y_train_cert = y_train_cert[num_train:]
-
 valid_ids = ra.valid_ids
 train_ids = ra.train_ids
 
@@ -181,7 +181,10 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models(final_units=10)
+winsol.init_models(input_shape=NUM_ELLIPSE_PARAMS,
+                   output_shape=10,
+                   final_activation='softmax',
+                   loss='categorical_crossentropy')
 
 if debug:
     winsol.print_summary(postfix=postfix)
@@ -207,12 +210,6 @@ ds_transforms = [
         3.0, target_size=input_sizes[1])
     + ra.build_augmentation_transform(rotation=45)
 ]
-
-
-def tripple_gray(img):
-    gray = skimage.color.rgb2gray(img)
-    return np.stack((gray, gray, gray), axis=-1)
-
 
 num_input_representations = len(ds_transforms)
 
@@ -245,19 +242,32 @@ for data, length in create_valid_gen():
         x_valid_list.append(x_chunk[:length])
 
 xs_valid = [np.vstack(x_valid) for x_valid in xs_valid]
-
-# make to bw
-xs_valid = [np.asarray([tripple_gray(x) for x in x_valid])
-            for x_valid in xs_valid]
-
 # move the colour dimension up
 xs_valid = [x_valid.transpose(0, 3, 1, 2) for x_valid in xs_valid]
 
 
-validation_data = (
-    [xs_valid[0], xs_valid[1]], y_valid)
-validation_data = (
-    [np.asarray(xs_valid[0]), np.asarray(xs_valid[1])], validation_data[1])
+# validation_data = (
+#     [xs_valid[0], xs_valid[1]], y_valid)
+# validation_data = (
+#     [np.asarray(xs_valid[0]), np.asarray(xs_valid[1])], validation_data[1])
+
+from numpy.linalg.linalg import LinAlgError
+
+validation_data = ([], y_valid)
+c = 0
+for x in xs_valid[0]:
+    try:
+        validation_data[0].append(
+            get_ellipse_kaggle_par(x, num_par=NUM_ELLIPSE_PARAMS)
+        )
+    except LinAlgError, e:
+        print 'try_conv'
+        print c
+        raise LinAlgError(e)
+    c += 1
+
+validation_data = (np.asarray(validation_data[0]), validation_data[1])
+
 
 t_val = (time.time() - start_time)
 print "  took %.2f seconds" % (t_val)
@@ -295,7 +305,7 @@ else:
 
         if DO_VALID:
             evalHist = winsol.evaluate(
-                [xs_valid[0], xs_valid[1]], y_valid=y_valid, postfix='')
+                validation_data[0], y_valid=y_valid, postfix=postfix)
             # validation_data[0], y_valid=y_valid, postfix=postfix)
             winsol.save_loss(modelname='model_norm_metrics',
                              postfix=postfix)
@@ -348,17 +358,6 @@ pred_l = []
 val_l_cutted = []
 pred_l_cutted = []
 
-n_pred_2nd_agree = [0] * len(output_names)
-n_pred_3rd_agree = [0] * len(output_names)
-
-
-def arg_nthmax(arr, n=2):
-    arr_ = arr
-    for _ in range(n - 1):
-        arr_[np.argmax(arr_)] = np.amin(arr_)
-    return np.argmax(arr_)
-
-
 for i in range(len(predictions)):
     argpred = np.argmax(predictions[i])
     argval = np.argmax(y_valid[i])
@@ -366,10 +365,6 @@ for i in range(len(predictions)):
     n_global_cat_valid[argval] += 1
     if argval == argpred:
         n_global_cat_agrement[argval] += 1
-    elif argval == arg_nthmax(predictions[i]):
-        n_pred_2nd_agree[argval] += 1
-    elif argval == arg_nthmax(predictions[i], 3):
-        n_pred_3rd_agree[argval] += 1
 
     categories[argval, argpred] += 1.
     val_l.append(argval)
@@ -400,11 +395,8 @@ for i in range(len(predictions)):
             n_sliced_cat_agrement[sargval + slice.start] += 1
             if cutpred:
                 n_sliced_cat_agrement_wcut[sargval + slice.start] += 1
-        c += 1
 
-print '\nfirst hit precision: %.3f' % (float(np.sum(n_global_cat_agrement)) / float(np.sum(n_global_cat_pred)))
-print 'second hit precision: %.3f' % (float(np.sum(n_pred_2nd_agree)) / float(np.sum(n_global_cat_pred) - np.sum(n_global_cat_agrement)))
-print 'third hit precision: %.3f\n' % (float(np.sum(n_pred_3rd_agree)) / float(np.sum(n_global_cat_pred) - np.sum(n_global_cat_agrement) - np.sum(n_pred_2nd_agree)))
+        c += 1
 
 
 def pred_to_val_hist(path=IMAGE_OUTPUT_PATH, also_cutted=True):
@@ -668,16 +660,10 @@ def try_different_cut_fraktion(cut_fraktions=map(lambda x: float(x) / 20.,
     n_wcut_pred = []
     n_wcut_valid = []
     n_wcut_agree = []
-
-    n_agree_total = []
-    n_selected_total = []
-
     for _ in cut_fraktions:
         n_wcut_pred.append([0] * len(output_names))
         n_wcut_valid.append([0] * len(output_names))
         n_wcut_agree.append([0] * len(output_names))
-        n_agree_total.append(0)
-        n_selected_total.append(0)
 
     for i in range(len(predictions)):
         for slic in question_slices:
@@ -690,21 +676,14 @@ def try_different_cut_fraktion(cut_fraktions=map(lambda x: float(x) / 20.,
                 if q_frak_pred > cut_val:
                     n_wcut_pred[j][sargval + slic.start] += 1
                     n_wcut_valid[j][sargpred + slic.start] += 1
-                    n_selected_total[j] = n_selected_total[j] + 1
                     if sargval == sargpred:
                         n_wcut_agree[j][sargval + slic.start] += 1
-                        n_agree_total[j] = n_agree_total[j] + 1
 
     Ps_no_zero = []
     Rs_no_zero = []
     effs = []
     signigicance = []  # agree/sqrt(pred-agree)
     effs_sig = []
-
-    P_total = [float(a) / float(s)
-               for a, s in zip(n_agree_total, n_selected_total)]
-    signif_total = [float(a) / np.sqrt(s - a)
-                    for a, s in zip(n_agree_total, n_selected_total)]
 
     Ps = [np.mean([P_i(i, param[0], param[1]) for i in range(
         VALID_CORR_OUTPUT_FILTER.shape[0])]) for param in zip(n_wcut_pred,
@@ -774,7 +753,7 @@ def try_different_cut_fraktion(cut_fraktions=map(lambda x: float(x) / 20.,
     plots = []
     label_h = []
 
-    # plt.subplot2grid((1, 1), (0, 0), colspan=1)
+    plt.subplot(211)
 
     plots.append(plt.plot(cut_fraktions, effs, 'r-', label="eff"))
     label_h.append(mlines.Line2D([], [], color='red', label='eff'))
@@ -783,39 +762,32 @@ def try_different_cut_fraktion(cut_fraktions=map(lambda x: float(x) / 20.,
         cut_fraktions, effs_sig, 'b-', label="eff sig"))
     label_h.append(mlines.Line2D([], [], color='blue', label='eff sig'))
 
-    # plots.append(plt.plot(cut_fraktions, [
-    #              s / 120. for s in signigicance], 'g-', label="signif/120"))
-
     plots.append(plt.plot(cut_fraktions, [
-        s / 250. for s in signif_total], 'g-', label="signif/250"))
+                 s / 120. for s in signigicance], 'g-', label="signif/120"))
+    label_h.append(mlines.Line2D([], [], color='green', label='signif/120'))
 
-    label_h.append(mlines.Line2D([], [], color='green', label='signif/250'))
-
-    plots.append(plt.plot(cut_fraktions, Ps_no_zero, 'r.', label="Ps no zero"))
-    label_h.append(mlines.Line2D([], [], color='red', marker='.',
-                                 markersize=15, linewidth=0, label='mean P, no 0.'))
-
-    plots.append(plt.plot(cut_fraktions, Rs_no_zero, 'b.', label="Rs no zero"))
-    label_h.append(mlines.Line2D([], [], color='blue', marker='.',
-                                 markersize=15, linewidth=0, label='mean R, no 0.'))
-
-    # plots.append(plt.plot(cut_fraktions, Ps, 'r.', label="Ps"))
-    plots.append(plt.plot(cut_fraktions, P_total, 'ro', label="Ps"))
+    plots.append(plt.plot(cut_fraktions, Ps_no_zero, 'ro', label="Ps no zero"))
     label_h.append(mlines.Line2D([], [], color='red', marker='o',
+                                 markersize=15, linewidth=0, label='P no 0.'))
+
+    plots.append(plt.plot(cut_fraktions, Rs_no_zero, 'bo', label="Rs no zero"))
+    label_h.append(mlines.Line2D([], [], color='blue', marker='o',
+                                 markersize=15, linewidth=0, label='R no 0.'))
+
+    plots.append(plt.plot(cut_fraktions, Ps, 'r.', label="Ps"))
+    label_h.append(mlines.Line2D([], [], color='red', marker='.',
                                  markersize=15, linewidth=0, label='P'))
 
-    # plots.append(plt.plot(cut_fraktions, Rs, 'b.', label="Rs"))
-    # label_h.append(mlines.Line2D([], [], color='blue', marker='.',
-    #                              markersize=15, linewidth=0, label='R'))
+    plots.append(plt.plot(cut_fraktions, Rs, 'b.', label="Rs"))
+    label_h.append(mlines.Line2D([], [], color='blue', marker='.',
+                                 markersize=15, linewidth=0, label='R'))
 
-    plt.legend(handles=label_h, loc='lower left')  # , bbox_to_anchor=(
-    # 1.05, 1), loc=2, borderaxespad=0.)
+    plt.legend(handles=label_h, bbox_to_anchor=(
+        0, -0.1), loc=2, borderaxespad=0.)
 
-    plt.ylabel('Value')
-    plt.xlabel('Cut Value')
+    plt.xlabel('frac')
+    plt.ylabel('Cut Value')
     # plt.show()
-
-    plt.tight_layout()
 
     plt.savefig(figname)
 
@@ -1244,20 +1216,15 @@ def print_weights(norm=False):
                 plt.colorbar()
             plt.savefig('weight_layer_%s_kernel_channel_%s.jpg' % (name, i))
             plt.close()
-            # print type(w[i])
-            # print np.shape(w[i])
-            # print np.max(w[i])
-            # print np.min(w[i])
             skimage.io.imsave(
-                'weight_layer_%s_kernel_channel_%s_small.jpg' % (name, i), np.clip(w[i], -1., 1.))
+                'weight_layer_%s_kernel_channel_%s_small.jpg' % (name, i), w[i])
 
         imshow_g(b)
         if not norm:
             plt.colorbar()
         plt.savefig('weight_layer_%s_bias.jpg' % (name))
         plt.close()
-        skimage.io.imsave('weight_layer_%s_bias_small.jpg' %
-                          (name), np.clip(b, -1., 1.))
+        skimage.io.imsave('weight_layer_%s_bias_small.jpg' % (name), b)
 
     os.chdir('../..')
 
@@ -1295,12 +1262,12 @@ def save_wrong_cat_cutted():
                    np.transpose(validation_data[0][0][i[1]], (1, 2, 0)))
 
 
-# pred_to_val_hist()
+pred_to_val_hist()
 
 # save_wrong_cat_cutted()
 
 # print_weights(norm=True)
-# print_weights(norm=False)
+# print_weights(norm=True)
 
 # valid_scatter()
 
@@ -1331,8 +1298,8 @@ def save_wrong_cat_cutted():
 #     highest_conv_activation(img_id=id)
 #     print
 
-# try_different_cut_fraktion(cut_fraktions=map(lambda x: float(
-#     x) / 80., range(32, 80)), figname=IMAGE_OUTPUT_PATH + '/10_cat_new.eps')
+try_different_cut_fraktion(cut_fraktions=map(lambda x: float(
+    x) / 80., range(32, 80)), figname=IMAGE_OUTPUT_PATH + '/10_cat.eps')
 
 # pixel_correlations(True)
 # pixel_correlations()

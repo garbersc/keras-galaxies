@@ -8,10 +8,10 @@ sys.path.append("../kaggle-galaxies/win_sol/kaggle-galaxies/")
 
 
 inputpaths = [
-    'img_orig_imported/weights_normalized/weight_layer_conv_2_kernel_channel_%i_small.jpg' % i for i in range(64)]
-outputpath = 'img_orig_imported/weights_normalized/weight_layer_conv_2_kernel.jpg'
+    'img_10cat/weights_normalized/weight_layer_conv_0_kernel_channel_%i_small.jpg' % i for i in range(3)]
+outputpath = 'img_10cat/weights_normalized/weight_layer_conv_0_kernel.jpg'
 
-format = (8, 8)
+format = (1, 3)
 
 img = [skimage.io.imread(path_, dtype='float32') for path_ in inputpaths]
 if format:

@@ -19,7 +19,7 @@ predict = False  # not implemented
 continueAnalysis = False
 saveAtEveryValidation = True
 
-import_conv_weights = True
+import_conv_weights = False
 
 # only relevant if not continued and not gets winsol weights, see http://arxiv.org/abs/1511.06422 for
 # describtion
@@ -33,22 +33,22 @@ NUM_INPUT_FEATURES = 3
 
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-EPOCHS = 100
+EPOCHS = 300
 VALIDATE_EVERY = 5  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 INCLUDE_FLIP = True
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_10cat_wMaxout.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_10cat_wConfidence.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_10cat_wMaxout.h5"
+WEIGHTS_PATH = "analysis/final/try_10cat_wConfidence.h5"
 
 CONV_WEIGHT_PATH = ''  # 'analysis/final/try_3cat_geometry_corr_geopics_next.h5'
 
 
 LEARNING_RATE_SCHEDULE = {
-    0: 0.002,
-    # 2: 0.1,
-    # 10: 0.05,
+    0: 0.001,
+    100: 0.0005,
+    200: 0.0001,
     # 40: 0.01,
     # 80: 0.005,
     # 120: 0.0005
@@ -89,7 +89,11 @@ if copy_to_ram_beforehand:
     ra.myLoadFrom_RAM = True
     import copy_data_to_shm
 
-y_train = np.load("data/solutions_train_10cat.npy")
+# y_train = np.load("data/solutions_train_10cat.npy")
+if not os.path.isfile('data/solution_certainties_train_10cat.npy'):
+    print 'generate 10 category solutions'
+    import solutions_to_10cat
+y_train = np.load('data/solution_certainties_train_10cat.npy')
 # y_train = np.concatenate((y_train, np.zeros((np.shape(y_train)[0], 30 - 3))),
 #                          axis=1)
 
@@ -176,7 +180,8 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models(final_units=10, optimizer=optimizer)
+winsol.init_models(final_units=10, optimizer=optimizer,
+                   loss='mean_squared_error')
 
 if debug:
     print winsol.models['model_norm'].get_output_shape_at(0)
