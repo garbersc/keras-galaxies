@@ -206,7 +206,7 @@ def load_and_process_image(img_index, ds_transforms, augmentation_params, target
     img = load_data.load_image(img_id, from_ram=myLoadFrom_RAM)
     # load_time = (time.time() - start_time) * 1000
     # start_time = time.time()
-    img_a = perturb_and_dscrop(
+    img_a =  perturb_and_dscrop(
         img, ds_transforms, augmentation_params, target_sizes)
     # augment_time = (time.time() - start_time) * 1000
     # print "load: %.2f ms\taugment: %.2f ms" % (load_time, augment_time)
@@ -362,7 +362,7 @@ def realtime_fixed_augmented_data_gen(selected_indices, subset, ds_transforms=ds
         pool = mp.Pool(NUM_PROCESSES)
         # lower chunksize seems to help to keep memory usage in check
         gen = pool.imap(process_func, indices_n, chunksize=100)
-
+        
         for k, imgs_aug in enumerate(gen):
             for j, imgs in enumerate(imgs_aug):
                 for i, img in enumerate(imgs):

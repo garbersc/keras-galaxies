@@ -17,7 +17,7 @@ copy_to_ram_beforehand = False
 
 debug = True
 predict = False  # not implemented
-continueAnalysis = True
+continueAnalysis = False
 saveAtEveryValidation = True
 
 import_conv_weights = False
@@ -43,15 +43,15 @@ TRAIN_LOSS_SF_PATH = "trainingNmbrs_10cat_wConfidence_bw.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
 WEIGHTS_PATH = "analysis/final/try_10cat_wConfidence_bw.h5"
 
-load_data.img_path = 'data/bw/images_train_rev1/%s.jpg'
+#load_data.img_path = 'data/bw/images_train_rev1/%s.jpg'
 
 CONV_WEIGHT_PATH = ''  # 'analysis/final/try_3cat_geometry_corr_geopics_next.h5'
 
 
 LEARNING_RATE_SCHEDULE = {
-    0: 0.001,
-    100: 0.0005,
-    200: 0.0001,
+    0: 0.01,
+    100: 0.005,
+    200: 0.001,
     # 40: 0.01,
     # 80: 0.005,
     # 120: 0.0005
