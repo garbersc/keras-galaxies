@@ -49,21 +49,11 @@ CONV_WEIGHT_PATH = ''  # 'analysis/final/try_3cat_geometry_corr_geopics_next.h5'
 
 
 LEARNING_RATE_SCHEDULE = {
-    0: 0.01,
-    100: 0.005,
-    200: 0.001,
-    # 40: 0.01,
-    # 80: 0.005,
-    # 120: 0.0005
-    # 500: 0.04,
-    # 0: 0.01,
-    # 1800: 0.004,
-    # 2300: 0.0004,
-    # 0: 0.08,
-    # 50: 0.04,
-    # 2000: 0.008,
-    # 3200: 0.0008,
-    # 4600: 0.0004,
+    0: 0.1,
+    20: 0.05,
+    40: 0.01,
+    80: 0.005
+
 }
 if continueAnalysis:
     LEARNING_RATE_SCHEDULE = {
@@ -219,7 +209,7 @@ def create_data_gen():
         chunk_size=BATCH_SIZE,
         augmentation_params=augmentation_params,
         ds_transforms=ds_transforms,
-        target_sizes=input_sizes)
+        target_sizes=input_sizes, features=NUM_INPUT_FEATURES)
 
     post_augmented_data_gen = ra.post_augment_brightness_gen(
         augmented_data_gen, std=0.5)

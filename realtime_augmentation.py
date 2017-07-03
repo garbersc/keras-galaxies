@@ -47,7 +47,7 @@ def select_indices(num, num_selected):
     return selected_indices
 
 
-def fast_warp(img, tf, output_shape=(53, 53), mode='reflect'):
+def fast_warp(img, tf, output_shape=(53, 53), mode='reflect', features=3):
     """
     This wrapper function is about five times faster than skimage.transform.warp, for our use case.
     """
@@ -55,10 +55,15 @@ def fast_warp(img, tf, output_shape=(53, 53), mode='reflect'):
     # print("DEBUG:")
    # print type(tf)
     m = tf.params
-    img_wf = np.empty((output_shape[0], output_shape[1], 3), dtype='float32')
-    for k in xrange(3):
-        img_wf[..., k] = skimage.transform._warps_cy._warp_fast(
-            img[..., k], m, output_shape=output_shape, mode=mode)
+    img_wf = np.empty(
+        (output_shape[0], output_shape[1], features), dtype='float32')
+    if features > 1:
+        for k in xrange(features):
+            img_wf[..., k] = skimage.transform._warps_cy._warp_fast(
+                img[..., k], m, output_shape=output_shape, mode=mode)
+    else:
+        img_wf = skimage.transform._warps_cy._warp_fast(
+            img, m, output_shape=output_shape, mode=mode)
     return img_wf
 
 
@@ -166,7 +171,7 @@ def random_perturbation_transform(zoom_range, rotation_range, shear_range, trans
     return build_augmentation_transform(zoom, rotation, shear, translation)
 
 
-def perturb_and_dscrop(img, ds_transforms, augmentation_params, target_sizes=None):
+def perturb_and_dscrop(img, ds_transforms, augmentation_params, target_sizes=None, features=3):
     if target_sizes is None:  # default to (53,53) for backwards compatibility
         target_sizes = [(53, 53) for _ in xrange(len(ds_transforms))]
 
@@ -178,7 +183,7 @@ def perturb_and_dscrop(img, ds_transforms, augmentation_params, target_sizes=Non
     result = []
     for tform_ds, target_size in zip(ds_transforms, target_sizes):
         result.append(fast_warp(img, tform_ds + tform_augment,
-                                output_shape=target_size, mode='reflect').astype('float32'))
+                                output_shape=target_size, mode='reflect', features=features).astype('float32'))
 
     return result
 
@@ -200,14 +205,14 @@ ds_transforms = ds_transforms_default
 ## REALTIME AUGMENTATION GENERATOR ##
 
 
-def load_and_process_image(img_index, ds_transforms, augmentation_params, target_sizes=None):
+def load_and_process_image(img_index, ds_transforms, augmentation_params, target_sizes=None, features=3):
     # start_time = time.time()
     img_id = load_data.train_ids[img_index]
     img = load_data.load_image(img_id, from_ram=myLoadFrom_RAM)
     # load_time = (time.time() - start_time) * 1000
     # start_time = time.time()
-    img_a =  perturb_and_dscrop(
-        img, ds_transforms, augmentation_params, target_sizes)
+    img_a = perturb_and_dscrop(
+        img, ds_transforms, augmentation_params, target_sizes, features=features)
     # augment_time = (time.time() - start_time) * 1000
     # print "load: %.2f ms\taugment: %.2f ms" % (load_time, augment_time)
     return img_a
@@ -225,13 +230,14 @@ class LoadAndProcess(object):
     The solution is to use a callable object instead, which is picklable.
     """
 
-    def __init__(self, ds_transforms, augmentation_params, target_sizes=None):
+    def __init__(self, ds_transforms, augmentation_params, target_sizes=None, features=3):
         self.ds_transforms = ds_transforms
         self.augmentation_params = augmentation_params
         self.target_sizes = target_sizes
+        self.features = features
 
     def __call__(self, img_index):
-        return load_and_process_image(img_index, self.ds_transforms, self.augmentation_params, self.target_sizes)
+        return load_and_process_image(img_index, self.ds_transforms, self.augmentation_params, self.target_sizes, features=self.features)
 
 
 default_augmentation_params = {
@@ -243,7 +249,7 @@ default_augmentation_params = {
 
 
 def realtime_augmented_data_gen(num_chunks=None, chunk_size=CHUNK_SIZE, augmentation_params=default_augmentation_params,
-                                ds_transforms=ds_transforms_default, target_sizes=None, processor_class=LoadAndProcess):
+                                ds_transforms=ds_transforms_default, target_sizes=None, processor_class=LoadAndProcess, features=3):
     """
     new version, using Pool.imap instead of Pool.map, to avoid the data structure conversion
     from lists to numpy arrays afterwards.
@@ -263,7 +269,7 @@ def realtime_augmented_data_gen(num_chunks=None, chunk_size=CHUNK_SIZE, augmenta
         labels = y_train[selected_indices]
 
         process_func = processor_class(
-            ds_transforms, augmentation_params, target_sizes)
+            ds_transforms, augmentation_params, target_sizes, features=features)
 
         target_arrays = [np.empty((chunk_size, size_x, size_y, 3), dtype='float32')
                          for size_x, size_y in target_sizes]
