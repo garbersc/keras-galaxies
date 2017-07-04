@@ -38,7 +38,7 @@ BATCH_SIZE = 16  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
-included_flipped = True
+included_flipped = False
 
 USE_BLENDED_PREDICTIONS = False
 PRED_BLENDED_PATH = 'predictions/final/blended/blended_predictions.npy.gz'

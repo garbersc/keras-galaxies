@@ -1,0 +1,10 @@
+#wRandFlip 
+#The training is running for 2500 chunks, each with 10000 images. That are about 550 epochs. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss 
+#  starting learning rate to 0.040000 
+ 1 , 149.038778782 , 0.166261 , 0.0, 0.0 
+ 2 , 246.374104977 , 0.164441 , 0.0, 0.0 
+ 3 , 341.428953886 , 0.164573 , 0.0, 0.0 
+ 4 , 436.446388006 , 0.164781 , 0.0, 0.0 
+ 5 , 534.054107904 , 0.163651 , 0.0, 0.0 
+ 6 , 628.955803871 , 0.161456 , 0.0, 0.0 

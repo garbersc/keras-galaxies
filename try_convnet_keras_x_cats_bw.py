@@ -212,7 +212,7 @@ def create_data_gen():
         target_sizes=input_sizes, features=NUM_INPUT_FEATURES)
 
     post_augmented_data_gen = ra.post_augment_brightness_gen(
-        augmented_data_gen, std=0.5)
+        augmented_data_gen, std=0.5, features=NUM_INPUT_FEATURES)
 
     train_gen = load_data.buffered_gen_mp(
         post_augmented_data_gen, buffer_size=GEN_BUFFER_SIZE)
@@ -233,7 +233,9 @@ def create_valid_gen():
         'train',
         ds_transforms=ds_transforms,
         chunk_size=N_VALID,
-        target_sizes=input_sizes)
+        target_sizes=input_sizes,
+        features=NUM_INPUT_FEATURES
+    )
     # load_data.buffered_gen_mp(data_gen_valid, buffer_size=GEN_BUFFER_SIZE)
     return data_gen_valid
 
@@ -270,7 +272,14 @@ elif DO_LSUV_INIT:
     print 'Starting LSUV initialisation'
     # TODO check influence on the first epoch of the data generation of this
     # .next()
+    #    print 'debugging'
+    #    input_gen.next()
+    #    print 'next worked'
+    #    print np.shape(input_gen.next())
+    
     train_batch = input_gen.next()[0]
+    print 'train batch shape'
+    print np.shape(train_batch)
     if debug:
         print type(train_batch)
         print np.shape(train_batch)

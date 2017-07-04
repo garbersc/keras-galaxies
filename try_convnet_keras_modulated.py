@@ -7,6 +7,7 @@ import sys
 import json
 from custom_for_keras import input_generator
 from datetime import datetime, timedelta
+from keras.optimizers import Adam
 
 from custom_keras_model_x_cat_x_maxout import kaggle_x_cat_x_maxout\
     as kaggle_winsol
@@ -17,10 +18,10 @@ copy_to_ram_beforehand = False
 
 debug = True
 predict = False  # not implemented
-continueAnalysis = False
+continueAnalysis = True
 saveAtEveryValidation = True
 
-import_conv_weights = True
+import_conv_weights = False
 
 get_winsol_weights = False
 
@@ -28,7 +29,7 @@ get_winsol_weights = False
 # describtion
 # for this to work, the batch size has to be something like 128, 256, 512,
 # ... reason not found
-DO_LSUV_INIT = False
+DO_LSUV_INIT = True
 
 BATCH_SIZE = 256  # keep in mind
 
@@ -36,26 +37,26 @@ NUM_INPUT_FEATURES = 3
 
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-EPOCHS = 150
+EPOCHS = 200
 VALIDATE_EVERY = 5  # 20 # 12 # 6 # 6 # 6 # 5 #
-NUM_EPOCHS_NONORM = 0.1
+NUM_EPOCHS_NONORM = 0.
 # this should be only a few, just .1 hopefully suffices.
 
-INCLUDE_FLIP = False
+INCLUDE_FLIP = True
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_started_with_3cat_noMaxout.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_started_adam_lsuv.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_started_with_3cat_noMaxout.h5"
+WEIGHTS_PATH='analysis/final/try_lsuv_adam_next.h5'
 
-CONV_WEIGHT_PATH = 'analysis/final/try_3cat_spiral_ellipse_other_started_with_geometry_without_maxout_next_next.h5'
+CONV_WEIGHT_PATH = ""#analysis/final/try_started_with_3cat_noMaxout_next_next.h5"
 
 LEARNING_RATE_SCHEDULE = {
-    0: 0.001,
+    0: 0.005,
     # 2: 0.1,
     # 10: 0.05,
     # 40: 0.01,
     # 80: 0.005,
-    # 120: 0.0005
+     120: 0.001
     # 500: 0.04,
     # 0: 0.01,
     # 1800: 0.004,
@@ -68,17 +69,18 @@ LEARNING_RATE_SCHEDULE = {
 }
 if continueAnalysis or get_winsol_weights:
     LEARNING_RATE_SCHEDULE = {
-        0: 0.1,
-        20: 0.05,
-        40: 0.01,
-        80: 0.005
+        0: 0.005,
+        120: 0.001,
+        #40: 0.01,
+        #80: 0.005
         # 0: 0.0001,
         # 500: 0.002,
         # 800: 0.0004,
         # 3200: 0.0002,
         # 4600: 0.0001,
     }
-
+    
+optimizer = None#Adam(lr=LEARNING_RATE_SCHEDULE[0])
 
 input_sizes = [(69, 69), (69, 69)]
 PART_SIZE = 45
@@ -87,10 +89,6 @@ N_INPUT_VARIATION = 2
 
 
 GEN_BUFFER_SIZE = 2
-
-if copy_to_ram_beforehand:
-    ra.myLoadFrom_RAM = True
-    import copy_data_to_shm
 
 y_train = np.load("data/solutions_train.npy")
 ra.y_train = y_train
@@ -149,6 +147,7 @@ print("The training sample contains %s , the validation sample contains %s image
 
 # maybe put into class
 with open(TRAIN_LOSS_SF_PATH, 'a')as f:
+    f.write('#now with ADAM optimisation')
     if continueAnalysis:
         f.write('#continuing from ')
         f.write(WEIGHTS_PATH)
@@ -179,7 +178,7 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models(final_units=37, loss='mean_squared_error')
+winsol.init_models(optimizer=Adam(lr=LEARNING_RATE_SCHEDULE[0]))
 
 if debug:
     winsol.print_summary()
@@ -337,13 +336,15 @@ try:
                     validation=validation_data,
                     samples_per_epoch=N_TRAIN,
                     validate_every=VALIDATE_EVERY,
-                    nb_epochs=EPOCHS)
+                    nb_epochs=EPOCHS,
+                    data_gen_creator=create_data_gen)
 
 except KeyboardInterrupt:
     print "\ngot keyboard interuption"
     save_exit()
-except ValueError:
+except ValueError, e:
     print "\ngot value error, could be the end of the generator in the fit"
+    print e
     save_exit()
 
 save_exit()

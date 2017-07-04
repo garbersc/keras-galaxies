@@ -17,7 +17,7 @@ copy_to_ram_beforehand = False
 
 debug = True
 predict = False  # not implemented
-continueAnalysis = True
+continueAnalysis = False
 saveAtEveryValidation = True
 
 import_conv_weights = False
@@ -65,10 +65,10 @@ LEARNING_RATE_SCHEDULE = {
 }
 if continueAnalysis:
     LEARNING_RATE_SCHEDULE = {
-        0: 0.1,
-        20: 0.05,
-        40: 0.01,
-        80: 0.005
+        0: 0.0001,
+        #60: 0.0005,
+        #40: 0.01,
+        #80: 0.005
         # 0: 0.0001,
         # 500: 0.002,
         # 800: 0.0004,

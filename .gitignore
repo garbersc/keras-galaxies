@@ -57,6 +57,7 @@ docs/_build/
 data/
 *.pyc
 *~
+tf_for_poets/
 analysis/
 predictions/
 *.jpeg
