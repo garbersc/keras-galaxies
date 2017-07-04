@@ -47,7 +47,7 @@ def select_indices(num, num_selected):
     return selected_indices
 
 
-def fast_warp(img, tf, output_shape=(53, 53), mode='reflect', features=3):
+def fast_warp(img, tf, output_shape=(53, 53), mode='reflect', features=None):
     """
     This wrapper function is about five times faster than skimage.transform.warp, for our use case.
     """
@@ -271,7 +271,7 @@ def realtime_augmented_data_gen(num_chunks=None, chunk_size=CHUNK_SIZE, augmenta
         process_func = processor_class(
             ds_transforms, augmentation_params, target_sizes, features=features)
 
-        target_arrays = [np.empty((chunk_size, size_x, size_y, 3), dtype='float32')
+        target_arrays = [np.empty((chunk_size, size_x, size_y, features), dtype='float32')
                          for size_x, size_y in target_sizes]
         pool = mp.Pool(NUM_PROCESSES)
         # lower chunksize seems to help to keep memory usage in check
