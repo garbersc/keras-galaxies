@@ -83,10 +83,10 @@ if copy_to_ram_beforehand:
     import copy_data_to_shm
 
 # y_train = np.load("data/solutions_train_10cat.npy")
-if not os.path.isfile('data/solution_certainties_train_10cat.npy'):
+if not os.path.isfile('data/solution_certainties_train_10cat_alt_2.npy'):
     print 'generate 10 category solutions'
     import solutions_to_10cat
-y_train = np.load('data/solution_certainties_train_10cat.npy')
+y_train = np.load('data/solution_certainties_train_10cat_alt_2.npy')
 # y_train = np.concatenate((y_train, np.zeros((np.shape(y_train)[0], 30 - 3))),
 #                          axis=1)
 
@@ -276,7 +276,7 @@ elif DO_LSUV_INIT:
     #    input_gen.next()
     #    print 'next worked'
     #    print np.shape(input_gen.next())
-    
+
     train_batch = input_gen.next()[0]
     print 'train batch shape'
     print np.shape(train_batch)
