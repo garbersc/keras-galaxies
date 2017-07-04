@@ -17,7 +17,7 @@ copy_to_ram_beforehand = False
 
 debug = True
 predict = False  # not implemented
-continueAnalysis = False
+continueAnalysis = True
 saveAtEveryValidation = True
 
 import_conv_weights = False
