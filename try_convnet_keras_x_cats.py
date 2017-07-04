@@ -66,9 +66,9 @@ LEARNING_RATE_SCHEDULE = {
 if continueAnalysis:
     LEARNING_RATE_SCHEDULE = {
         0: 0.0001,
-        #60: 0.0005,
-        #40: 0.01,
-        #80: 0.005
+        # 60: 0.0005,
+        # 40: 0.01,
+        # 80: 0.005
         # 0: 0.0001,
         # 500: 0.002,
         # 800: 0.0004,
@@ -94,7 +94,7 @@ if copy_to_ram_beforehand:
 if not os.path.isfile('data/solution_certainties_train_10cat.npy'):
     print 'generate 10 category solutions'
     import solutions_to_10cat
-y_train = np.load('data/solution_certainties_train_10cat.npy')
+y_train = np.load('data/solution_certainties_train_10cat_alt_2.npy')
 # y_train = np.concatenate((y_train, np.zeros((np.shape(y_train)[0], 30 - 3))),
 #                          axis=1)
 
