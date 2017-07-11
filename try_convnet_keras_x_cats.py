@@ -10,6 +10,7 @@ from custom_for_keras import input_generator
 from datetime import datetime, timedelta
 from custom_keras_model_x_cat import kaggle_x_cat
 from keras.optimizers import Adam
+from make_class_weights import create_class_weight
 
 start_time = time.time()
 
@@ -17,8 +18,10 @@ copy_to_ram_beforehand = False
 
 debug = True
 predict = False  # not implemented
-continueAnalysis = False
+continueAnalysis = True
 saveAtEveryValidation = True
+
+use_class_weights = True
 
 import_conv_weights = False
 
@@ -34,14 +37,14 @@ NUM_INPUT_FEATURES = 3
 
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-EPOCHS = 300
+EPOCHS = 100
 VALIDATE_EVERY = 5  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 INCLUDE_FLIP = True
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_10cat_wConfidence.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_10cat_wConfidence_wWeights.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_10cat_wConfidence.h5"
+WEIGHTS_PATH = "analysis/final/try_10cat_wConfidence_wWeights.h5"
 
 CONV_WEIGHT_PATH = ''  # 'analysis/final/try_3cat_geometry_corr_geopics_next.h5'
 
@@ -65,7 +68,7 @@ LEARNING_RATE_SCHEDULE = {
 }
 if continueAnalysis:
     LEARNING_RATE_SCHEDULE = {
-        0: 0.0001,
+        0: 0.001,
         # 60: 0.0005,
         # 40: 0.01,
         # 80: 0.005
@@ -160,6 +163,20 @@ with open(TRAIN_LOSS_SF_PATH, 'a')as f:
     f.write("the learning rate schedule is ")
     json.dump(LEARNING_RATE_SCHEDULE, f)
     f.write('\n')
+
+
+class_weights = None
+if use_class_weights:
+    class_weight_path = 'classweights.json'
+    if os.path.isfile(class_weight_path):
+        print 'loading category weights from %s' % class_weight_path
+        with open(class_weight_path, 'r') as f:
+            class_weights = json.load(f)
+    else:
+        print 'generating category weights...'
+        class_weights = create_class_weight(
+            y_train, savefile=class_weight_path)
+        print 'saved category weights to %s' % class_weight_path
 
 print 'initiate winsol class'
 winsol = kaggle_x_cat(BATCH_SIZE=BATCH_SIZE,
@@ -329,6 +346,7 @@ try:
                     samples_per_epoch=N_TRAIN,
                     validate_every=VALIDATE_EVERY,
                     nb_epochs=EPOCHS,
+                    class_weight=class_weights
                     )
 
 except KeyboardInterrupt:

@@ -93,15 +93,15 @@ class kaggle_base(object):
                         loss='mean_squared_error',
                         postfix='',
                         metrics=[rmse,
-                         'categorical_accuracy',
-                         sliced_accuracy_mean,
-                         sliced_accuracy_std]):
+                                 'categorical_accuracy',
+                                 sliced_accuracy_mean,
+                                 sliced_accuracy_std]):
 
         if 'rmse' in metrics:
-            metrics=metrics
+            metrics = metrics
             metrics.remove('rmse')
             metrics.append(rmse)
-            
+
         if not self.models:
             raise ValueError('Did not find any models to compile')
 
@@ -519,7 +519,8 @@ class kaggle_base(object):
     def full_fit(self, data_gen, validation, samples_per_epoch,
                  validate_every,
                  nb_epochs, verbose=1, save_at_every_validation=True,
-                 data_gen_creator=None, postfix='', extracallbacks=None):
+                 data_gen_creator=None, postfix='', extracallbacks=None,
+                 class_weight=None):
         if verbose:
             timedeltas = []
         epochs_run = 0
@@ -552,14 +553,16 @@ class kaggle_base(object):
                         epoch_togo, validate_every]) + epochs_run,
                     initial_epoch=epochs_run, verbose=1,
                     callbacks=callbacks_,
-                    data_gen_creator=data_gen_creator, postfix=postfix):
+                    data_gen_creator=data_gen_creator, postfix=postfix,
+                    class_weight=class_weight):
                 try:
                     hist = self.models['model_norm' + postfix].fit_generator(
                         data_gen, validation_data=validation_data,
                         steps_per_epoch=steps_per_epoch,
                         epochs=nb_epoch,
                         initial_epoch=initial_epoch, verbose=verbose,
-                        callbacks=callbacks)
+                        callbacks=callbacks,
+                        class_weight=class_weight)
                     self._save_hist(hist.history, postfix=postfix)
                 except ValueError, e:
                     warnings.warn(
