@@ -158,9 +158,6 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
                                    'include_flip': include_flip,
                                    'random_flip': False}, name='input_merge'))
 
-        if self.use_keras_conv:
-            kerasCudaConvnetPooling2DLayer = MaxPool2D
-
         # needed for the pylearn moduls used by kerasCudaConvnetConv2DLayer and
         # kerasCudaConvnetPooling2DLayer
         if not self.use_keras_conv:
@@ -170,6 +167,8 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
             if self.use_keras_conv:
                 model.add(Conv2D(filters=32, kernel_size=6, name='conv_0',
                                  trainable=not freeze_conv[0]))
+                model.add(Bias(32, name='conv_0_bias'))
+                self.layer_formats['conv_0_bias'] = 3
             else:
                 model.add(kerasCudaConvnetConv2DLayer(
                     n_filters=32, filter_size=6, untie_biases=True, name='conv_0',
@@ -177,12 +176,17 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
         else:
             del self.layer_formats['conv_0']
 
-        model.add(kerasCudaConvnetPooling2DLayer(name='pool_0'))
+        if self.use_keras_conv:
+            model.add(MaxPool2D(name='pool_0'))
+        else:
+            model.add(kerasCudaConvnetPooling2DLayer(name='pool_0'))
 
         if not cut_out_conv[1]:
             if self.use_keras_conv:
                 model.add(Conv2D(filters=64, kernel_size=5, name='conv_1',
                                  trainable=not freeze_conv[1]))
+                model.add(Bias(64, name='conv_1_bias'))
+                self.layer_formats['conv_1_bias'] = 3
             else:
                 model.add(kerasCudaConvnetConv2DLayer(
                     n_filters=64, filter_size=5, untie_biases=True, name='conv_1',
@@ -190,12 +194,17 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
         else:
             del self.layer_formats['conv_1']
 
-        model.add(kerasCudaConvnetPooling2DLayer(name='pool_1'))
+        if self.use_keras_conv:
+            model.add(MaxPool2D(name='pool_1'))
+        else:
+            model.add(kerasCudaConvnetPooling2DLayer(name='pool_1'))
 
         if not cut_out_conv[2]:
             if self.use_keras_conv:
                 model.add(Conv2D(filters=128, kernel_size=3, name='conv_2',
                                  trainable=not freeze_conv[2]))
+                model.add(Bias(128, name='conv_2_bias'))
+                self.layer_formats['conv_2_bias'] = 3
             else:
                 model.add(kerasCudaConvnetConv2DLayer(
                     n_filters=128, filter_size=3, untie_biases=True, name='conv_2',
@@ -207,6 +216,8 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
             if self.use_keras_conv:
                 model.add(Conv2D(filters=128, kernel_size=3, name='conv_3',
                                  trainable=not freeze_conv[3]))
+                model.add(Bias(128, name='conv_3_bias'))
+                self.layer_formats['conv_3_bias'] = 3
             else:
                 model.add(kerasCudaConvnetConv2DLayer(n_filters=128,
                                                       filter_size=3,  weights_std=0.1,
@@ -215,7 +226,10 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
         else:
             del self.layer_formats['conv_3']
 
-        model.add(kerasCudaConvnetPooling2DLayer(name='pool_2'))
+        if self.use_keras_conv:
+            model.add(MaxPool2D(name='pool_2'))
+        else:
+            model.add(kerasCudaConvnetPooling2DLayer(name='pool_2'))
 
         if not self.use_keras_conv:
             model.add(fPermute((3, 0, 1, 2), name='cuda_out_perm'))

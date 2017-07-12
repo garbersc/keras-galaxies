@@ -190,28 +190,32 @@ class kaggle_base(object):
 
             weight = [np.array(weight[n]) for n in weight.keys()]
 
-            # if self.debug:
-            #     print '\t %s' % repr(np.shape(weight[0]))
-            #     # if ls == 'conv_3':
-            #     for w in weight:
-            #         print np.shape(w)
-            #         print np.shape(w[0])
+            if 'use_keras_conv' in vars(self):
+                if ls.find('conv') >= 0:
+                    self.models[modelname].get_layer(
+                        sub_modelname).get_layer(lt + '_bias').set_weights([weight[1]])
+                    weight = [np.transpose(weight[0], (1, 2, 0, 3)), np.zeros(
+                        np.shape(self.models[modelname].get_layer(
+                            sub_modelname).get_layer(lt).get_weights()[1]))]
+                elif ls.find('dense_output') >= 0:
+                    weight = weight[::-1]
 
-            if 'use_keras_conv' in vars(self) and ls.find('conv') >= 0:
-                print
-                print 'loading weight of a conv layer'
-                print 'source'
+            try:
+                self.models[modelname].get_layer(
+                    sub_modelname).get_layer(lt).set_weights(weight)
+            except ValueError, e:
+                print 'source ' + ls
                 for w in weight:
                     print np.shape(w)
-                print 'target'
+                print 'target ' + lt
                 for w in self.models[modelname].get_layer(
                         sub_modelname).get_layer(lt).get_weights():
                     print np.shape(w)
                 print
-
-            weight[0] = np.transpose(weight[0], (1, 2, 0, 3))
-            self.models[modelname].get_layer(
-                sub_modelname).get_layer(lt).set_weights(weight)
+                print self.models[modelname].get_layer(
+                    sub_modelname).get_layer(lt).get_config()
+                print
+                raise ValueError(e)
 
         file_.close()
         if self.debug:
@@ -232,26 +236,25 @@ class kaggle_base(object):
     '''
 
     def load_weights(self, path, modelname='model_norm', postfix=''):
-        if 'use_keras_conv' in vars(self):
-            if self.use_keras_conv:
-                for sub_model in self.models[modelname + postfix].layers:
-                    if 'layers' in vars(sub_model):
-                        for layer in sub_model.layers:
-                            if 'layer_formats' in vars(self) \
-                               and layer.name in self.layer_formats\
-                               and self.layer_formats[layer.name] >= 0:
-                                self.load_one_layers_weight(path=path,
-                                                            layername_source=layer.name,
-                                                            modelname=modelname,
-                                                            sub_modelname=sub_model.name,
-                                                            postfix=postfix)
-                return True
-
-        modelname = modelname + postfix
-        self.models[modelname].load_weights(path)
-        with open(self.LOSS_PATH, 'a')as f:
-            f.write('#loaded weights from ' + path +
-                    ' into  model ' + modelname + '\n')
+        if 'use_keras_conv' in vars(self) and self.use_keras_conv:
+            for sub_model in self.models[modelname + postfix].layers:
+                if 'layers' in vars(sub_model):
+                    for layer in sub_model.layers:
+                        if 'layer_formats' in vars(self) \
+                           and layer.name in self.layer_formats\
+                           and (self.layer_formats[layer.name] == 0
+                                or self.layer_formats[layer.name] == 1):
+                            self.load_one_layers_weight(path=path,
+                                                        layername_source=layer.name,
+                                                        modelname=modelname,
+                                                        sub_modelname=sub_model.name,
+                                                        postfix=postfix)
+        else:
+            modelname = modelname + postfix
+            self.models[modelname].load_weights(path)
+            with open(self.LOSS_PATH, 'a')as f:
+                f.write('#loaded weights from ' + path +
+                        ' into  model ' + modelname + '\n')
         return True
     '''
     prints the loss and metric information of a model
@@ -290,8 +293,8 @@ class kaggle_base(object):
             raise
 
         for i in range(len(self.models[modelname].metrics_names)):
-            self.hists[modelname][self.models[modelname].metrics_names[i]]\
-                .append(evalHist[i])
+            self.hists[modelname][self.models[modelname].metrics_names[i]].append(
+                evalHist[i])
 
         if verbose:
             self.print_last_hist(postfix=postfix)
@@ -310,8 +313,8 @@ class kaggle_base(object):
         )
 
         for i in range(len(self.models[modelname].metrics_names)):
-            self.hists[modelname][self.models[modelname].metrics_names[i]]\
-                .append(evalHist[i])
+            self.hists[modelname][self.models[modelname].metrics_names[i]].append(
+                evalHist[i])
 
         if verbose:
             self.print_last_hist(postfix=postfix)
@@ -715,7 +718,7 @@ class kaggle_base(object):
                 main_layer).layers[layer].get_weights()
         elif type(layer) == str:
             ret_weights = self.models[modelname].get_layer(main_layer)\
-                                                .get_layer(layer).get_weights()
+                .get_layer(layer).get_weights()
         else:
             raise ValueError('layer must be specified as int or string')
         return ret_weights

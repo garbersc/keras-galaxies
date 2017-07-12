@@ -35,7 +35,7 @@ BATCH_SIZE = 16  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
-included_flipped = False
+included_flipped = True
 
 USE_BLENDED_PREDICTIONS = False
 PRED_BLENDED_PATH = 'predictions/final/blended/blended_predictions.npy.gz'
@@ -168,7 +168,8 @@ winsol = kaggle_winsol(BATCH_SIZE=BATCH_SIZE,
                        LOSS_PATH=TRAIN_LOSS_SF_PATH,
                        WEIGHTS_PATH=WEIGHTS_PATH,
                        include_flip=included_flipped,
-                       use_keras_conv=True)
+                       use_keras_conv=True,
+                       )
 
 layer_formats = winsol.layer_formats
 layer_names = layer_formats.keys()
