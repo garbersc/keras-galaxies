@@ -13,7 +13,7 @@ from termcolor import colored
 from datetime import datetime, timedelta
 from custom_keras_model_and_fit_capsels import kaggle_winsol
 from custom_for_keras import input_generator
-from simple_deconv import deconvnet
+from simple_deconv import simple_deconv
 
 ##############################################
 # starting parameters
@@ -34,12 +34,13 @@ if debug:
 TRAIN_LOSS_SF_PATH = 'try_ellipseOnly_2param.txt'
 # TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = 'analysis/final/try_10cat_wMaxout_next_next_next_next.h5'
+# WEIGHTS_PATH = 'analysis/final/try_10cat_wMaxout_next_next_next_next.h5'
+WEIGHTS_PATH = './'
 TXT_OUTPUT_PATH = '_'
 ELLIPSE_FIT = WEIGHTS_PATH.find('ellipse') >= 0
 if ELLIPSE_FIT:
     postfix = '_ellipse'
-DONT_LOAD_WEIGHTS = False
+DONT_LOAD_WEIGHTS = True
 input_sizes = [(69, 69), (69, 69)]
 PART_SIZE = 45
 postfix = ''
@@ -48,7 +49,7 @@ GEN_BUFFER_SIZE = 2
 # set to True if the prediction and evaluation should be done when the
 # prediction file already exists
 REPREDICT_EVERYTIME = False
-IMAGE_OUTPUT_PATH = "images_deconv"
+IMAGE_OUTPUT_PATH = "images_simple_deconv"
 TEST = False  # disable this to not generate predictions on the testset
 
 ##############################################
@@ -73,7 +74,7 @@ question_slices = [slice(0, 10)]
 # question_requierement[3] = question_slices[1].start + 1
 # question_requierement[4] = question_slices[1].start + 1
 # question_requierement[6] = question_slices[0].start
-# question_requierement[9] = question_slices[4].start
+# question_requierement[9] = question_slices[4].start#
 # question_requierement[10] = question_slices[4].start
 
 # print 'Question requirements: %s' % question_requierement
@@ -148,13 +149,13 @@ print("validation sample contains %s images. \n" %
       (ra.num_valid))
 
 print 'initiate deconvnet class'
-deconv = deconvnet(BATCH_SIZE=BATCH_SIZE,
-                   NUM_INPUT_FEATURES=NUM_INPUT_FEATURES,
-                   PART_SIZE=PART_SIZE,
-                   input_sizes=input_sizes,
-                   LOSS_PATH=TRAIN_LOSS_SF_PATH,
-                   WEIGHTS_PATH=WEIGHTS_PATH,
-                   include_flip=included_flipped)
+deconv = simple_deconv(BATCH_SIZE=BATCH_SIZE,
+                       NUM_INPUT_FEATURES=NUM_INPUT_FEATURES,
+                       PART_SIZE=PART_SIZE,
+                       input_sizes=input_sizes,
+                       LOSS_PATH=TRAIN_LOSS_SF_PATH,
+                       WEIGHTS_PATH=WEIGHTS_PATH,
+                       include_flip=included_flipped)
 
 layer_formats = deconv.layer_formats
 layer_names = layer_formats.keys()
@@ -171,11 +172,12 @@ if debug:
 deconv.init_models()
 
 if debug:
-    deconv.print_summary(postfix=postfix)
+    deconv.print_summary(modelname='model_simple', postfix=postfix)
 
 
 print "Load model weights..."
-deconv.load_weights(path=WEIGHTS_PATH, postfix=postfix)
+deconv.load_weights(modelname='model_simple',
+                    path=WEIGHTS_PATH, postfix=postfix)
 deconv.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
 # c, y, x, filter
 # y, x, c, filter
@@ -390,7 +392,7 @@ def reshape_output(x):
     return x
 
 
-def print_output(nr_images=5, plots=False, combined_rgb=True, wall_variations=True, wall_output=False, norm_single_img=False):
+def print_output(nr_images=1, combined_rgb=True, norm_single_img=False):
     if debug:
         print 'Checking save directory...'
     if not os.path.isdir(IMAGE_OUTPUT_PATH):
@@ -424,123 +426,34 @@ def print_output(nr_images=5, plots=False, combined_rgb=True, wall_variations=Tr
         if type(image_nr) == int:
             input_img = [np.asarray([validation_data[0][0][image_nr]]),
                          np.asarray([validation_data[0][1][image_nr]])]
-#        if debug:
-        #     print 'Collecting output from merge layer...'
-        # intermediate_outputs = {}
-        # intermediate_outputs['input_merge'] = np.asarray(deconv.get_layer_output(
-        #     'input_merge', input_=input_img))
-        # intermediate_outputs['input_merge'] = reshape_output(
-        #     intermediate_outputs['input_merge'])
         if debug:
-            # print 'Shape of intermediate outputs: ' +
-            # str(np.shape(intermediate_outputs['input_merge']))
             print 'Shape of input image array: ' + str(np.shape(input_img[0][0]))
 
-        if plots:
-            print 'Creating plots for Image %s' % (valid_ids[i])
-            if wall_variations & wall_output:
-                canvas, (im1, im2) = plt.subplots(1, 2)
+        print 'Creating plots for Image %s' % (valid_ids[i])
+        for j, channel in enumerate(img):
+            if norm_single_img:
+                channel -= np.min(channel)
+                channel = channel / np.max(channel)
+
+                canvas, (im1, im2, im3) = plt.subplots(1, 3)
                 im1.imshow(np.transpose((input_img[0][0]), (1, 2, 0)),
                            interpolation='none')
                 im1.set_title('Input Image %s' % (valid_ids[i]))
+                if combined_rgb:
+                    im3.imshow(_img_wall(img))
+                    im3.set_title('Deconv Variations')
+                    im3.axis('off')
+                else:
+                    im3.imshow(_img_wall(channel), interpolation='none',
+                               cmap=plt.get_cmap('gray'))
+                    im3.set_title('Deconv Variations')
+                    im3.axis('off')
 
-                # im2.imshow(
-                #     _img_wall(intermediate_outputs['input_merge']), interpolation='none')
-                # im2.set_title('Variations')
-                # im2.axis('off')
-
-                im2.imshow(_img_wall(img))
-                im2.set_title('Deconv Variations')
-                im2.axis('off')
-
-                plt.savefig('image_%s_variations.jpg' %
-                            (valid_ids[i]), dpi=300)
-                plt.close()
-            else:
-                for j, channel in enumerate(img):
-                    if norm_single_img:
-                        channel -= np.min(channel)
-                        channel = channel / np.max(channel)
-
-                    canvas, (im1, im2, im3) = plt.subplots(1, 3)
-                    im1.imshow(np.transpose((input_img[0][0]), (1, 2, 0)),
-                               interpolation='none')
-                    im1.set_title('Input Image %s' % (valid_ids[i]))
-
-                    if wall_variations:  # not working yet
-                        im2.imshow(
-                            _img_wall(intermediate_outputs['input_merge']), interpolation='none')
-                        im2.set_title('Variation %s' % j)
-                        im2.axis('off')
-                    else:
-                        im2.imshow(np.transpose(intermediate_outputs['input_merge'][j], (
-                            1, 2, 0)), interpolation='none', cmap=plt.get_cmap('gray'))
-                        im2.set_title('Variation %s' % j)
-
-                    if wall_output:
-                        if combined_rgb:
-                            im3.imshow(_img_wall(img))
-                            im3.set_title('Deconv Variations')
-                            im3.axis('off')
-                        else:
-                            im3.imshow(_img_wall(channel), interpolation='none',
-                                       cmap=plt.get_cmap('gray'))
-                            im3.set_title('Deconv Variations')
-                            im3.axis('off')
-                    else:
-                        if combined_rgb:
-                            fpicture = np.transpose((channel),
-                                                    (2, 1, 0))
-                            im3.imshow(fpicture, interpolation='none')
-                            im3.set_title('Deconv Variation %s' % j)
-                        else:
-                            im3.imshow(_img_wall(channel), interpolation='none',
-                                       cmap=plt.get_cmap('gray'))
-                            im3.set_title('Deconv Variation %s' % j)
-                            im3.axis('off')
-                    plt.savefig('image_%s_variation_%s.jpg' %
-                                (valid_ids[i], j), dpi=300)
-                    plt.close()
-
-        # for i, img in enumerate(output_deconv[0:5]):
-        #     for j, channel in enumerate(img):
-        #         imshow_g(channel)
-        #         plt.colorbar()
-        #         plt.savefig('%s_%s.jpg' % (i, j), dpi=300)
-        #         plt.close()
-
-        # if type(image_nr) == int:
-        #     imshow_c(np.transpose(input_img[0][0], (1, 2, 0)))
-        #     plt.savefig('input_fig_%s_rotation_0.jpg' % (image_nr))
-        #     plt.close()
-
-        #     imshow_c(np.transpose(input_img[1][0], (1, 2, 0)))
-        #     plt.savefig('input_fig_%s_rotation_45.jpg' % (image_nr))
-        #     plt.close()
-
-        #     for i in range(len(input_img[0][0])):
-        #         imshow_g(input_img[0][0][i])
-        #         plt.savefig('input_fig_%s_rotation_0_dim_%s.jpg' %
-        #                     (image_nr, i))
-        #         plt.close()
-
-        #     for i in range(len(input_img[1][0])):
-        #         imshow_g(input_img[1][0][i])
-        #         plt.savefig('input_fig_%s_rotation_45_dim_%s.jpg' %
-        #                     (image_nr, i))
-        #         plt.close()
-
-        #     imshow_g(_img_wall(intermediate_outputs['input_merge']))
-        #     plt.colorbar()
-        #     plt.savefig('output_fig_%s_%s.jpg' %
-        #                 (image_nr, 'input_merge'))
-        #     plt.close()
-
-    os.chdir('..')
+        os.chdir('..')
 
 
 if MAKE_PLOTS:
-    print_output(plots=True)
+    print_output()
     save_exit()
 
 print 'Done'
