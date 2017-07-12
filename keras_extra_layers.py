@@ -113,6 +113,8 @@ class DeConv(Conv2DTranspose):
 
         return outputs
 
+# Untied Bias Layer. Can be used instead of Activation.
+
 
 class Bias(Layer):
     def __init__(self, nFilters, **kwargs):
@@ -143,8 +145,7 @@ class Bias(Layer):
 
 class DeBias(Bias):
     def __init__(self, nFilters, **kwargs):
-        self.nFilters = nFilters
-        super(DeBias, self).__init__(**kwargs)
+        super(DeBias, self).__init__(nFilters, **kwargs)
 
     def call(self, x, mask=None):
         output = x
