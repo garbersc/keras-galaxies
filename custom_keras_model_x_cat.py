@@ -5,7 +5,7 @@ class kaggle_x_cat(kaggle_x_cat_x_maxout):
     def __init__(self, *args,
                  **kwargs):
 
-        super(kaggle_x_cat_x_maxout, self).__init__(
+        super(kaggle_x_cat, self).__init__(
             *args,
             **kwargs)
 

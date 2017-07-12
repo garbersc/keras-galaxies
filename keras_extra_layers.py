@@ -114,10 +114,10 @@ class DeConv(Conv2DTranspose):
         return outputs
 
 
-class DeBias(Layer):
+class Bias(Layer):
     def __init__(self, nFilters, **kwargs):
         self.nFilters = nFilters
-        super(DeBias, self).__init__(**kwargs)
+        super(Bias, self).__init__(**kwargs)
 
     def build(self, input_shape):
         # Create a trainable weight variable for this layer.
@@ -127,11 +127,11 @@ class DeBias(Layer):
                                  name='{}_b'.format(self.name))
         self.built = True
         # Be sure to call this somewhere!
-        super(DeBias, self).build(input_shape)
+        super(Bias, self).build(input_shape)
 
     def call(self, x, mask=None):
         output = x
-        output -= self.b.dimshuffle('x', 0, 1, 2)
+        output += self.b.dimshuffle('x', 0, 1, 2)
         return output
 
     def get_output_shape_for(self, input_shape):
@@ -139,6 +139,18 @@ class DeBias(Layer):
 
     def compute_output_shape(self, input_shape):
         return self.get_output_shape_for(input_shape)
+
+
+class DeBias(Bias):
+    def __init__(self, nFilters, **kwargs):
+        self.nFilters = nFilters
+        super(DeBias, self).__init__(**kwargs)
+
+    def call(self, x, mask=None):
+        output = x
+        output -= self.b.dimshuffle('x', 0, 1, 2)
+        return output
+
 
 # not neede anymore, available in keras 2
 

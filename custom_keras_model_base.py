@@ -197,6 +197,19 @@ class kaggle_base(object):
             #         print np.shape(w)
             #         print np.shape(w[0])
 
+            if 'use_keras_conv' in vars(self) and ls.find('conv') >= 0:
+                print
+                print 'loading weight of a conv layer'
+                print 'source'
+                for w in weight:
+                    print np.shape(w)
+                print 'target'
+                for w in self.models[modelname].get_layer(
+                        sub_modelname).get_layer(lt).get_weights():
+                    print np.shape(w)
+                print
+
+            weight[0] = np.transpose(weight[0], (1, 2, 0, 3))
             self.models[modelname].get_layer(
                 sub_modelname).get_layer(lt).set_weights(weight)
 
@@ -219,6 +232,21 @@ class kaggle_base(object):
     '''
 
     def load_weights(self, path, modelname='model_norm', postfix=''):
+        if 'use_keras_conv' in vars(self):
+            if self.use_keras_conv:
+                for sub_model in self.models[modelname + postfix].layers:
+                    if 'layers' in vars(sub_model):
+                        for layer in sub_model.layers:
+                            if 'layer_formats' in vars(self) \
+                               and layer.name in self.layer_formats\
+                               and self.layer_formats[layer.name] >= 0:
+                                self.load_one_layers_weight(path=path,
+                                                            layername_source=layer.name,
+                                                            modelname=modelname,
+                                                            sub_modelname=sub_model.name,
+                                                            postfix=postfix)
+                return True
+
         modelname = modelname + postfix
         self.models[modelname].load_weights(path)
         with open(self.LOSS_PATH, 'a')as f:
