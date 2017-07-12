@@ -1,0 +1,80 @@
+#wRandFlip 
+#The training is running for 10 chunks, each with 1008 images. That are about 0 epochs. The validation sample contains 3078 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#  starting learning rate to 0.040000 
+ 1 , 45.8366789818 , 0.228691 , 0.0 , 0.0, 0.0, 0.0 
+ 2 , 75.0098948479 , 0.299003 , 0.0 , 0.0, 0.0, 0.0 
+ 3 , 91.9295179844 , 0.299386 , 0.0 , 0.0, 0.0, 0.0 
+ 4 , 108.953307867 , 0.296891 , 0.0 , 0.0, 0.0, 0.0 
+#wRandFlip 
+#The training is running for 10 chunks, each with 10000 images. That are about 2 epochs. The validation sample contains 3078 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#  starting learning rate to 0.040000 
+#wRandFlip 
+#The training is running for 10 chunks, each with 10000 images. That are about 2 epochs. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#  starting learning rate to 0.040000 
+ 1 , 256.207056999 , 0.225136 , 0.0 , 0.0, 0.0, 0.0 
+ 2 , 484.376540899 , 0.298017 , 0.0 , 0.0, 0.0, 0.0 
+ 3 , 651.606496811 , 0.298768 , 0.0 , 0.0, 0.0, 0.0 
+#wRandFlip 
+#The training is running for 10 chunks, each with 10000 images. That are about 2 epochs. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#  starting learning rate to 0.040000 
+#wRandFlip 
+#The training is running for 10 chunks, each with 10000 images. That are about 2 epochs. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#  starting learning rate to 0.040000 
+ 1 , 226.954747915 , 0.22419 , 0.0 , 0.0, 0.0, 0.0 
+ 2 , 460.935566902 , 0.29822 , 0.0 , 0.0, 0.0, 0.0 
+ 3 , 627.373869896 , 0.297658 , 0.0 , 0.0, 0.0, 0.0 
+ 4 , 793.457099915 , 0.29797 , 0.0 , 0.0, 0.0, 0.0 
+ 5 , 959.809201002 , 0.298905 , 0.0 , 0.0, 0.0, 0.0 
+ 6 , 1126.25691509 , 0.2983 , 0.0 , 0.0, 0.0, 0.0 
+#wRandFlip 
+#The training is running for 10 chunks, each with 10000 images. That are about 2 epochs. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#  starting learning rate to 0.040000 
+ 1 , 217.427118063 , 0.224249 , 0.0 , 0.0, 0.0, 0.0 
+ 2 , 449.188508034 , 0.300325 , 0.0 , 0.0, 0.0, 0.0 
+#wRandFlip 
+#The training is running for 10 chunks, each with 10000 images. That are about 2 epochs. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#  starting learning rate to 0.040000 
+ 1 , 253.351795197 , 0.225751 , 0.0 , 0.0, 0.0, 0.0 
+ 2 , 456.256392002 , 0.298435 , 0.0 , 0.0, 0.0, 0.0 
+ 3 , 624.585803032 , 0.298504 , 0.0 , 0.0, 0.0, 0.0 
+ 4 , 792.773235083 , 0.297972 , 0.0 , 0.0, 0.0, 0.0 
+ 5 , 961.360922098 , 0.298214 , 0.0 , 0.0, 0.0, 0.0 
+ 6 , 1129.8942492 , 0.298009 , 0.0 , 0.0, 0.0, 0.0 
+#wRandFlip 
+#The training is running for 10 chunks, each with 1008 images. That are about 0 epochs. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#  starting learning rate to 0.040000 
+ 1 , 30.2359938622 , 0.23163 , 0.0 , 0.0, 0.0, 0.0 
+ 2 , 53.7698757648 , 0.302247 , 0.0 , 0.0, 0.0, 0.0 
+ 3 , 70.6094989777 , 0.298573 , 0.0 , 0.0, 0.0, 0.0 
+ 4 , 87.1924948692 , 0.30111 , 0.0 , 0.0, 0.0, 0.0 
+ 5 , 103.81957078 , 0.299676 , 0.0 , 0.0, 0.0, 0.0 
+ 6 , 120.680850983 , 0.302673 , 0.0 , 0.0, 0.0, 0.0 
+ 7 , 137.2624228 , 0.299443 , 0.0 , 0.0, 0.0, 0.0 
+ 8 , 153.888349771 , 0.298503 , 0.0 , 0.0, 0.0, 0.0 
+#wRandFlip 
+#The training is running for 10 chunks, each with 1008 images. That are about 0 epochs. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#  starting learning rate to 0.040000 
+ 1 , 28.7935168743 , 0.229201 , 0.0 , 0.0, 0.0, 0.0 
+ 2 , 52.3987338543 , 0.298845 , 0.0 , 0.0, 0.0, 0.0 
+ 3 , 69.1041049957 , 0.297921 , 0.0 , 0.0, 0.0, 0.0 
+ 4 , 85.8317248821 , 0.296478 , 0.0 , 0.0, 0.0, 0.0 
+#wRandFlip 
+#The training is running for 10 chunks, each with 1008 images. That are about 0 epochs. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#  starting learning rate to 0.040000 
+ 1 , 28.0994198322 , 0.231166 , 0.0 , 0.0, 0.0, 0.0 
+ 2 , 53.7794308662 , 0.304141 , 0.0 , 0.0, 0.0, 0.0 
+ 3 , 70.0202379227 , 0.30169 , 0.0 , 0.0, 0.0, 0.0 
+#wRandFlip 
+#The training is running for 10 chunks, each with 10000 images. That are about 2 epochs. The validation sample contains 6157 images. 
+#round  ,time, mean_train_loss , mean_valid_loss, mean_sliced_accuracy, mean_train_loss_test, mean_accuracy 
+#  starting learning rate to 0.040000 

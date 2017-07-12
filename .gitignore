@@ -57,6 +57,7 @@ docs/_build/
 data/
 *.pyc
 *~
+tf_for_poets/
 analysis/
 predictions/
 *.jpeg
@@ -77,6 +78,8 @@ img_weight_hist/
 *.eps
 trainingLoss_different_*.txt
 loss_*.txt
+*.h5
+*_old
 
 # emacs autosave files and hidden files
 \#*

@@ -47,7 +47,7 @@ def select_indices(num, num_selected):
     return selected_indices
 
 
-def fast_warp(img, tf, output_shape=(53, 53), mode='reflect'):
+def fast_warp(img, tf, output_shape=(53, 53), mode='reflect', features=None):
     """
     This wrapper function is about five times faster than skimage.transform.warp, for our use case.
     """
@@ -55,10 +55,21 @@ def fast_warp(img, tf, output_shape=(53, 53), mode='reflect'):
     # print("DEBUG:")
    # print type(tf)
     m = tf.params
-    img_wf = np.empty((output_shape[0], output_shape[1], 3), dtype='float32')
-    for k in xrange(3):
-        img_wf[..., k] = skimage.transform._warps_cy._warp_fast(
-            img[..., k], m, output_shape=output_shape, mode=mode)
+    img_wf = np.empty(
+        (output_shape[0], output_shape[1], features), dtype='float32')
+    if features > 1:
+        for k in xrange(features):
+            img_wf[..., k] = skimage.transform._warps_cy._warp_fast(
+                img[..., k], m, output_shape=output_shape, mode=mode)
+    else:
+        try:
+            img_w=np.empty(
+                        (output_shape[0], output_shape[1]), dtype='float32')
+            img_w = skimage.transform._warps_cy._warp_fast(
+                img, m, output_shape=output_shape, mode=mode)
+            img_wf=img_w.reshape(output_shape[0], output_shape[1], features)
+        except:
+            raise
     return img_wf
 
 
@@ -166,7 +177,7 @@ def random_perturbation_transform(zoom_range, rotation_range, shear_range, trans
     return build_augmentation_transform(zoom, rotation, shear, translation)
 
 
-def perturb_and_dscrop(img, ds_transforms, augmentation_params, target_sizes=None):
+def perturb_and_dscrop(img, ds_transforms, augmentation_params, target_sizes=None, features=3):
     if target_sizes is None:  # default to (53,53) for backwards compatibility
         target_sizes = [(53, 53) for _ in xrange(len(ds_transforms))]
 
@@ -178,7 +189,7 @@ def perturb_and_dscrop(img, ds_transforms, augmentation_params, target_sizes=Non
     result = []
     for tform_ds, target_size in zip(ds_transforms, target_sizes):
         result.append(fast_warp(img, tform_ds + tform_augment,
-                                output_shape=target_size, mode='reflect').astype('float32'))
+                                output_shape=target_size, mode='reflect', features=features).astype('float32'))
 
     return result
 
@@ -200,14 +211,14 @@ ds_transforms = ds_transforms_default
 ## REALTIME AUGMENTATION GENERATOR ##
 
 
-def load_and_process_image(img_index, ds_transforms, augmentation_params, target_sizes=None):
+def load_and_process_image(img_index, ds_transforms, augmentation_params, target_sizes=None, features=None):
     # start_time = time.time()
     img_id = load_data.train_ids[img_index]
     img = load_data.load_image(img_id, from_ram=myLoadFrom_RAM)
     # load_time = (time.time() - start_time) * 1000
     # start_time = time.time()
     img_a = perturb_and_dscrop(
-        img, ds_transforms, augmentation_params, target_sizes)
+        img, ds_transforms, augmentation_params, target_sizes, features=features)
     # augment_time = (time.time() - start_time) * 1000
     # print "load: %.2f ms\taugment: %.2f ms" % (load_time, augment_time)
     return img_a
@@ -225,13 +236,14 @@ class LoadAndProcess(object):
     The solution is to use a callable object instead, which is picklable.
     """
 
-    def __init__(self, ds_transforms, augmentation_params, target_sizes=None):
+    def __init__(self, ds_transforms, augmentation_params, target_sizes=None, features=None):
         self.ds_transforms = ds_transforms
         self.augmentation_params = augmentation_params
         self.target_sizes = target_sizes
+        self.features = features
 
     def __call__(self, img_index):
-        return load_and_process_image(img_index, self.ds_transforms, self.augmentation_params, self.target_sizes)
+        return load_and_process_image(img_index, self.ds_transforms, self.augmentation_params, self.target_sizes, features=self.features)
 
 
 default_augmentation_params = {
@@ -243,14 +255,16 @@ default_augmentation_params = {
 
 
 def realtime_augmented_data_gen(num_chunks=None, chunk_size=CHUNK_SIZE, augmentation_params=default_augmentation_params,
-                                ds_transforms=ds_transforms_default, target_sizes=None, processor_class=LoadAndProcess):
+                                ds_transforms=ds_transforms_default, target_sizes=None, processor_class=LoadAndProcess, features=None):
     """
     new version, using Pool.imap instead of Pool.map, to avoid the data structure conversion
     from lists to numpy arrays afterwards.
     """
     if target_sizes is None:  # default to (53,53) for backwards compatibility
         target_sizes = [(53, 53) for _ in xrange(len(ds_transforms))]
-
+    if features is None:
+        features=3
+        
     n = 0  # number of chunks yielded so far
     while True:
         if num_chunks is not None and n >= num_chunks:
@@ -263,9 +277,9 @@ def realtime_augmented_data_gen(num_chunks=None, chunk_size=CHUNK_SIZE, augmenta
         labels = y_train[selected_indices]
 
         process_func = processor_class(
-            ds_transforms, augmentation_params, target_sizes)
+            ds_transforms, augmentation_params, target_sizes, features=features)
 
-        target_arrays = [np.empty((chunk_size, size_x, size_y, 3), dtype='float32')
+        target_arrays = [np.empty((chunk_size, size_x, size_y, features), dtype='float32')
                          for size_x, size_y in target_sizes]
         pool = mp.Pool(NUM_PROCESSES)
         # lower chunksize seems to help to keep memory usage in check
@@ -294,28 +308,28 @@ def realtime_augmented_data_gen(num_chunks=None, chunk_size=CHUNK_SIZE, augmenta
 ### Fixed test-time augmentation ####
 
 
-def augment_fixed_and_dscrop(img, ds_transforms, augmentation_transforms, target_sizes=None):
+def augment_fixed_and_dscrop(img, ds_transforms, augmentation_transforms, target_sizes=None, features=None):
     if target_sizes is None:  # default to (53,53) for backwards compatibility
         target_sizes = [(53, 53) for _ in xrange(len(ds_transforms))]
 
     augmentations_list = []
     for tform_augment in augmentation_transforms:
-        augmentation = [fast_warp(img, tform_ds + tform_augment, output_shape=target_size, mode='reflect').astype(
+        augmentation = [fast_warp(img, tform_ds + tform_augment, output_shape=target_size, mode='reflect', features=features).astype(
             'float32') for tform_ds, target_size in zip(ds_transforms, target_sizes)]
         augmentations_list.append(augmentation)
 
     return augmentations_list
 
 
-def load_and_process_image_fixed(img_index, subset, ds_transforms, augmentation_transforms, target_sizes=None):
+def load_and_process_image_fixed(img_index, subset, ds_transforms, augmentation_transforms, target_sizes=None, features=None):
     if subset == 'train':
         img_id = load_data.train_ids[img_index]
     elif subset == 'test':
         img_id = load_data.test_ids[img_index]
-
+        
     img = load_data.load_image(img_id, from_ram=myLoadFrom_RAM, subset=subset)
     img_a = augment_fixed_and_dscrop(
-        img, ds_transforms, augmentation_transforms, target_sizes)
+        img, ds_transforms, augmentation_transforms, target_sizes, features=features)
     return img_a
 
 
@@ -324,18 +338,19 @@ class LoadAndProcessFixed(object):
     Same ugly hack as before
     """
 
-    def __init__(self, subset, ds_transforms, augmentation_transforms, target_sizes=None):
+    def __init__(self, subset, ds_transforms, augmentation_transforms, target_sizes=None, features=None):
         self.subset = subset
         self.ds_transforms = ds_transforms
         self.augmentation_transforms = augmentation_transforms
         self.target_sizes = target_sizes
+        self.features=features
 
     def __call__(self, img_index):
-        return load_and_process_image_fixed(img_index, self.subset, self.ds_transforms, self.augmentation_transforms, self.target_sizes)
+        return load_and_process_image_fixed(img_index, self.subset, self.ds_transforms, self.augmentation_transforms, self.target_sizes, features=self.features)
 
 
 def realtime_fixed_augmented_data_gen(selected_indices, subset, ds_transforms=ds_transforms_default, augmentation_transforms=[tform_identity],
-                                      chunk_size=CHUNK_SIZE, target_sizes=None, processor_class=LoadAndProcessFixed):
+                                      chunk_size=CHUNK_SIZE, target_sizes=None, processor_class=LoadAndProcessFixed, features =None):
     """
     by default, only the identity transform is in the augmentation list, so no augmentation occurs (only ds_transforms are applied).
     """
@@ -347,8 +362,11 @@ def realtime_fixed_augmented_data_gen(selected_indices, subset, ds_transforms=ds
     if target_sizes is None:  # default to (53,53) for backwards compatibility
         target_sizes = [(53, 53) for _ in xrange(len(ds_transforms))]
 
+    if features is None:
+        features=3
+
     process_func = processor_class(
-        subset, ds_transforms, augmentation_transforms, target_sizes)
+        subset, ds_transforms, augmentation_transforms, target_sizes, features =features)
 
     for n in xrange(num_chunks):
         indices_n = selected_indices[n *
@@ -356,13 +374,14 @@ def realtime_fixed_augmented_data_gen(selected_indices, subset, ds_transforms=ds
         # last chunk will be shorter!
         current_chunk_size = len(indices_n) * len(augmentation_transforms)
 
-        target_arrays = [np.empty((chunk_size, size_x, size_y, 3), dtype='float32')
+        target_arrays = [np.empty((chunk_size, size_x, size_y, features), dtype='float32')
                          for size_x, size_y in target_sizes]
 
         pool = mp.Pool(NUM_PROCESSES)
         # lower chunksize seems to help to keep memory usage in check
-        gen = pool.imap(process_func, indices_n, chunksize=100)
 
+        gen = pool.imap(process_func, indices_n, chunksize=100)
+        
         for k, imgs_aug in enumerate(gen):
             for j, imgs in enumerate(imgs_aug):
                 for i, img in enumerate(imgs):
@@ -411,13 +430,11 @@ colour_channel_weights = np.array(
     [-0.0148366, -0.01253134, -0.01040762], dtype='float32')
 
 
-def post_augment_brightness_gen(data_gen, std=0.5):
+def post_augment_brightness_gen(data_gen, std=0.5, features=3):
     for target_arrays, chunk_size in data_gen:
         labels = target_arrays.pop()
-
         stds = np.random.randn(chunk_size).astype('float32') * std
-        noise = stds[:, None] * colour_channel_weights[None, :]
-
+        noise = stds[:, None] * colour_channel_weights[None, :features]
         target_arrays = [np.clip(t + noise[:, None, None, :], 0, 1)
                          for t in target_arrays]
         target_arrays.append(labels)

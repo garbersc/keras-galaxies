@@ -93,15 +93,15 @@ class kaggle_base(object):
                         loss='mean_squared_error',
                         postfix='',
                         metrics=[rmse,
-                         'categorical_accuracy',
-                         sliced_accuracy_mean,
-                         sliced_accuracy_std]):
+                                 'categorical_accuracy',
+                                 sliced_accuracy_mean,
+                                 sliced_accuracy_std]):
 
         if 'rmse' in metrics:
-            metrics=metrics
+            metrics = metrics
             metrics.remove('rmse')
             metrics.append(rmse)
-            
+
         if not self.models:
             raise ValueError('Did not find any models to compile')
 
@@ -197,6 +197,19 @@ class kaggle_base(object):
             #         print np.shape(w)
             #         print np.shape(w[0])
 
+            if 'use_keras_conv' in vars(self) and ls.find('conv') >= 0:
+                print
+                print 'loading weight of a conv layer'
+                print 'source'
+                for w in weight:
+                    print np.shape(w)
+                print 'target'
+                for w in self.models[modelname].get_layer(
+                        sub_modelname).get_layer(lt).get_weights():
+                    print np.shape(w)
+                print
+
+            weight[0] = np.transpose(weight[0], (1, 2, 0, 3))
             self.models[modelname].get_layer(
                 sub_modelname).get_layer(lt).set_weights(weight)
 
@@ -219,6 +232,21 @@ class kaggle_base(object):
     '''
 
     def load_weights(self, path, modelname='model_norm', postfix=''):
+        if 'use_keras_conv' in vars(self):
+            if self.use_keras_conv:
+                for sub_model in self.models[modelname + postfix].layers:
+                    if 'layers' in vars(sub_model):
+                        for layer in sub_model.layers:
+                            if 'layer_formats' in vars(self) \
+                               and layer.name in self.layer_formats\
+                               and self.layer_formats[layer.name] >= 0:
+                                self.load_one_layers_weight(path=path,
+                                                            layername_source=layer.name,
+                                                            modelname=modelname,
+                                                            sub_modelname=sub_model.name,
+                                                            postfix=postfix)
+                return True
+
         modelname = modelname + postfix
         self.models[modelname].load_weights(path)
         with open(self.LOSS_PATH, 'a')as f:
@@ -519,7 +547,8 @@ class kaggle_base(object):
     def full_fit(self, data_gen, validation, samples_per_epoch,
                  validate_every,
                  nb_epochs, verbose=1, save_at_every_validation=True,
-                 data_gen_creator=None, postfix='', extracallbacks=None):
+                 data_gen_creator=None, postfix='', extracallbacks=None,
+                 class_weight=None):
         if verbose:
             timedeltas = []
         epochs_run = 0
@@ -552,14 +581,16 @@ class kaggle_base(object):
                         epoch_togo, validate_every]) + epochs_run,
                     initial_epoch=epochs_run, verbose=1,
                     callbacks=callbacks_,
-                    data_gen_creator=data_gen_creator, postfix=postfix):
+                    data_gen_creator=data_gen_creator, postfix=postfix,
+                    class_weight=class_weight):
                 try:
                     hist = self.models['model_norm' + postfix].fit_generator(
                         data_gen, validation_data=validation_data,
                         steps_per_epoch=steps_per_epoch,
                         epochs=nb_epoch,
                         initial_epoch=initial_epoch, verbose=verbose,
-                        callbacks=callbacks)
+                        callbacks=callbacks,
+                        class_weight=class_weight)
                     self._save_hist(hist.history, postfix=postfix)
                 except ValueError, e:
                     warnings.warn(

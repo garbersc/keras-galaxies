@@ -1,0 +1,42 @@
+#wRandFlip 
+#The training is running for 1000 chunks, each with 1008 images. That are about 17 epochs. The validation sample contains 3078 images. 
+#round  ,time, mean_train_loss , mean_valid_loss 
+#wRandFlip 
+#The training is running for 1000 chunks, each with 1008 images. That are about 17 epochs. The validation sample contains 3078 images. 
+#round  ,time, mean_train_loss , mean_valid_loss 
+#wRandFlip 
+#The training is running for 1000 chunks, each with 1008 images. That are about 17 epochs. The validation sample contains 3078 images. 
+#round  ,time, mean_train_loss , mean_valid_loss 
+#  starting learning rate to 0.020000 
+#wRandFlip 
+#The training is running for 1000 chunks, each with 1008 images. That are about 17 epochs. The validation sample contains 3078 images. 
+#round  ,time, mean_train_loss , mean_valid_loss 
+#  starting learning rate to 0.020000 
+ 1 , 14.3430161476 , 0.19846 , 0.0, 0.0 
+ 2 , 22.2201509476 , 0.270046 , 0.0, 0.0 
+ 3 , 30.0256421566 , 0.272896 , 0.0, 0.0 
+ 4 , 37.850605011 , 0.272831 , 0.0, 0.0 
+#Free GPU Mem after validation step 4605.25 MiB 
+ 5 , 60.2306480408 , 0.272967 , 0.0, 0.0 
+ 6 , 68.1313791275 , 0.269502 , 0.0, 0.0 
+ 7 , 76.0076420307 , 0.26905 , 0.271185, 2.19578 
+ 8 , 83.8754410744 , 0.271419 , 0.271185, 2.19578 
+ 9 , 91.6571800709 , 0.271876 , 0.271185, 2.19578 
+ 10 , 113.981627941 , 0.271007 , 0.271185, 2.19578 
+ 11 , 121.87509203 , 0.270289 , 0.271185, 2.19578 
+ 12 , 129.753520012 , 0.271722 , 0.271185, 2.19578 
+ 13 , 137.632707119 , 0.271179 , 0.271185, 2.19578 
+ 14 , 145.440865993 , 0.273449 , 0.271185, 2.19578 
+ 15 , 167.775280952 , 0.272877 , 0.271185, 2.19578 
+ 16 , 175.635744095 , 0.27186 , 0.271185, 2.19578 
+ 17 , 183.537868023 , 0.272082 , 0.271185, 2.19578 
+ 18 , 191.422167063 , 0.274706 , 0.271185, 2.19578 
+ 19 , 199.304352999 , 0.271923 , 0.271185, 2.19578 
+ 20 , 221.550395966 , 0.269325 , 0.271185, 2.19578 
+ 21 , 229.502124071 , 0.273471 , 0.271185, 2.19578 
+ 22 , 237.413676977 , 0.272228 , 0.271185, 2.19578 
+ 23 , 245.331846952 , 0.272609 , 0.271185, 2.19578 
+ 24 , 253.208927155 , 0.270566 , 0.271185, 2.19578 
+ 25 , 275.515191078 , 0.27083 , 0.271185, 2.19578 
+ 26 , 283.367481947 , 0.272079 , 0.271185, 2.19578 
+ 27 , 291.268171072 , 0.271235 , 0.271185, 2.19578 

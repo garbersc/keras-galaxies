@@ -11,8 +11,11 @@ from keras.layers import Merge
 from keras.engine.topology import InputLayer
 from keras import initializers
 
+from keras.layers.convolutional import Conv2D
+from keras.layers.pooling import MaxPool2D
+
 from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute,\
-    kerasCudaConvnetConv2DLayer, MaxoutDense
+    kerasCudaConvnetConv2DLayer, MaxoutDense, Bias
 from custom_for_keras import kaggle_MultiRotMergeLayer_output,  kaggle_input,\
     dense_weight_init_values
 
@@ -36,14 +39,22 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
     def __init__(self, *args,
                  **kwargs):
 
+        # TODO: extraction of the weights and output of the keras conv layer is
+        # not checked yet
+        use_keras_conv = False
+        if 'use_keras_conv' in kwargs:
+            use_keras_conv = kwargs.pop('use_keras_conv')
+
         super(kaggle_x_cat_x_maxout, self).__init__(
             *args,
             **kwargs)
 
+        self.use_keras_conv = use_keras_conv
         self.layer_formats = {'conv_0': 1, 'conv_1': 1, 'conv_2': 1,
                               'conv_3': 1, 'pool_0': 2, 'pool_1': 2,
                               'pool_2': 2, 'conv_out_merge': -1,
                               'dense_output': 0}
+
     '''
     compliles all available models
     initilises loss histories
@@ -147,46 +158,67 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
                                    'include_flip': include_flip,
                                    'random_flip': False}, name='input_merge'))
 
+        if self.use_keras_conv:
+            kerasCudaConvnetPooling2DLayer = MaxPool2D
+
         # needed for the pylearn moduls used by kerasCudaConvnetConv2DLayer and
         # kerasCudaConvnetPooling2DLayer
-        model.add(fPermute((1, 2, 3, 0), name='input_perm'))
+        if not self.use_keras_conv:
+            model.add(fPermute((1, 2, 3, 0), name='input_perm'))
 
         if not cut_out_conv[0]:
-            model.add(kerasCudaConvnetConv2DLayer(
-                n_filters=32, filter_size=6, untie_biases=True, name='conv_0',
-                trainable=not freeze_conv[0]))
+            if self.use_keras_conv:
+                model.add(Conv2D(filters=32, kernel_size=6, name='conv_0',
+                                 trainable=not freeze_conv[0]))
+            else:
+                model.add(kerasCudaConvnetConv2DLayer(
+                    n_filters=32, filter_size=6, untie_biases=True, name='conv_0',
+                    trainable=not freeze_conv[0]))
         else:
             del self.layer_formats['conv_0']
 
         model.add(kerasCudaConvnetPooling2DLayer(name='pool_0'))
 
         if not cut_out_conv[1]:
-            model.add(kerasCudaConvnetConv2DLayer(
-                n_filters=64, filter_size=5, untie_biases=True, name='conv_1',
-                trainable=not freeze_conv[1]))
+            if self.use_keras_conv:
+                model.add(Conv2D(filters=64, kernel_size=5, name='conv_1',
+                                 trainable=not freeze_conv[1]))
+            else:
+                model.add(kerasCudaConvnetConv2DLayer(
+                    n_filters=64, filter_size=5, untie_biases=True, name='conv_1',
+                    trainable=not freeze_conv[1]))
         else:
             del self.layer_formats['conv_1']
 
         model.add(kerasCudaConvnetPooling2DLayer(name='pool_1'))
 
         if not cut_out_conv[2]:
-            model.add(kerasCudaConvnetConv2DLayer(
-                n_filters=128, filter_size=3, untie_biases=True, name='conv_2',
-                trainable=not freeze_conv[2]))
+            if self.use_keras_conv:
+                model.add(Conv2D(filters=128, kernel_size=3, name='conv_2',
+                                 trainable=not freeze_conv[2]))
+            else:
+                model.add(kerasCudaConvnetConv2DLayer(
+                    n_filters=128, filter_size=3, untie_biases=True, name='conv_2',
+                    trainable=not freeze_conv[2]))
         else:
             del self.layer_formats['conv_2']
 
         if not cut_out_conv[3]:
-            model.add(kerasCudaConvnetConv2DLayer(n_filters=128,
-                                                  filter_size=3,  weights_std=0.1,
-                                                  untie_biases=True, name='conv_3',
-                                                  trainable=not freeze_conv[3]))
+            if self.use_keras_conv:
+                model.add(Conv2D(filters=128, kernel_size=3, name='conv_3',
+                                 trainable=not freeze_conv[3]))
+            else:
+                model.add(kerasCudaConvnetConv2DLayer(n_filters=128,
+                                                      filter_size=3,  weights_std=0.1,
+                                                      untie_biases=True, name='conv_3',
+                                                      trainable=not freeze_conv[3]))
         else:
             del self.layer_formats['conv_3']
 
         model.add(kerasCudaConvnetPooling2DLayer(name='pool_2'))
 
-        model.add(fPermute((3, 0, 1, 2), name='cuda_out_perm'))
+        if not self.use_keras_conv:
+            model.add(fPermute((3, 0, 1, 2), name='cuda_out_perm'))
 
         model.add(Lambda(function=kaggle_MultiRotMergeLayer_output,
                          output_shape=lambda x: (
