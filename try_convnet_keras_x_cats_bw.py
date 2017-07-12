@@ -39,9 +39,9 @@ VALIDATE_EVERY = 5  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 INCLUDE_FLIP = True
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_10cat_wConfidence_bw.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_10cat_wConfidence_bw_test.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_10cat_wConfidence_bw.h5"
+WEIGHTS_PATH = "analysis/final/try_10cat_wConfidence_bw_test.h5"
 
 load_data.img_path = 'data/bw/images_train_rev1/%s.jpg'
 
@@ -49,18 +49,18 @@ CONV_WEIGHT_PATH = ''  # 'analysis/final/try_3cat_geometry_corr_geopics_next.h5'
 
 
 LEARNING_RATE_SCHEDULE = {
-    0: 0.1,
-    20: 0.05,
-    40: 0.01,
-    80: 0.005
+    0: 0.01,
+    5: 0.005,
+    40: 0.001,
+    80: 0.0005
 
 }
 if continueAnalysis:
     LEARNING_RATE_SCHEDULE = {
-        0: 0.1,
-        20: 0.05,
-        40: 0.01,
-        80: 0.005
+        0: 0.01,
+        #20: 0.005,
+        5: 0.001,
+        #80: 0.0005
         # 0: 0.0001,
         # 500: 0.002,
         # 800: 0.0004,
