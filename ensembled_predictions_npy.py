@@ -16,6 +16,8 @@ import scipy.optimize
 
 import load_data
 
+# from keras.losses import categorical_crossentropy
+# from keras.optimizers import categorical_accuracy
 
 TARGET_PATH = "predictions/final/blended/blended_predictions.npy.gz"
 TARGET_PATH_SEPARATE = "predictions/final/blended/blended_predictions_separate.npy.gz"
@@ -25,10 +27,13 @@ predictions_valid_dir = "predictions/final/augmented/valid"
 predictions_test_dir = "predictions/final/augmented/test"
 
 USE_SELECTED_VAL_PRED = True
-predicton_valid_selected = ['predictions/final/augmented/valid/try_ellipseOnly_2param.npy.gz',
-                            'predictions/final/augmented/valid/best_keras_only_weights.npy.gz']
+# predicton_valid_selected = ['predictions/final/augmented/valid/try_ellipseOnly_2param.npy.gz',
+#                             'predictions/final/augmented/valid/best_keras_only_weights.npy.gz']
+predicton_valid_selected = ['predictions/final/augmented/valid/try_10cat_wMaxout_next_next_next_next.npy.gz',
+                            'predictions/final/augmented/valid/try_10cat_wConfidence_next_next.npy.gz']
 
-y_train = np.load("data/solutions_train.npy")
+
+y_train = np.load("data/solution_certainties_train_10cat_test_alt_2.npy")
 train_ids = load_data.train_ids
 # test_ids = load_data.test_ids
 
@@ -107,8 +112,8 @@ def f(W):
 
 def f2(W):
     # separate weights for all answers
-    s2 = softmax(W.reshape((37, predictions_stack.shape[0]))).T.reshape(
-        predictions_stack.shape[0], 1, 37)
+    s2 = softmax(W.reshape((10, predictions_stack.shape[0]))).T.reshape(
+        predictions_stack.shape[0], 1, 10)
     # T.tensordot(X, s, [[0], [0]])
     weighted_avg_predictions = np.sum(X * s2, axis=0)
     error = np.mean((weighted_avg_predictions - t)**2)
@@ -130,14 +135,14 @@ print
 
 print "Optimizing blending weights: separate"
 w_init2 = np.random.randn(
-    predictions_stack.shape[0] * 37).astype('float64') * 0.01
+    predictions_stack.shape[0] * 10).astype('float64') * 0.01
 
 f2min = scipy.optimize.minimize(
     fun=f2, x0=w_init2, options={'maxiter':
                                  10000})
 
 rmse2 = np.sqrt(f2min.fun)
-out_s2 = np.exp(f2min.x).reshape(37, predictions_stack.shape[0]).T
+out_s2 = np.exp(f2min.x).reshape(10, predictions_stack.shape[0]).T
 out_s2 /= out_s2.sum(0)[None, :]
 print
 
