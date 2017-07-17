@@ -34,8 +34,8 @@ if debug:
 TRAIN_LOSS_SF_PATH = 'try_ellipseOnly_2param.txt'
 # TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-# WEIGHTS_PATH = 'analysis/final/try_10cat_wMaxout_next_next_next_next.h5'
-WEIGHTS_PATH = './'
+WEIGHTS_PATH = 'analysis/final/simple_deconv_weights.h5'
+# WEIGHTS_PATH = './'
 TXT_OUTPUT_PATH = '_'
 ELLIPSE_FIT = WEIGHTS_PATH.find('ellipse') >= 0
 if ELLIPSE_FIT:
@@ -176,17 +176,21 @@ if debug:
 
 
 print "Load model weights..."
-deconv.load_weights(modelname='model_simple',
-                    path=WEIGHTS_PATH, postfix=postfix)
+# deconv.load_weights(modelname='model_simple',
+#                    path=WEIGHTS_PATH, postfix=postfix)
 deconv.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
 # c, y, x, filter
 # y, x, c, filter
-deconv_weight, conv_bias = deconv.get_layer_weights(layer='conv_0')
-deconv_weight = np.transpose(deconv_weight, (1, 2, 0, 3))
+# deconv_weight, conv_bias = deconv.get_layer_weights(
+#    layer='sconv_0', modelname='model_simple', main_layer='simple_mod')
+deconv_weight = deconv.get_layer_weights(
+    layer='sconv_0', modelname='model_simple', main_layer='simple_mod')
+print 'Conv layer output weight shape: ' + str(np.shape(deconv_weight))
+#deconv_weight = np.transpose(deconv_weight, (1, 2, 0, 3))
 deconv.models['model_deconv'].get_layer(
-    'deconv_layer').set_weights([deconv_weight, ])
-deconv.models['model_deconv'].get_layer('debias_layer').set_weights(
-    [conv_bias, ])
+    'deconv_layer').set_weights(deconv_weight)
+# deconv.models['model_deconv'].get_layer('debias_layer').set_weights(
+#  [conv_bias, ])
 
 
 print "Set up data loading"
@@ -392,7 +396,7 @@ def reshape_output(x):
     return x
 
 
-def print_output(nr_images=1, combined_rgb=True, norm_single_img=False):
+def print_output(nr_images=1, combined_rgb=True, norm_single_img=True):
     if debug:
         print 'Checking save directory...'
     if not os.path.isdir(IMAGE_OUTPUT_PATH):
@@ -402,52 +406,60 @@ def print_output(nr_images=1, combined_rgb=True, norm_single_img=False):
     os.chdir(IMAGE_OUTPUT_PATH)
 
     print '  Output images will be saved at dir: %s' % (IMAGE_OUTPUT_PATH)
-
     print 'Collecting output from Deconvnet... this may take a while...'
-
-    valid_data_crop = []
-    for img in validation_data[0][1]:
-        valid_data_crop.append(img[:, :45, :45])
-    valid_data_crop = [np.asarray(valid_data_crop)]
-    output_deconv = deconv.predict(
-        x=valid_data_crop, modelname='model_simple')
-    #output_deconv = reshape_output(output_deconv)
     if debug:
-        print 'Deconv output shape:' + str(np.shape(output_deconv))
-        print 'Ids of input images are: ' + str(valid_ids[0:nr_images])
-    deconv.layer_formats['input_merge'] = 4
+        print 'Shape of validation data array: ' + str(np.shape(validation_data))
 
-    for i, img in enumerate(output_deconv[0:nr_images]):
+    for i, img in enumerate(validation_data[0][0][0:nr_images]):
         image_nr = i
-        if not norm_single_img:
-            img -= np.min(img)
-            img = img / np.max(img)
 
         if type(image_nr) == int:
             input_img = [np.asarray([validation_data[0][0][image_nr]]),
                          np.asarray([validation_data[0][1][image_nr]])]
         if debug:
             print 'Shape of input image array: ' + str(np.shape(input_img[0][0]))
+            valid_data_crop = []
+            for img in validation_data[0][1]:
+                valid_data_crop.append(img[:, :45, :45])
+            valid_data_crop = [np.asarray(valid_data_crop)]
+            output_deconv = deconv.predict(
+                x=valid_data_crop, modelname='model_simple')
+            # output_deconv = reshape_output(output_deconv)
+            if debug:
+                print 'Deconv output shape:' + str(np.shape(output_deconv))
+                print 'Ids of input images are: ' + str(valid_ids[0:nr_images])
+                deconv.layer_formats['input_merge'] = 4
 
         print 'Creating plots for Image %s' % (valid_ids[i])
-        for j, channel in enumerate(img):
+        img_out = output_deconv[0]
+
+        if not norm_single_img:
+            img_out -= np.min(img_out)
+            img_out = img_out / np.max(img_out)
+
+        for j, channel in enumerate(img_out):
             if norm_single_img:
                 channel -= np.min(channel)
                 channel = channel / np.max(channel)
 
-                canvas, (im1, im2, im3) = plt.subplots(1, 3)
+                canvas, (im1, im2) = plt.subplots(1, 2)
                 im1.imshow(np.transpose((input_img[0][0]), (1, 2, 0)),
                            interpolation='none')
                 im1.set_title('Input Image %s' % (valid_ids[i]))
                 if combined_rgb:
-                    im3.imshow(_img_wall(img))
-                    im3.set_title('Deconv Variations')
-                    im3.axis('off')
+                    print 'Shape ouf output image array: ' + str(np.shape(img_out))
+                    im2.imshow(np.transpose((img_out), (1, 2, 0)),
+                               interpolation='none')
+                    im2.set_title('Deconv')
+                    im2.axis('off')
                 else:
-                    im3.imshow(_img_wall(channel), interpolation='none',
+                    im2.imshow(_img_wall(channel), interpolation='none',
                                cmap=plt.get_cmap('gray'))
-                    im3.set_title('Deconv Variations')
-                    im3.axis('off')
+                    im2.set_title('Deconv Variations')
+                    im2.axis('off')
+            plt.savefig('image_%s.jpg' %
+                        (valid_ids[i]), dpi=300)
+            plt.close()
 
         os.chdir('..')
 
