@@ -12,7 +12,7 @@ from keras.engine.topology import InputLayer
 from keras import initializers
 
 from keras.layers.convolutional import Conv2D
-from keras.layers.pooling import MaxPool2D
+from keras.layers.pooling import MaxPooling2D as MaxPool2D
 
 from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute,\
     kerasCudaConvnetConv2DLayer, MaxoutDense, Bias
@@ -239,7 +239,7 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
                              x[0] // 4 // N_INPUT_VARIATION, (x[1] * x[2]
                                                               * x[3] * 4
                                                               * num_views)),
-                         arguments={'num_views': num_views},
+                         arguments={'n_input_var':N_INPUT_VARIATION,'num_views': num_views},
                          name='conv_out_merge'))
 
         for i in range(n_maxout_layers) if n_maxout_layers > 0 else []:

@@ -31,7 +31,7 @@ debug = True
 
 get_winsol_weights = False
 
-BATCH_SIZE = 16  # keep in mind
+BATCH_SIZE = 256  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
@@ -113,6 +113,7 @@ ra.num_train = y_train.shape[0]
 
 # integer division, is defining validation size
 ra.num_valid = ra.num_train // 10
+ra.num_valid = ra.num_valid - ra.num_valid % BATCH_SIZE
 ra.num_train -= ra.num_valid
 
 
@@ -295,6 +296,12 @@ else:
         print ''
         print 'Re-evalulating and predicting'
 
+        # print
+        # for layer in winsol.models['model_norm_metrics'].get_layer('main_seq').layers:
+        #     print layer.name
+        #     print layer.get_output_shape_at(0)
+        # print
+        
         if DO_VALID:
             evalHist = winsol.evaluate(
                 [xs_valid[0], xs_valid[1]], y_valid=y_valid, postfix='')
