@@ -12,7 +12,7 @@ from keras.engine.topology import InputLayer
 from keras import initializers
 
 from keras.layers.convolutional import Conv2D
-from keras.layers.pooling import MaxPooling2D as MaxPool2D
+from keras.layers.pooling import MaxPooling2D
 
 from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute,\
     kerasCudaConvnetConv2DLayer, MaxoutDense, Bias
@@ -106,6 +106,8 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
                     extra_metrics=[],
                     freeze_conv=False,
                     cut_out_conv=(False, False, False, False),
+                    conv_filters_n=(32, 64, 128, 128),
+                    use_dropout=True,
                     final_activation='softmax'):
 
         if not (type(freeze_conv) in (tuple, list)):
@@ -165,69 +167,76 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
 
         if not cut_out_conv[0]:
             if self.use_keras_conv:
-                model.add(Conv2D(filters=32, kernel_size=6, name='conv_0',
-                                 trainable=not freeze_conv[0]))
-                model.add(Bias(32, name='conv_0_bias'))
+                model.add(Conv2D(filters=conv_filters_n[0], kernel_size=6, name='conv_0',
+                                 trainable=not freeze_conv[0], use_bias=False))
+                model.add(Bias(conv_filters_n[0], name='conv_0_bias'))
                 self.layer_formats['conv_0_bias'] = 3
             else:
                 model.add(kerasCudaConvnetConv2DLayer(
-                    n_filters=32, filter_size=6, untie_biases=True, name='conv_0',
+                    n_filters=conv_filters_n[0], filter_size=6, untie_biases=True, name='conv_0',
                     trainable=not freeze_conv[0]))
         else:
             del self.layer_formats['conv_0']
 
         if self.use_keras_conv:
-            model.add(MaxPool2D(name='pool_0'))
+            model.add(MaxPooling2D(name='pool_0'))
         else:
             model.add(kerasCudaConvnetPooling2DLayer(name='pool_0'))
 
         if not cut_out_conv[1]:
             if self.use_keras_conv:
-                model.add(Conv2D(filters=64, kernel_size=5, name='conv_1',
-                                 trainable=not freeze_conv[1]))
-                model.add(Bias(64, name='conv_1_bias'))
+                model.add(Conv2D(filters=conv_filters_n[1], kernel_size=5,
+                                 name='conv_1',
+                                 trainable=not freeze_conv[1], use_bias=False))
+                model.add(Bias(conv_filters_n[1], name='conv_1_bias'))
                 self.layer_formats['conv_1_bias'] = 3
             else:
                 model.add(kerasCudaConvnetConv2DLayer(
-                    n_filters=64, filter_size=5, untie_biases=True, name='conv_1',
+                    n_filters=conv_filters_n[1], filter_size=5,
+                    untie_biases=True, name='conv_1',
                     trainable=not freeze_conv[1]))
         else:
             del self.layer_formats['conv_1']
 
         if self.use_keras_conv:
-            model.add(MaxPool2D(name='pool_1'))
+            model.add(MaxPooling2D(name='pool_1'))
         else:
             model.add(kerasCudaConvnetPooling2DLayer(name='pool_1'))
 
         if not cut_out_conv[2]:
             if self.use_keras_conv:
-                model.add(Conv2D(filters=128, kernel_size=3, name='conv_2',
-                                 trainable=not freeze_conv[2]))
-                model.add(Bias(128, name='conv_2_bias'))
+                model.add(Conv2D(filters=conv_filters_n[2], kernel_size=3,
+                                 name='conv_2',
+                                 trainable=not freeze_conv[2], use_bias=False))
+                model.add(Bias(conv_filters_n[2], name='conv_2_bias'))
                 self.layer_formats['conv_2_bias'] = 3
             else:
                 model.add(kerasCudaConvnetConv2DLayer(
-                    n_filters=128, filter_size=3, untie_biases=True, name='conv_2',
+                    n_filters=conv_filters_n[2], filter_size=3,
+                    untie_biases=True, name='conv_2',
                     trainable=not freeze_conv[2]))
         else:
             del self.layer_formats['conv_2']
 
         if not cut_out_conv[3]:
             if self.use_keras_conv:
-                model.add(Conv2D(filters=128, kernel_size=3, name='conv_3',
-                                 trainable=not freeze_conv[3]))
-                model.add(Bias(128, name='conv_3_bias'))
+                model.add(Conv2D(filters=conv_filters_n[3], kernel_size=3,
+                                 name='conv_3',
+                                 trainable=not freeze_conv[3], use_bias=False))
+                model.add(Bias(conv_filters_n[3], name='conv_3_bias'))
                 self.layer_formats['conv_3_bias'] = 3
             else:
-                model.add(kerasCudaConvnetConv2DLayer(n_filters=128,
-                                                      filter_size=3,  weights_std=0.1,
-                                                      untie_biases=True, name='conv_3',
+                model.add(kerasCudaConvnetConv2DLayer(n_filters=conv_filters_n[3],
+                                                      filter_size=3,
+                                                      weights_std=0.1,
+                                                      untie_biases=True,
+                                                      name='conv_3',
                                                       trainable=not freeze_conv[3]))
         else:
             del self.layer_formats['conv_3']
 
         if self.use_keras_conv:
-            model.add(MaxPool2D(name='pool_2'))
+            model.add(MaxPooling2D(name='pool_2'))
         else:
             model.add(kerasCudaConvnetPooling2DLayer(name='pool_2'))
 
@@ -245,14 +254,16 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
         for i in range(n_maxout_layers) if n_maxout_layers > 0 else []:
             mo_name = 'maxout_%s' % str(i)
             self.layer_formats[mo_name] = 0
-            model.add(Dropout(0.5))
+            if use_dropout:
+                model.add(Dropout(0.5))
             model.add(MaxoutDense(output_dim=2048, nb_feature=2,
                                   weights=dense_weight_init_values(
                                       model.output_shape[-1], 2048,
                                       nb_feature=2),
                                   name=mo_name))
 
-        model.add(Dropout(0.5))
+        if use_dropout:
+            model.add(Dropout(0.5))
         model.add(Dense(units=final_units, activation=final_activation,
                         kernel_initializer=initializers.RandomNormal(
                             stddev=0.01),

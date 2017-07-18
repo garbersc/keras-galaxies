@@ -21,6 +21,7 @@ predict = False  # not implemented
 continueAnalysis = True
 saveAtEveryValidation = True
 
+# FIXME reloading existing classweights seems not to work
 use_class_weights = True
 
 import_conv_weights = False

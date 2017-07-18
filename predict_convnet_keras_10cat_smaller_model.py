@@ -22,6 +22,9 @@ from custom_keras_model_x_cat import kaggle_x_cat\
 import skimage
 from skimage.transform import rotate
 
+from keras import backend as K
+from keras_extra_layers import fPermute
+
 starting_time = time.time()
 
 cut_fraktion = 0.9
@@ -44,13 +47,13 @@ if debug:
     print os.path.isfile(PRED_BLENDED_PATH)
 
 
-TRAIN_LOSS_SF_PATH = 'loss_10cat_bw.txt'
+TRAIN_LOSS_SF_PATH = 'loss_10cat_smaller.txt'
 # TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
 WEIGHTS_PATH = "analysis/final/try_10cat_wMaxout_next_next_next_next.h5"
-TXT_OUTPUT_PATH = 'try_10cat_bw.txt'
-WRONG_CAT_IMGS_PATH = 'wrong_categorized_10cat_bw.json'
-IMAGE_OUTPUT_PATH = "img_10cat_bw"
+TXT_OUTPUT_PATH = 'try_10cat_smaller.txt'
+WRONG_CAT_IMGS_PATH = 'wrong_categorized_10cat_smaller.json'
+IMAGE_OUTPUT_PATH = "img_10cat_smaller"
 
 
 postfix = ''
@@ -199,6 +202,141 @@ if not DONT_LOAD_WEIGHTS:
         winsol.load_weights(path=WEIGHTS_PATH, postfix=postfix)
         winsol.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
 
+
+print '\nidentify the used convolution layers\n'
+
+used_conv_layers = {}
+used_conv_layers = {'conv_1': [2, 12, 15, 30, 33, 48, 56], 'conv_0': [0, 1, 4, 5, 8, 17, 18, 23, 25, 26, 28, 30], 'conv_3': [3, 9, 18, 31, 35, 36, 54, 58, 59, 67, 73, 74, 77, 79, 83, 94, 101, 115, 118], 'conv_2': [
+    0, 2, 3, 4, 13, 14, 16, 18, 19, 23, 27, 35, 37, 38, 41, 50, 51, 52, 60, 62, 64, 68, 69, 72, 78, 80, 81, 82, 85, 86, 88, 91, 92, 96, 98, 99, 109, 112, 115, 118, 123]}
+
+# def find_filter_max_input(layer_name='conv_3', filter_index=0,
+#                           step=1.):
+#     if filter_index == 0:
+#         print layer_name
+#     # print filter_index
+
+#     if layer_name not in used_conv_layers:
+#         used_conv_layers[layer_name] = []
+
+#     # print winsol.models['model_norm'].get_layer(
+#     #     'main_seq').get_layer(layer_name).output_shape
+
+#     # build a loss function that maximizes the activation
+#     # of the nth filter of the layer considered
+#     layer_output = winsol.models['model_norm'].get_layer(
+#         'main_seq').get_layer(layer_name).output
+
+#     if layer_name.find('conv_out_merge') >= 0:
+#         loss = K.mean(layer_output[:, filter_index])
+#     elif layer_name.find('conv') >= 0:
+#         loss = K.mean(fPermute((3, 0, 1, 2))(
+#             layer_output)[:, filter_index, :, :])
+#     elif layer_name.find('dense') >= 0 or layer_name.find('maxout') >= 0\
+#             or layer_name.find('dropout') >= 0:
+#         target = np.zeros((1, 10,), dtype='int8')
+#         target[:, filter_index] = 1
+#         # loss = K.mean(-K.categorical_crossentropy(layer_output, target))
+#         # loss = K.mean(K.sqrt(layer_output - target))
+
+#         loss = K.mean(layer_output[:, filter_index] -
+#                       K.sum(layer_output[:, :filter_index], -1) -
+#                       K.sum(layer_output[:, filter_index - 9:], -1))
+#     elif layer_name.find('cuda_out_perm') >= 0:
+#         loss = K.mean(
+#             layer_output[:, filter_index, :, :])
+#     else:
+#         raise TypeError(
+#             'Cant find loss definition for the layer %s' % layer_name)
+
+#     input_img_0, input_img_45 = winsol.models['model_norm'].get_layer(
+#         'main_seq').get_input_at(0)
+
+#     # compute the gradient of the input picture wrt this loss
+#     grads = K.gradients(loss, [input_img_0, input_img_45])[0]
+
+#     # normalization trick: we normalize the gradient
+#     grads /= (K.sqrt(K.mean(K.square(grads))) + 1e-5)
+
+#     # this function returns the loss and grads given the input picture
+#     iterate = K.function([input_img_0, input_img_45], [loss])  # , grads])
+
+#     # we start from a gray image with some noise
+#     input_img_data_0 = np.random.random(
+#         (1, 3, 141, 141)) * 20 + 128.
+
+#     input_img_data_45 = np.reshape(
+#         [rotate(img, 45) for img in input_img_data_0[0]], (1, 3, 141, 141))
+
+#     # gehen wir mal von dem standart quadratischen format aus
+#     n_pix = input_sizes[0][0]
+
+#     input_imgs = [input_img_data_0[:, :, 36:36 + n_pix, 36:36 + n_pix],
+#                   input_img_data_45[:, :, 36:36 + n_pix, 36:36 + n_pix]]
+
+#     # print type(input_imgs)
+#     # print np.shape(input_imgs)
+#     # print type(input_imgs[0])
+#     # print np.shape(input_imgs[0])
+#     # print type(input_imgs[1])
+#     # print np.shape(input_imgs[1])
+
+#     # run gradient ascent for 20 steps
+
+#     loss_value = 0.
+
+#     # for i in range(3):
+#     # if not i % 200:
+#     #     print 'step %s' % i
+#     try:
+#         loss_value = iterate(input_imgs)
+#     except IndexError, e:
+#         print 'IndexError at step %s' % 0
+#         print e
+#         # break
+
+#     # if loss_value <= 0.:
+#     #     # some filters get stuck to 0, we can skip them
+#     #     break
+
+#     #     if i == 2:
+#     #         print loss_value
+#     #     input_imgs[0] += grads_value * step
+#     #     input_imgs[1] += grads_value * step
+
+#     # print loss_value[0]
+
+#     if loss_value[0] > 0.:
+#         used_conv_layers[layer_name].append(filter_index)
+#         print filter_index
+
+#     return True
+
+
+# for i in range(0, 4):
+#     layer_name = 'conv_%s' % i
+#     filter_list = []
+#     filter_list_45 = []
+#     print
+#     # print layer_name
+#     for filter_nr in range(winsol.models['model_norm'].get_layer('main_seq')
+#                            .get_layer(layer_name).n_filters):
+#         find_filter_max_input(layer_name, filter_nr)
+
+print
+print 'convolution layers that will be used:'
+print used_conv_layers
+print
+
+
+print 'building smaller model'
+conv_filters_n = tuple(len(used_conv_layers['conv_%s' % i]) for i in range(4))
+print conv_filters_n
+winsol.init_models(final_units=10, conv_filters_n=conv_filters_n)
+
+if not DONT_LOAD_WEIGHTS:
+    print "Load smaller model weights"
+    winsol.load_weights(path=WEIGHTS_PATH, postfix=postfix,
+                        used_conv_layers=used_conv_layers)
 
 print "Set up data loading"
 
@@ -1295,65 +1433,6 @@ def save_wrong_cat_cutted():
                    i[0] + '_' + str(valid_ids[i[1]]) + '.jpg',
                    np.transpose(validation_data[0][0][i[1]], (1, 2, 0)))
 
-
-# util function to convert a tensor into a valid image
-def _deprocess_image(x):
-    # normalize tensor: center on 0., ensure std is 0.1
-    x -= x.mean()
-    x /= (x.std() + 1e-5)
-    x *= 0.1
-
-    # clip to [0, 1]
-    x += 0.5
-    x = np.clip(x, 0, 1)
-
-    # convert to RGB array
-    x *= 255
-    x = x.transpose((1, 2, 0))
-    x = np.clip(x, 0, 255).astype('uint8')
-    return x
-
-
-def find_filter_max_input(layer_name='conv_0', filter_index=0,
-                          step=0.01):
-    from keras import backend as K
-
-    # we start from a gray image with some noise
-    input_img_data_0 = np.random.random(
-        (1, 3, 141, 141)) * 20 + 128.
-    input_img_data_45 = rotate(input_img_data_0, 45)
-
-    # gehen wir mal von dem standart quadratischen format aus
-    n_pix = input_sizes[0][0]
-
-    input_imgs = [input_img_data_0[:, 36:36 + n_pix, 36:36 + n_pix],
-                  input_img_data_45[:, 36:36 + n_pix, 36:36 + n_pix]]
-
-    # build a loss function that maximizes the activation
-    # of the nth filter of the layer considered
-    layer_output = winsol.models['model_norm'].layers['main_seq']\
-                                              .layers[layer_name].output
-    loss = K.mean(layer_output[:, :, :, filter_index])
-
-    # compute the gradient of the input picture wrt this loss
-    grads = K.gradients(loss, input_imgs)[0]
-
-    # normalization trick: we normalize the gradient
-    grads /= (K.sqrt(K.mean(K.square(grads))) + 1e-5)
-
-    # this function returns the loss and grads given the input picture
-    iterate = K.function([input_imgs], [loss, grads])
-
-    # run gradient ascent for 20 steps
-    for i in range(20):
-        loss_value, grads_value = iterate(input_imgs)
-        input_imgs += grads_value * step
-
-    plt.plot(_deprocess_image(input_imgs[0]))
-    plt.show()
-
-
-find_filter_max_input()
 
 # pred_to_val_hist()
 
