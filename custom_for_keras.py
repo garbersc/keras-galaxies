@@ -69,13 +69,13 @@ def kaggle_MultiRotMergeLayer_output(x,n_input_var=2 ,num_views=2):
     # build check?
     input_shape = T.shape(x)
     input_ = x
-    mb_size = input_shape[0] / 4 / n_input_var
+    mb_size = input_shape[0] / 4 / num_views
     # split out the 4* dimension
 
     input_r = input_.reshape((4 * num_views, mb_size, T.prod(input_shape[1:])))
 
     def output_shape(lx): return (
-        lx[0] // 4 // n_input_var, (lx[1] * lx[2] * lx[3] * 4 * num_views))
+        lx[0] // 4 // num_views, (lx[1] * lx[2] * lx[3] * 4 * num_views))
 
     input_r=input_r.transpose(1, 0, 2).reshape(output_shape(input_shape))
     return input_r

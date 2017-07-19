@@ -35,7 +35,7 @@ debug = True
 
 get_winsol_weights = False
 
-BATCH_SIZE = 16  # keep in mind
+BATCH_SIZE = 1  # keep in mind
 
 NUM_INPUT_FEATURES = 3
 
@@ -206,8 +206,8 @@ if not DONT_LOAD_WEIGHTS:
 print '\nidentify the used convolution layers\n'
 
 used_conv_layers = {}
-used_conv_layers = {'conv_1': [2, 12, 15, 30, 33, 48, 56], 'conv_0': [0, 1, 4, 5, 8, 17, 18, 23, 25, 26, 28, 30], 'conv_3': [3, 9, 18, 31, 35, 36, 54, 58, 59, 67, 73, 74, 77, 79, 83, 94, 101, 115, 118], 'conv_2': [
-    0, 2, 3, 4, 13, 14, 16, 18, 19, 23, 27, 35, 37, 38, 41, 50, 51, 52, 60, 62, 64, 68, 69, 72, 78, 80, 81, 82, 85, 86, 88, 91, 92, 96, 98, 99, 109, 112, 115, 118, 123]}
+used_conv_layers = {'conv_1': [0,1,2, 12, 15, 30, 33, 48, 56,57,58,59,60,61,62,63], 'conv_0': [0, 1,2,3, 4, 5,6, 8, 17, 18, 23, 25, 26, 28, 30,31], 'conv_3': [0,1,2,3,4,5,6,7,8, 9,10,11,12,13,14, 18, 31, 35, 36, 54, 58, 59, 67, 73, 74, 77, 79, 83, 94, 101, 115, 118], 'conv_2': [
+    0,1, 2, 3, 4,5,6,7,8,9,10,11,12, 13, 14,15, 16,17, 18, 19,20,21,22, 23,24,25,26, 27,28,29,30,31,32,33, 35, 37, 38, 41, 50, 51, 52, 60, 62, 64, 68, 69, 72, 78, 80, 81, 82, 85, 86, 88, 91, 92, 96, 98, 99, 109, 112, 115, 118, 123]}
 
 # def find_filter_max_input(layer_name='conv_3', filter_index=0,
 #                           step=1.):
@@ -333,11 +333,24 @@ conv_filters_n = tuple(len(used_conv_layers['conv_%s' % i]) for i in range(4))
 print conv_filters_n
 winsol.init_models(final_units=10, conv_filters_n=conv_filters_n)
 
+
+
+if debug:
+    winsol.print_summary(postfix=postfix)
+    print winsol.models.keys()
+
+    
+    for layer in winsol.models['model_norm'].get_layer('main_seq').layers:
+        print layer.name
+        print layer.output_shape
+
 if not DONT_LOAD_WEIGHTS:
     print "Load smaller model weights"
     winsol.load_weights(path=WEIGHTS_PATH, postfix=postfix,
-                        used_conv_layers=used_conv_layers)
+                       used_conv_layers=used_conv_layers)
 
+
+    
 print "Set up data loading"
 
 ds_transforms = [
