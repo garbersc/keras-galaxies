@@ -694,12 +694,18 @@ class kaggle_base(object):
                 input_shape = T.shape(x)
                 input_ = x
                 new_input_shape = (
-                    prediction_batch_size, input_shape[1], input_shape[2] * input_shape[0] / prediction_batch_size, input_shape[3])
+                    prediction_batch_size, input_shape[1],
+                    input_shape[2] * input_shape[0] / prediction_batch_size,
+                    input_shape[3])
                 input_ = input_.reshape(new_input_shape)
                 return input_
 
-            output_lambda = Lambda(function=reshape_output, output_shape=lambda input_shape: (
-                prediction_batch_size, input_shape[1], input_shape[2] * input_shape[0] / prediction_batch_size, input_shape[3]))
+            output_lambda = Lambda(function=reshape_output,
+                                   output_shape=lambda input_shape: (
+                                       prediction_batch_size, input_shape[1],
+                                       input_shape[2] * input_shape[0] /
+                                       prediction_batch_size,
+                                       input_shape[3]))
             output_layer = output_lambda(output_layer)
 
         intermediate_layer_model = Model(inputs=self.models[modelname]
