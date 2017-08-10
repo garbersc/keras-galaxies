@@ -277,6 +277,94 @@ class kerasCudaConvnetPooling2DLayer(Layer):
         return self.get_output_shape_for(input_shape)
 
 
+class kerasCudaConvnetDeconv2DLayer(Layer):
+    def __init__(self, n_filters, filter_size, weights_std=0.01,
+                 init_bias_value=0.1, stride=1, activation='relu',
+                 partial_sum=None, pad=0, untie_biases=False,
+                 initW='truncated_normal', initB='constant',
+                 initial_weights=None, W_regularizer=None, W_constraint=None,
+                 b_regularizer=None, b_constraint=None, **kwargs):
+        """
+        Transposed convolution for the pylearn implementation
+
+        """
+
+        self.initW = initializers.get(
+            {'class_name': initW, 'config': {'stddev': weights_std}})
+        self.initB = initializers.get({'class_name': initB,
+                                       'config': {'value': init_bias_value}})
+        self.initial_weights = initial_weights
+        self.n_filters = n_filters
+        self.filter_size = filter_size
+        self.weights_std = np.float32(weights_std)
+        self.init_bias_value = np.float32(init_bias_value)
+        self.stride = stride
+        self.nonlinearity = activations.get(activation)
+        self.partial_sum = partial_sum
+        self.pad = pad
+        self.untie_biases = untie_biases
+        self.W_regularizer = W_regularizer
+        self.W_constraint = W_constraint
+
+        if stride != 1 or pad != 0:
+            warnings.warn(
+                'Layer DeConv was not build for this stride and/or padding option!')
+
+        self.filter_acts_op = FilterActs(
+            stride=self.stride, partial_sum=self.partial_sum, pad=self.pad)
+        super(kerasCudaConvnetDeconv2DLayer, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.input_shape_ = input_shape
+        self.filter_shape = (
+            self.n_filters, self.filter_size, self.filter_size, input_shape[0])
+
+        self.W = self.add_weight(self.filter_shape,
+                                 initializer=self.initW,
+                                 name='{}_W'.format(self.name),
+                                 regularizer=self.W_regularizer,
+                                 constraint=self.W_constraint,
+                                 trainable=True)
+        if self.initial_weights is not None:
+            self.set_weights(self.initial_weights)
+            del self.initial_weights
+        self.built = True
+
+        super(kerasCudaConvnetDeconv2DLayer, self).build(
+            input_shape)
+
+    def call(self, x, mask=None):
+        input_ = x
+        output_ = K.zeros(self.compute_output_shape(self.input_shape_))
+        for w in range(self.input_shape_[1]):
+            for h in range(self.input_shape_[2]):
+                # w_extended = np.zeros(
+                #     self.compute_output_shape(self.input_shape_))
+                # w_extended[:, w: w + self.filter_size,
+                #             h: h + self.filter_size, :] = w_extended[
+                #                 :, w: w + self.filter_size,
+                #                 h: h + self.filter_size, :] + K.eval(self.W)
+                # w_extended = K.variable(w_extended)
+                # output_step = K.dot(w_extended, input_[:, w, h, :])
+                output_[:, w: w + self.filter_size, h: h +
+                        self.filter_size, :]
+                # output_ += output_step
+        return output_
+
+    def get_output_shape_for(self, input_shape):
+        l, w, h, m_b = input_shape
+        output_width = (w + 2 * self.pad + self.filter_size -
+                        self.stride) // self.stride
+
+        output_height = (h + 2 * self.pad + self.filter_size -
+                         self.stride) // self.stride
+        output_shape = (self.n_filters, output_width, output_height, m_b)
+        return output_shape
+
+    def compute_output_shape(self, input_shape):
+        return self.get_output_shape_for(input_shape)
+
+
 class kerasCudaConvnetConv2DLayer(Layer):
     def __init__(self, n_filters, filter_size, weights_std=0.01,
                  init_bias_value=0.1, stride=1, activation='relu',

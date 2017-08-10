@@ -174,6 +174,16 @@ deconv.init_models()
 if debug:
     deconv.print_summary(modelname='model_simple', postfix=postfix)
 
+for layer in deconv.models['model_simple'].get_layer('simple_mod').layers:
+    print layer.name
+    print layer.input_shape
+    print layer.output_shape
+print
+for layer in deconv.models['model_simple'].layers:
+    print layer.name
+    print layer.input_shape
+    print layer.output_shape
+print
 
 print "Load model weights..."
 # deconv.load_weights(modelname='model_simple',
@@ -187,8 +197,8 @@ deconv_weight = deconv.get_layer_weights(
     layer='sconv_0', modelname='model_simple', main_layer='simple_mod')
 print 'Conv layer output weight shape: ' + str(np.shape(deconv_weight))
 #deconv_weight = np.transpose(deconv_weight, (1, 2, 0, 3))
-deconv.models['model_deconv'].get_layer(
-    'deconv_layer').set_weights(deconv_weight)
+deconv.models['model_simple'].get_layer(
+    'simple_mod').get_layer('deconv_layer').set_weights([deconv_weight[0]])
 # deconv.models['model_deconv'].get_layer('debias_layer').set_weights(
 #  [conv_bias, ])
 
