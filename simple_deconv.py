@@ -78,8 +78,8 @@ class simple_deconv(kaggle_winsol):
         smodel.add(kerasCudaConvnetConv2DLayer(
             n_filters=32, filter_size=6, untie_biases=False, name='sconv_0'))
 
-        smodel.add(kerasCudaConvnetDeconv2DLayer(
-            n_filters=3, filter_size=6, name='deconv_layer'))
+        smodel.add(kerasCudaConvnetDeconv2DLayer(model=smodel,
+                                                 n_filters=3, filter_size=6, name='deconv_layer'))
         smodel.add(fPermute(
             (3, 0, 1, 2),  name='deconv_perm'))
 

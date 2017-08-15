@@ -15,6 +15,7 @@ from keras import activations
 from keras import regularizers
 from keras import constraints
 
+from theano import tensor as T
 from theano.sandbox.cuda.basic_ops import gpu_contiguous
 from pylearn2.sandbox.cuda_convnet.pool import MaxPool
 from pylearn2.sandbox.cuda_convnet.filter_acts import FilterActs
@@ -278,8 +279,8 @@ class kerasCudaConvnetPooling2DLayer(Layer):
 
 
 class kerasCudaConvnetDeconv2DLayer(Layer):
-    def __init__(self, n_filters, filter_size, weights_std=0.01,
-                 init_bias_value=0.1, stride=1, activation='relu',
+    def __init__(self,  model, n_filters, filter_size, deconv_origin=['sconv_0'],
+                 weights_std=0.01, init_bias_value=0.1, stride=1, activation='relu',
                  partial_sum=None, pad=0, untie_biases=False,
                  initW='truncated_normal', initB='constant',
                  initial_weights=None, W_regularizer=None, W_constraint=None,
@@ -305,6 +306,8 @@ class kerasCudaConvnetDeconv2DLayer(Layer):
         self.untie_biases = untie_biases
         self.W_regularizer = W_regularizer
         self.W_constraint = W_constraint
+        self.model = model
+        self.deconv_origin = deconv_origin
 
         if stride != 1 or pad != 0:
             warnings.warn(
@@ -334,22 +337,29 @@ class kerasCudaConvnetDeconv2DLayer(Layer):
             input_shape)
 
     def call(self, x, mask=None):
+        conv_layer = self.model
+        for name in self.deconv_origin:
+            conv_layer = conv_layer.get_layer(name)
         input_ = x
         output_ = K.zeros(self.compute_output_shape(self.input_shape_))
         for w in range(self.input_shape_[1]):
             for h in range(self.input_shape_[2]):
+                step_tensor = K.zeros(
+                    self.compute_output_shape(self.input_shape_))
                 # w_extended = np.zeros(
                 #     self.compute_output_shape(self.input_shape_))
-                # w_extended[:, w: w + self.filter_size,
-                #             h: h + self.filter_size, :] = w_extended[
-                #                 :, w: w + self.filter_size,
-                #                 h: h + self.filter_size, :] + K.eval(self.W)
+               # subtensor = T.inc_subtensor(step_tensor[:, w: w +
+               # self.filter_size,
+               # h: h + self.filter_size, :], 1)
+                subtensor = conv_layer.get_weights(
+                )[0][:, w: w + self.filter_size, h: h + self.filter_size, :]
+                subtensor = K.variable(subtensor)
                 # w_extended = K.variable(w_extended)
-                # output_step = K.dot(w_extended, input_[:, w, h, :])
-                output_[:, w: w + self.filter_size, h: h +
-                        self.filter_size, :]
-                # output_ += output_step
-        return output_
+                output_step = K.dot(subtensor, input_[:, w, h, :])
+                # output_ = x[:, w: w + self.filter_size, h: h +
+                #             self.filter_size, :]
+                # output_ = output_ + output_step
+        return output_step
 
     def get_output_shape_for(self, input_shape):
         l, w, h, m_b = input_shape
