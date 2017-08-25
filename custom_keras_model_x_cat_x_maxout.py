@@ -41,7 +41,7 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
 
         # TODO: extraction of the weights and output of the keras conv layer is
         # not checked yet
-        use_keras_conv = False
+        use_keras_conv = True
         if 'use_keras_conv' in kwargs:
             use_keras_conv = kwargs.pop('use_keras_conv')
 
