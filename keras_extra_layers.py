@@ -20,6 +20,9 @@ from theano.sandbox.cuda.basic_ops import gpu_contiguous
 from pylearn2.sandbox.cuda_convnet.pool import MaxPool
 from pylearn2.sandbox.cuda_convnet.filter_acts import FilterActs
 
+# from deconv_fun import deconv_fun
+
+from theano import pp
 # no mask implementation
 
 '''
@@ -337,29 +340,43 @@ class kerasCudaConvnetDeconv2DLayer(Layer):
             input_shape)
 
     def call(self, x, mask=None):
-        conv_layer = self.model
-        for name in self.deconv_origin:
-            conv_layer = conv_layer.get_layer(name)
-        input_ = x
-        output_ = K.zeros(self.compute_output_shape(self.input_shape_))
-        for w in range(self.input_shape_[1]):
-            for h in range(self.input_shape_[2]):
-                step_tensor = K.zeros(
-                    self.compute_output_shape(self.input_shape_))
-                # w_extended = np.zeros(
-                #     self.compute_output_shape(self.input_shape_))
-               # subtensor = T.inc_subtensor(step_tensor[:, w: w +
-               # self.filter_size,
-               # h: h + self.filter_size, :], 1)
-                subtensor = conv_layer.get_weights(
-                )[0][:, w: w + self.filter_size, h: h + self.filter_size, :]
-                subtensor = K.variable(subtensor)
-                # w_extended = K.variable(w_extended)
-                output_step = K.dot(subtensor, input_[:, w, h, :])
-                # output_ = x[:, w: w + self.filter_size, h: h +
-                #             self.filter_size, :]
-                # output_ = output_ + output_step
-        return output_step
+        output_ = x
+        # input_ = x
+        # input_shape_ = self.input_shape_
+        # weights
+        # output_ = K.dot(filters, x)
+
+        # conv_layer = self.model
+        # for name in self.deconv_origin:
+        #     conv_layer = conv_layer.get_layer(name)
+        # input_ = x
+        # input_shape_ = self.input_shape_
+        # weights_ = conv_layer.get_weights()[0]
+        # output_shape_ = self.compute_output_shape(self.input_shape_)
+        # output_ = deconv_fun(input_, input_shape_, weights_,
+        #                      output_shape_, self.filter_size)
+
+        # output_ = K.zeros(self.compute_output_shape(self.input_shape_))
+        # for w in range(self.input_shape_[1]):
+        #     for h in range(self.input_shape_[2]):
+        #         step_tensor = K.zeros(
+        #             self.compute_output_shape(self.input_shape_))
+        # w_extended = np.zeros(
+        #     self.compute_output_shape(self.input_shape_))
+        # subtensor = T.inc_subtensor(step_tensor[:, w: w +
+        # self.filter_size,
+        # h: h + self.filter_size, :], 1)
+        # subtensor = conv_layer.get_weights(
+        # )[0][:, w: w + self.filter_size, h: h + self.filter_size, :]
+        # subtensor = K.variable(subtensor)
+        # w_extended = K.variable(w_extended)
+        # output_step = K.dot(
+        #     subtensor, input_[:, w: w + self.filter_size, h: h + self.filter_size, :])
+        # output_ = x[:, w: w + self.filter_size, h: h +
+        #             self.filter_size, :]
+        # output_ = output_ + output_step
+
+        return output_
 
     def get_output_shape_for(self, input_shape):
         l, w, h, m_b = input_shape
