@@ -150,7 +150,7 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
         model.add(Merge([input_lay_0, input_lay_1], mode=kaggle_input,
                         output_shape=lambda x: ((input_lay_0.output_shape[0]
                                                  + input_lay_1.output_shape[0])
-                                                * 2
+                                                * num_views
                                                 * N_INPUT_VARIATION,
                                                 self.NUM_INPUT_FEATURES,
                                                 self.PART_SIZE,
@@ -245,10 +245,11 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
 
         model.add(Lambda(function=kaggle_MultiRotMergeLayer_output,
                          output_shape=lambda x: (
-                             x[0] // 4 // N_INPUT_VARIATION, (x[1] * x[2]
+                             x[0] // 4 // num_views, (x[1] * x[2]
                                                               * x[3] * 4
                                                               * num_views)),
-                         arguments={'num_views': num_views},
+                         arguments={'n_input_var':N_INPUT_VARIATION,
+                                    'num_views': num_views},
                          name='conv_out_merge'))
 
         for i in range(n_maxout_layers) if n_maxout_layers > 0 else []:

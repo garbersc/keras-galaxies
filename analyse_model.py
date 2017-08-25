@@ -28,8 +28,8 @@ NUM_INPUT_FEATURES = 3
 
 included_flipped = True
 
-WEIGHTS_PATH = "analysis/final/try_10cat_wMaxout_next_next_next_next.h5"
-IMAGE_OUTPUT_PATH = "img_10cat_filter_best_2"
+WEIGHTS_PATH = "analysis/final/try_10cat_smaller_next.h5"
+IMAGE_OUTPUT_PATH = "img_10cat_smaller_filter"
 
 
 postfix = ''
@@ -67,7 +67,27 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models(final_units=10, use_dropout=False)
+print '\nidentify the used convolution layers\n'
+
+used_conv_layers = {}
+used_conv_layers = {'conv_1': [0,1,2, 12, 15, 30, 33, 48, 56,57,58,59,60,61,62,63],
+                    'conv_0': [0, 1,2,3, 4, 5,6, 8, 17, 18, 23, 25, 26, 28, 30,31],
+                    'conv_3': [0,1,2,3,4,5,6,7,8, 9,10,11,12,13,14, 18, 31, 35, 36, 54, 58, 59, 67, 73, 74, 77, 79, 83, 94, 101, 115, 118],
+                    'conv_2': [0,1, 2, 3, 4,5,6,7,8,9,10,11,12, 13, 14,15, 16,17, 18, 19,20,21,22, 23,24,25,26, 27,28,29,30,31,32,33, 35, 37, 38, 41, 50, 51, 52, 60, 62, 64, 68, 69, 72, 78, 80, 81, 82, 85, 86, 88, 91, 92, 96, 98, 99, 109, 112, 115, 118, 123]}
+
+
+print
+print 'convolution layers that will be used:'
+print used_conv_layers
+print
+
+
+print 'building smaller model'
+conv_filters_n = tuple(len(used_conv_layers['conv_%s' % i]) for i in range(4))
+print conv_filters_n
+
+    
+winsol.init_models(final_units=10, use_dropout=False,conv_filters_n=conv_filters_n)
 
 if debug:
     winsol.print_summary(postfix=postfix)
@@ -327,12 +347,12 @@ for i in range(0, 4):
     plt.imshow(np.transpose(wall, (1, 2, 0)))
     plt.savefig(IMAGE_OUTPUT_PATH + '/' + layer_name + '_45.jpg')
 
-# print
-# for layer in winsol.models['model_norm'].get_layer(
-#         'main_seq').layers:
-#     print layer.name
-#     print layer.output_shape
-# print
+#print
+#for layer in winsol.models['model_norm'].get_layer(
+#       'main_seq').layers:
+#    print layer.name
+#    print layer.output_shape
+#print
 
 # layer_name = 'dense_output'
 # filter_list = []

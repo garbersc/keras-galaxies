@@ -10,6 +10,7 @@ from custom_for_keras import input_generator
 from datetime import datetime, timedelta
 from custom_keras_model_x_cat import kaggle_x_cat
 from keras.optimizers import Adam
+from make_class_weights import create_class_weight
 
 start_time = time.time()
 
@@ -19,6 +20,9 @@ debug = True
 predict = False  # not implemented
 continueAnalysis = True
 saveAtEveryValidation = True
+
+# FIXME reloading existing classweights seems not to work
+use_class_weights = False
 
 import_conv_weights = False
 
@@ -30,7 +34,7 @@ DO_LSUV_INIT = True
 
 BATCH_SIZE = 256  # keep in mind
 
-NUM_INPUT_FEATURES = 1
+NUM_INPUT_FEATURES = 3
 
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
@@ -39,28 +43,37 @@ VALIDATE_EVERY = 5  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 INCLUDE_FLIP = True
 
-TRAIN_LOSS_SF_PATH = "trainingNmbrs_10cat_wConfidence_bw_test.txt"
+TRAIN_LOSS_SF_PATH = "trainingNmbrs_10cat_smaller.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_10cat_wConfidence_bw_test.h5"
-
-load_data.img_path = 'data/bw/images_train_rev1/%s.jpg'
+WEIGHTS_PATH = "analysis/final/try_10cat_smaller.h5"
 
 CONV_WEIGHT_PATH = ''  # 'analysis/final/try_3cat_geometry_corr_geopics_next.h5'
 
 
 LEARNING_RATE_SCHEDULE = {
-    0: 0.01,
-    5: 0.005,
-    40: 0.001,
-    80: 0.0005
-
+    0: 0.001,
+    5:0.0005,
+    100: 0.00005,
+    200: 0.000005,
+    # 40: 0.01,
+    # 80: 0.005,
+    # 120: 0.0005
+    # 500: 0.04,
+    # 0: 0.01,
+    # 1800: 0.004,
+    # 2300: 0.0004,
+    # 0: 0.08,
+    # 50: 0.04,
+    # 2000: 0.008,
+    # 3200: 0.0008,
+    # 4600: 0.0004,
 }
 if continueAnalysis:
     LEARNING_RATE_SCHEDULE = {
-        0: 0.01,
-        #20: 0.005,
-        5: 0.001,
-        #80: 0.0005
+        0: 0.0001,
+        100: 0.00005,
+        200: 0.00001,
+        # 80: 0.005
         # 0: 0.0001,
         # 500: 0.002,
         # 800: 0.0004,
@@ -82,11 +95,11 @@ if copy_to_ram_beforehand:
     ra.myLoadFrom_RAM = True
     import copy_data_to_shm
 
-# y_train = np.load("data/solutions_train_10cat.npy")
-if not os.path.isfile('data/solution_certainties_train_10cat_alt_2.npy'):
-    print 'generate 10 category solutions'
-    import solutions_to_10cat
-y_train = np.load('data/solution_certainties_train_10cat_alt_2.npy')
+y_train = np.load("data/solutions_train_10cat.npy")
+#if not os.path.isfile('data/solution_certainties_train_10cat.npy'):
+#    print 'generate 10 category solutions'
+#    import solutions_to_10cat
+#y_train = np.load('data/solution_certainties_train_10cat_alt_2.npy')
 # y_train = np.concatenate((y_train, np.zeros((np.shape(y_train)[0], 30 - 3))),
 #                          axis=1)
 
@@ -153,6 +166,20 @@ with open(TRAIN_LOSS_SF_PATH, 'a')as f:
     json.dump(LEARNING_RATE_SCHEDULE, f)
     f.write('\n')
 
+
+class_weights = None
+if use_class_weights:
+    class_weight_path = 'classweights.json'
+    if os.path.isfile(class_weight_path):
+        print 'loading category weights from %s' % class_weight_path
+        with open(class_weight_path, 'r') as f:
+            class_weights = json.load(f)
+    else:
+        print 'generating category weights...'
+        class_weights = create_class_weight(
+            y_train, savefile=class_weight_path)
+        print 'saved category weights to %s' % class_weight_path
+
 print 'initiate winsol class'
 winsol = kaggle_x_cat(BATCH_SIZE=BATCH_SIZE,
                       NUM_INPUT_FEATURES=NUM_INPUT_FEATURES,
@@ -173,8 +200,27 @@ if debug:
            NUM_INPUT_FEATURES,
            BATCH_SIZE))
 
-winsol.init_models(final_units=10, optimizer=optimizer,
-                   loss='mean_squared_error')
+
+print '\nidentify the used convolution layers\n'
+
+used_conv_layers = {}
+used_conv_layers = {'conv_1': [0,1,2, 12, 15, 30, 33, 48, 56,57,58,59,60,61,62,63], 'conv_0': [0, 1,2,3, 4, 5,6, 8, 17, 18, 23, 25, 26, 28, 30,31], 'conv_3': [0,1,2,3,4,5,6,7,8, 9,10,11,12,13,14, 18, 31, 35, 36, 54, 58, 59, 67, 73, 74, 77, 79, 83, 94, 101, 115, 118], 'conv_2': [
+    0,1, 2, 3, 4,5,6,7,8,9,10,11,12, 13, 14,15, 16,17, 18, 19,20,21,22, 23,24,25,26, 27,28,29,30,31,32,33, 35, 37, 38, 41, 50, 51, 52, 60, 62, 64, 68, 69, 72, 78, 80, 81, 82, 85, 86, 88, 91, 92, 96, 98, 99, 109, 112, 115, 118, 123]}
+
+
+print
+print 'convolution layers that will be used:'
+print used_conv_layers
+print
+
+
+print 'building smaller model'
+conv_filters_n = tuple(len(used_conv_layers['conv_%s' % i]) for i in range(4))
+print conv_filters_n
+winsol.init_models(final_units=10,optimizer=optimizer,
+                   #loss='mean_squared_error',
+                   conv_filters_n=conv_filters_n)
+
 
 if debug:
     print winsol.models['model_norm'].get_output_shape_at(0)
@@ -209,10 +255,10 @@ def create_data_gen():
         chunk_size=BATCH_SIZE,
         augmentation_params=augmentation_params,
         ds_transforms=ds_transforms,
-        target_sizes=input_sizes, features=NUM_INPUT_FEATURES)
+        target_sizes=input_sizes)
 
     post_augmented_data_gen = ra.post_augment_brightness_gen(
-        augmented_data_gen, std=0.5, features=NUM_INPUT_FEATURES)
+        augmented_data_gen, std=0.5)
 
     train_gen = load_data.buffered_gen_mp(
         post_augmented_data_gen, buffer_size=GEN_BUFFER_SIZE)
@@ -233,9 +279,7 @@ def create_valid_gen():
         'train',
         ds_transforms=ds_transforms,
         chunk_size=N_VALID,
-        target_sizes=input_sizes,
-        features=NUM_INPUT_FEATURES
-    )
+        target_sizes=input_sizes)
     # load_data.buffered_gen_mp(data_gen_valid, buffer_size=GEN_BUFFER_SIZE)
     return data_gen_valid
 
@@ -272,14 +316,7 @@ elif DO_LSUV_INIT:
     print 'Starting LSUV initialisation'
     # TODO check influence on the first epoch of the data generation of this
     # .next()
-    #    print 'debugging'
-    #    input_gen.next()
-    #    print 'next worked'
-    #    print np.shape(input_gen.next())
-
     train_batch = input_gen.next()[0]
-    print 'train batch shape'
-    print np.shape(train_batch)
     if debug:
         print type(train_batch)
         print np.shape(train_batch)
@@ -330,6 +367,7 @@ try:
                     samples_per_epoch=N_TRAIN,
                     validate_every=VALIDATE_EVERY,
                     nb_epochs=EPOCHS,
+                    class_weight=class_weights
                     )
 
 except KeyboardInterrupt:
