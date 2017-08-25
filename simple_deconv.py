@@ -6,7 +6,7 @@ from keras.layers import Dense, Dropout, Input, Conv2DTranspose, Conv2D
 from keras.layers.core import Lambda
 
 from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute,\
-    kerasCudaConvnetConv2DLayer, DeBias
+    kerasCudaConvnetConv2DLayer, kerasCudaConvnetDeconv2DLayer, DeBias
 
 from keras.optimizers import SGD
 
@@ -49,12 +49,6 @@ class simple_deconv(kaggle_winsol):
                 momentum=self.MOMENTUM,
                 nesterov=bool(self.MOMENTUM))
         try:
-            self.models['model_deconv' + postfix].compile(
-                loss=loss,
-                optimizer=optimizer)
-        except KeyError:
-            pass
-        try:
             self.models['model_simple' + postfix].compile(
                 loss=loss,
                 optimizer=optimizer)
@@ -79,13 +73,27 @@ class simple_deconv(kaggle_winsol):
         smodel = Sequential(name='simple_mod')
 
         smodel.add(fPermute(
-            (0, 1, 2, 3), batch_input_shape=(self.BATCH_SIZE, self.NUM_INPUT_FEATURES, 45, 45),  name='sinput_perm'))
+            (1, 2, 3, 0), batch_input_shape=(self.BATCH_SIZE, self.NUM_INPUT_FEATURES, 45, 45),  name='sinput_perm'))
 
-        # smodel.add(kerasCudaConvnetConv2DLayer(
-        # n_filters=32, filter_size=6, untie_biases=True, name='sconv_0'))
+        smodel.add(kerasCudaConvnetConv2DLayer(
+            n_filters=32, filter_size=6, untie_biases=False, name='sconv_0'))
 
-        smodel.add(Conv2D(filters=32, kernel_size=6,
-                          strides=(1, 1), use_bias=False, name='sconv_0'))
+        smodel.add(kerasCudaConvnetConv2DLayer(
+            n_filters=3, filter_size=6, untie_biases=False, name='deconv_layer'))
+
+        smodel.add(fPermute(
+            (3, 0, 1, 2),  name='deconv_perm'))
+
+        # smodel.add(Conv2DTranspose(filters=3, kernel_size=6,
+        #                            strides=(1, 1),
+        #                            use_bias=False,
+        #                            name='deconv_layer'))
+
+        # smodel.add(kerasCudaConvnetDeconv2DLayer(model=smodel,
+        #                                          n_filters=3, filter_size=6, name='deconv_layer'
+        # ))
+        # smodel.add(fPermute(
+        #     (3, 0, 1, 2),  name='deconv_perm'))
 
         smodel_seq = smodel(sinput_tensor)
 
@@ -97,19 +105,19 @@ class simple_deconv(kaggle_winsol):
         deconvolution model
         '''
 
-       # deconv_perm_layer = fPermute((3, 0, 1, 2), name='deconv_out_perm')
+        # deconv_perm_layer = fPermute((3, 0, 1, 2), name='deconv_out_perm')
 
-       # deconv_perm_tensor = deconv_perm_layer(
+        # deconv_perm_tensor = deconv_perm_layer(
         #  smodel.get_layer('sconv_0').get_output_at(0))
 
-       # debias_layer = DeBias(nFilters=32, name='debias_layer')(
+        # debias_layer = DeBias(nFilters=32, name='debias_layer')(
         #    smodel.get_layer('sconv_0').get_output_at(0))
 
-        deconv_layer = Conv2DTranspose(filters=3, kernel_size=6,
-                                       strides=(1, 1),
-                                       use_bias=False,
-                                       name='deconv_layer',
-                                       )(smodel.get_layer('sconv_0').get_output_at(0))
+        # deconv_layer = Conv2DTranspose(filters=3, kernel_size=6,
+        #                                strides=(1, 1),
+        #                                use_bias=False,
+        #                                name='deconv_layer',
+        #                                )(smodel.get_layer('sconv_0').get_output_at(0))
 
         def reshape_output(x, BATCH_SIZE=self.BATCH_SIZE):
             input_shape = T.shape(x)
@@ -122,20 +130,14 @@ class simple_deconv(kaggle_winsol):
             input_ = input_.reshape(new_input_shape)
             return input_
 
-        output_layer_deconv = Lambda(
-            function=lambda x: x, output_shape=lambda x: x)(deconv_layer)
-
-       # output_layer_deconv = Lambda(function=reshape_output, output_shape=lambda input_shape: (
+        # output_layer_deconv = Lambda(function=reshape_output, output_shape=lambda input_shape: (
         # self.BATCH_SIZE, input_shape[1], input_shape[2] * input_shape[0] /
         # self.BATCH_SIZE, input_shape[3]))(deconv_layer)
 
-        model_deconv = Model(inputs=smodel.get_input_at(0), outputs=output_layer_deconv,
-                             name='deconv_1')
         model_simple = Model(sinput_tensor,
                              outputs=output_layer_smodel, name='simple_model')
 
-        self.models = {'model_deconv': model_deconv,
-                       'model_simple': model_simple
+        self.models = {'model_simple': model_simple
                        }
 
         self._compile_models(loss='categorical_crossentropy')
