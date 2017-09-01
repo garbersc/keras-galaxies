@@ -18,7 +18,7 @@ copy_to_ram_beforehand = False
 
 debug = True
 predict = False  # not implemented
-continueAnalysis = True
+continueAnalysis = False
 saveAtEveryValidation = True
 
 # FIXME reloading existing classweights seems not to work
@@ -30,7 +30,7 @@ import_conv_weights = False
 # describtion
 # for this to work, the batch size has to be something like 128, 256, 512,
 # ... reason not found
-DO_LSUV_INIT = True
+DO_LSUV_INIT = False
 
 BATCH_SIZE = 256  # keep in mind
 
@@ -38,7 +38,7 @@ NUM_INPUT_FEATURES = 3
 
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-EPOCHS = 300
+EPOCHS = 50
 VALIDATE_EVERY = 5  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 INCLUDE_FLIP = True
@@ -52,7 +52,7 @@ CONV_WEIGHT_PATH = ''  # 'analysis/final/try_3cat_geometry_corr_geopics_next.h5'
 
 LEARNING_RATE_SCHEDULE = {
     0: 0.001,
-    5:0.0005,
+    5: 0.0005,
     100: 0.00005,
     200: 0.000005,
     # 40: 0.01,
@@ -96,7 +96,7 @@ if copy_to_ram_beforehand:
     import copy_data_to_shm
 
 y_train = np.load("data/solutions_train_10cat.npy")
-#if not os.path.isfile('data/solution_certainties_train_10cat.npy'):
+# if not os.path.isfile('data/solution_certainties_train_10cat.npy'):
 #    print 'generate 10 category solutions'
 #    import solutions_to_10cat
 #y_train = np.load('data/solution_certainties_train_10cat_alt_2.npy')
@@ -110,6 +110,7 @@ ra.num_train = y_train.shape[0]
 
 # integer division, is defining validation size
 ra.num_valid = ra.num_train // 10
+ra.num_valid -= ra.num_valid % BATCH_SIZE
 ra.num_train -= ra.num_valid
 
 ra.y_valid = ra.y_train[ra.num_train:]
@@ -204,8 +205,8 @@ if debug:
 print '\nidentify the used convolution layers\n'
 
 used_conv_layers = {}
-used_conv_layers = {'conv_1': [0,1,2, 12, 15, 30, 33, 48, 56,57,58,59,60,61,62,63], 'conv_0': [0, 1,2,3, 4, 5,6, 8, 17, 18, 23, 25, 26, 28, 30,31], 'conv_3': [0,1,2,3,4,5,6,7,8, 9,10,11,12,13,14, 18, 31, 35, 36, 54, 58, 59, 67, 73, 74, 77, 79, 83, 94, 101, 115, 118], 'conv_2': [
-    0,1, 2, 3, 4,5,6,7,8,9,10,11,12, 13, 14,15, 16,17, 18, 19,20,21,22, 23,24,25,26, 27,28,29,30,31,32,33, 35, 37, 38, 41, 50, 51, 52, 60, 62, 64, 68, 69, 72, 78, 80, 81, 82, 85, 86, 88, 91, 92, 96, 98, 99, 109, 112, 115, 118, 123]}
+used_conv_layers = {'conv_1': [0, 1, 2, 12, 15, 30, 33, 48, 56, 57, 58, 59, 60, 61, 62, 63], 'conv_0': [0, 1, 2, 3, 4, 5, 6, 8, 17, 18, 23, 25, 26, 28, 30, 31], 'conv_3': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 18, 31, 35, 36, 54, 58, 59, 67, 73, 74, 77, 79, 83, 94, 101, 115, 118], 'conv_2': [
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 37, 38, 41, 50, 51, 52, 60, 62, 64, 68, 69, 72, 78, 80, 81, 82, 85, 86, 88, 91, 92, 96, 98, 99, 109, 112, 115, 118, 123]}
 
 
 print
@@ -217,8 +218,8 @@ print
 print 'building smaller model'
 conv_filters_n = tuple(len(used_conv_layers['conv_%s' % i]) for i in range(4))
 print conv_filters_n
-winsol.init_models(final_units=10,optimizer=optimizer,
-                   #loss='mean_squared_error',
+winsol.init_models(final_units=10, optimizer=optimizer,
+                   # loss='mean_squared_error',
                    conv_filters_n=conv_filters_n)
 
 

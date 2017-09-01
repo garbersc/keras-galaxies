@@ -11,8 +11,7 @@ from keras.layers import Merge, Conv2D, MaxPooling2D
 from keras.engine.topology import InputLayer
 from keras import initializers
 
-from keras_extra_layers import kerasCudaConvnetPooling2DLayer,\
-    kerasCudaConvnetConv2DLayer, MaxoutDense
+from keras_extra_layers import MaxoutDense
 from custom_for_keras import kaggle_MultiRotMergeLayer_output,\
     OptimisedDivGalaxyOutput, kaggle_input, dense_weight_init_values
 

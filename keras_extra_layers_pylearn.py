@@ -15,8 +15,14 @@ from keras import activations
 from keras import regularizers
 from keras import constraints
 
+from theano import tensor as T
+from theano.sandbox.cuda.basic_ops import gpu_contiguous
+from pylearn2.sandbox.cuda_convnet.pool import MaxPool
+from pylearn2.sandbox.cuda_convnet.filter_acts import FilterActs
+
 # from deconv_fun import deconv_fun
 
+from theano import pp
 # no mask implementation
 
 '''
@@ -238,6 +244,255 @@ class DePool(Layer):
 
     def compute_output_shape(self, input_shape):
         return self.get_output_shape_for(input_shape)
+
+
+class kerasCudaConvnetPooling2DLayer(Layer):
+    def __init__(self, pool_size=2, stride=None, **kwargs):
+        self.pool_size = pool_size
+        self.stride = stride if stride is not None else pool_size
+        # self.input_layer = input_layer
+        self.params = []
+        self.bias_params = []
+        # self.mb_size = self.input_layer.mb_size
+
+        self.pool_op = MaxPool(ds=self.pool_size, stride=self.stride)
+
+        super(kerasCudaConvnetPooling2DLayer, self).__init__(**kwargs)
+
+    # def build(self, input_shape):
+    # super(kerasCudaConvnetPooling2DLayer, self).build(input_shape)  # Be
+    # sure to call this somewhere!
+
+    def call(self, x, mask=None):
+        contiguous_input = gpu_contiguous(x)
+        return self.pool_op(contiguous_input)
+
+    def get_output_shape_for(self, input_shape):
+        l, w, h, m_b = input_shape
+
+        new_w = int(
+            np.ceil(float(w - self.pool_size + self.stride) / self.stride))
+        new_h = int(
+            np.ceil(float(h - self.pool_size + self.stride) / self.stride))
+
+        return (l, new_w, new_h, m_b)
+
+    def compute_output_shape(self, input_shape):
+        return self.get_output_shape_for(input_shape)
+
+
+class kerasCudaConvnetDeconv2DLayer(Layer):
+    def __init__(self,  model, n_filters, filter_size, deconv_origin=['sconv_0'],
+                 weights_std=0.01, init_bias_value=0.1, stride=1, activation='relu',
+                 partial_sum=None, pad=0, untie_biases=False,
+                 initW='truncated_normal', initB='constant',
+                 initial_weights=None, W_regularizer=None, W_constraint=None,
+                 b_regularizer=None, b_constraint=None, **kwargs):
+        """
+        Transposed convolution for the pylearn implementation
+
+        """
+
+        self.initW = initializers.get(
+            {'class_name': initW, 'config': {'stddev': weights_std}})
+        self.initB = initializers.get({'class_name': initB,
+                                       'config': {'value': init_bias_value}})
+        self.initial_weights = initial_weights
+        self.n_filters = n_filters
+        self.filter_size = filter_size
+        self.weights_std = np.float32(weights_std)
+        self.init_bias_value = np.float32(init_bias_value)
+        self.stride = stride
+        self.nonlinearity = activations.get(activation)
+        self.partial_sum = partial_sum
+        self.pad = pad
+        self.untie_biases = untie_biases
+        self.W_regularizer = W_regularizer
+        self.W_constraint = W_constraint
+        self.model = model
+        self.deconv_origin = deconv_origin
+
+        if stride != 1 or pad != 0:
+            warnings.warn(
+                'Layer DeConv was not build for this stride and/or padding option!')
+
+        self.filter_acts_op = FilterActs(
+            stride=self.stride, partial_sum=self.partial_sum, pad=self.pad)
+        super(kerasCudaConvnetDeconv2DLayer, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.input_shape_ = input_shape
+        self.filter_shape = (
+            self.n_filters, self.filter_size, self.filter_size, input_shape[0])
+
+        self.W = self.add_weight(self.filter_shape,
+                                 initializer=self.initW,
+                                 name='{}_W'.format(self.name),
+                                 regularizer=self.W_regularizer,
+                                 constraint=self.W_constraint,
+                                 trainable=True)
+        if self.initial_weights is not None:
+            self.set_weights(self.initial_weights)
+            del self.initial_weights
+        self.built = True
+
+        super(kerasCudaConvnetDeconv2DLayer, self).build(
+            input_shape)
+
+    def call(self, x, mask=None):
+        output_ = x
+        # input_ = x
+        # input_shape_ = self.input_shape_
+        # weights
+        # output_ = K.dot(filters, x)
+
+        # conv_layer = self.model
+        # for name in self.deconv_origin:
+        #     conv_layer = conv_layer.get_layer(name)
+        # input_ = x
+        # input_shape_ = self.input_shape_
+        # weights_ = conv_layer.get_weights()[0]
+        # output_shape_ = self.compute_output_shape(self.input_shape_)
+        # output_ = deconv_fun(input_, input_shape_, weights_,
+        #                      output_shape_, self.filter_size)
+
+        # output_ = K.zeros(self.compute_output_shape(self.input_shape_))
+        # for w in range(self.input_shape_[1]):
+        #     for h in range(self.input_shape_[2]):
+        #         step_tensor = K.zeros(
+        #             self.compute_output_shape(self.input_shape_))
+        # w_extended = np.zeros(
+        #     self.compute_output_shape(self.input_shape_))
+        # subtensor = T.inc_subtensor(step_tensor[:, w: w +
+        # self.filter_size,
+        # h: h + self.filter_size, :], 1)
+        # subtensor = conv_layer.get_weights(
+        # )[0][:, w: w + self.filter_size, h: h + self.filter_size, :]
+        # subtensor = K.variable(subtensor)
+        # w_extended = K.variable(w_extended)
+        # output_step = K.dot(
+        #     subtensor, input_[:, w: w + self.filter_size, h: h + self.filter_size, :])
+        # output_ = x[:, w: w + self.filter_size, h: h +
+        #             self.filter_size, :]
+        # output_ = output_ + output_step
+
+        return output_
+
+    def get_output_shape_for(self, input_shape):
+        l, w, h, m_b = input_shape
+        output_width = (w + 2 * self.pad + self.filter_size -
+                        self.stride) // self.stride
+
+        output_height = (h + 2 * self.pad + self.filter_size -
+                         self.stride) // self.stride
+        output_shape = (self.n_filters, output_width, output_height, m_b)
+        return output_shape
+
+    def compute_output_shape(self, input_shape):
+        return self.get_output_shape_for(input_shape)
+
+
+class kerasCudaConvnetConv2DLayer(Layer):
+    def __init__(self, n_filters, filter_size, weights_std=0.01,
+                 init_bias_value=0.1, stride=1, activation='relu',
+                 partial_sum=None, pad=0, untie_biases=False,
+                 # check the keyword arguments if nopt on default values
+                 initW='truncated_normal', initB='constant',
+                 initial_weights=None, W_regularizer=None, W_constraint=None,
+                 b_regularizer=None, b_constraint=None, **kwargs):
+        """
+        Only the valid border mode is supported.
+
+        n_filters should be a multiple of 16
+        """
+
+        self.initW = initializers.get(
+            {'class_name': initW, 'config': {'stddev': weights_std}})
+        self.initB = initializers.get({'class_name': initB,
+                                       'config': {'value': init_bias_value}})
+        self.initial_weights = initial_weights
+        self.n_filters = n_filters
+        self.filter_size = filter_size
+        self.weights_std = np.float32(weights_std)
+        self.init_bias_value = np.float32(init_bias_value)
+        self.stride = stride
+        self.nonlinearity = activations.get(activation)
+        self.partial_sum = partial_sum
+        self.pad = pad
+        self.untie_biases = untie_biases
+        self.W_regularizer = W_regularizer
+        self.W_constraint = W_constraint
+        self.b_regularizer = b_regularizer
+        self.b_constraint = b_constraint
+
+        self.filter_acts_op = FilterActs(
+            stride=self.stride, partial_sum=self.partial_sum, pad=self.pad)
+        super(kerasCudaConvnetConv2DLayer, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        if K.image_data_format() != 'channels_first':
+            warnings.warn(
+                "maybe wrong dim ordering in custom conv layer, ordering is %s, data format is" % (
+                    K.image_dim_ordering(), K.image_data_format()))
+
+        self.filter_shape = (
+            input_shape[0], self.filter_size, self.filter_size, self.n_filters)
+
+        self.W = self.add_weight(self.filter_shape,
+                                 initializer=self.initW,
+                                 name='{}_W'.format(self.name),
+                                 regularizer=self.W_regularizer,
+                                 constraint=self.W_constraint,
+                                 trainable=True)
+        if self.untie_biases:
+            self.b = self.add_weight((self.get_output_shape_for(input_shape)[:3]),
+                                     initializer=self.initB,
+                                     name='{}_b'.format(self.name),
+                                     regularizer=self.b_regularizer,
+                                     constraint=self.b_constraint,
+                                     trainable=True)
+        else:
+            self.b = self.add_weight((self.n_filters,),
+                                     initializer=self.initB,
+                                     name='{}_b'.format(self.name),
+                                     regularizer=self.b_regularizer,
+                                     constraint=self.b_constraint,
+                                     trainable=True)
+
+        if self.initial_weights is not None:
+            self.set_weights(self.initial_weights)
+            del self.initial_weights
+        self.built = True
+
+        super(kerasCudaConvnetConv2DLayer, self).build(
+            input_shape)  # Be sure to call this somewhere!
+
+    def call(self, x, mask=None):
+        input_ = x
+
+        contiguous_input = gpu_contiguous(input_)
+        contiguous_filters = gpu_contiguous(self.W)
+        conved = self.filter_acts_op(contiguous_input, contiguous_filters)
+
+        if self.untie_biases:
+            conved += self.b.dimshuffle(0, 1, 2, 'x')
+        else:
+            conved += self.b.dimshuffle(0, 'x', 'x', 'x')
+
+        return self.nonlinearity(conved)
+
+    def get_output_shape_for(self, input_shape):
+        l, w, h, m_b = input_shape
+        output_width = (w + 2 * self.pad - self.filter_size +
+                        self.stride) // self.stride
+        output_height = (h + 2 * self.pad - self.filter_size +
+                         self.stride) // self.stride
+        output_shape = (self.n_filters, output_width, output_height, m_b)
+        return output_shape
+
+    def compute_output_shape(self, input_shape):
+        return self.get_output_shape_for(input_shape)
+
 
 # from keras1:
 

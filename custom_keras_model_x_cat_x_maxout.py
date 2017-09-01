@@ -14,8 +14,7 @@ from keras import initializers
 from keras.layers.convolutional import Conv2D
 from keras.layers.pooling import MaxPooling2D
 
-from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute,\
-    kerasCudaConvnetConv2DLayer, MaxoutDense, Bias
+from keras_extra_layers import MaxoutDense, Bias
 from custom_for_keras import kaggle_MultiRotMergeLayer_output,  kaggle_input,\
     dense_weight_init_values
 
@@ -109,6 +108,9 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
                     conv_filters_n=(32, 64, 128, 128),
                     use_dropout=True,
                     final_activation='softmax'):
+        if not self.use_keras_conv:
+            from keras_extra_layers import kerasCudaConvnetPooling2DLayer, fPermute,\
+                kerasCudaConvnetConv2DLayer
 
         if not (type(freeze_conv) in (tuple, list)):
             freeze_conv = bool(freeze_conv)
@@ -246,9 +248,9 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
         model.add(Lambda(function=kaggle_MultiRotMergeLayer_output,
                          output_shape=lambda x: (
                              x[0] // 4 // num_views, (x[1] * x[2]
-                                                              * x[3] * 4
-                                                              * num_views)),
-                         arguments={'n_input_var':N_INPUT_VARIATION,
+                                                      * x[3] * 4
+                                                      * num_views)),
+                         arguments={'n_input_var': N_INPUT_VARIATION,
                                     'num_views': num_views},
                          name='conv_out_merge'))
 

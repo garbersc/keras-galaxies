@@ -3,7 +3,7 @@ import numpy as np
 from keras.models import Model
 from keras import backend as K
 from keras.layers import Dense, Convolution2D
-from keras_extra_layers import kerasCudaConvnetConv2DLayer, MaxoutDense
+from keras_extra_layers import MaxoutDense
 
 # Orthonorm init code is taked from Lasagne
 # https://github.com/Lasagne/Lasagne/blob/master/lasagne/init.py
@@ -33,7 +33,7 @@ def svd_orthonormal(shape):
 
 
 def get_activations(model, layer, X_batch, batch_size):
-    if (type(layer) is kerasCudaConvnetConv2DLayer):
+    if (type(layer) is Convolution2D):
         batch_size = layer.output_shape[0]
     intermediate_layer_model = Model(
         inputs=model.get_input_at(0), outputs=layer.get_output_at(0))
@@ -46,7 +46,7 @@ def LSUVinit(model, batch, batch_size):
     # only these layer classes considered for LSUV initialization; add more if
     # needed
     classes_to_consider = (Dense, Convolution2D,
-                           MaxoutDense, kerasCudaConvnetConv2DLayer)
+                           MaxoutDense)
 
     margin = 0.1
     max_iter = 10
