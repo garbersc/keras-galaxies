@@ -14,6 +14,8 @@ class kaggle_x_cat(kaggle_x_cat_x_maxout):
 
     def init_models(self, final_units=3, loss='categorical_crossentropy',
                     **kwargs):
+        if 'conv_filters_n' in kwargs.keys():
+            self.conv_filters_n = kwargs['conv_filters_n']
         return super(kaggle_x_cat, self).init_models(final_units=final_units,
                                                      loss=loss,
                                                      n_maxout_layers=2,
@@ -32,6 +34,14 @@ class kaggle_x_cat(kaggle_x_cat_x_maxout):
                 modelname='model_norm',
                 sub_modelname='main_seq',
                 postfix='')
+        elif not used_conv_layers:
+            used_conv_layers = {'conv_3': range(self.conv_filters_n[3])}
+
+        # debug!!!
+        print type(used_conv_layers)
+        print type(self.conv_filters_n)
+        print used_conv_layers
+        print self.conv_filters_n
 
         modelname = modelname + postfix
 
