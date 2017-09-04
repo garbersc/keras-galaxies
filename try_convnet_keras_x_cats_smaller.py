@@ -6,6 +6,7 @@ import time
 import sys
 import os
 import json
+import os.path
 from custom_for_keras import input_generator
 from datetime import datetime, timedelta
 from custom_keras_model_x_cat import kaggle_x_cat
@@ -18,7 +19,7 @@ copy_to_ram_beforehand = False
 
 debug = True
 predict = False  # not implemented
-continueAnalysis = False
+continueAnalysis = True
 saveAtEveryValidation = True
 
 # FIXME reloading existing classweights seems not to work
@@ -38,7 +39,7 @@ NUM_INPUT_FEATURES = 3
 
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-EPOCHS = 50
+EPOCHS = 1
 VALIDATE_EVERY = 5  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 INCLUDE_FLIP = True
@@ -157,6 +158,7 @@ print("The training sample contains %s , the validation sample contains %s image
 # maybe put into class
 with open(TRAIN_LOSS_SF_PATH, 'a')as f:
     if continueAnalysis:
+
         f.write('#continuing from ')
         f.write(WEIGHTS_PATH)
     # f.write("#wRandFlip \n")
@@ -307,6 +309,8 @@ print "  took %.2f seconds" % (t_val)
 
 if continueAnalysis:
     print "Load model weights"
+    if not os.path.isfile(WEIGHTS_PATH):
+        raise Exception('in ' + WEIGHTS_PATH + ' weights file not found')
     winsol.load_weights(path=WEIGHTS_PATH)
     winsol.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
 elif import_conv_weights:

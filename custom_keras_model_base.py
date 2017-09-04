@@ -190,15 +190,15 @@ class kaggle_base(object):
 
             weight = [np.array(weight[n]) for n in weight.keys()]
 
-            if 'use_keras_conv' in vars(self):
-                if ls.find('conv') >= 0:
-                    self.models[modelname].get_layer(
-                        sub_modelname).get_layer(lt + '_bias').set_weights([weight[1]])
-                    weight = [np.transpose(weight[0], (1, 2, 0, 3)), np.zeros(
-                        np.shape(self.models[modelname].get_layer(
-                            sub_modelname).get_layer(lt).get_weights()[1]))]
-                elif ls.find('dense_output') >= 0:
-                    weight = weight[::-1]
+            # if 'use_keras_conv' in vars(self):
+            #     if ls.find('conv') >= 0:
+            #         self.models[modelname].get_layer(
+            #             sub_modelname).get_layer(lt + '_bias').set_weights([weight[1]])
+            #         weight = [np.transpose(weight[0], (1, 2, 0, 3)), np.zeros(
+            #             np.shape(self.models[modelname].get_layer(
+            #                 sub_modelname).get_layer(lt).get_weights()[1]))]
+            #     elif ls.find('dense_output') >= 0:
+            #         weight = weight[::-1]
 
             try:
                 self.models[modelname].get_layer(
