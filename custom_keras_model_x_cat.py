@@ -14,8 +14,8 @@ class kaggle_x_cat(kaggle_x_cat_x_maxout):
 
     def init_models(self, final_units=3, loss='categorical_crossentropy',
                     **kwargs):
-        if 'conv_filters_n' in kwargs.keys():
-            self.conv_filters_n = kwargs['conv_filters_n']
+        # if 'conv_filters_n' in kwargs.keys():
+        #     self.conv_filters_n = kwargs['conv_filters_n']
         return super(kaggle_x_cat, self).init_models(final_units=final_units,
                                                      loss=loss,
                                                      n_maxout_layers=2,
@@ -25,8 +25,8 @@ class kaggle_x_cat(kaggle_x_cat_x_maxout):
                                modelname='model_norm',
                                sub_modelname='main_seq',
                                postfix='', used_conv_layers=None):
-        if (not used_conv_layers or layername_source not in used_conv_layers)\
-           and layername_source.find('maxout_0') < 0:
+        if (not used_conv_layers or layername_source not in used_conv_layers):
+           # and layername_source.find('maxout_0') < 0: TODO AUFRAEUMEN!!!!
             return super(kaggle_x_cat, self).load_one_layers_weight(
                 path,
                 layername_source,
@@ -34,14 +34,14 @@ class kaggle_x_cat(kaggle_x_cat_x_maxout):
                 modelname='model_norm',
                 sub_modelname='main_seq',
                 postfix='')
-        elif not used_conv_layers:
-            used_conv_layers = {'conv_3': range(self.conv_filters_n[3])}
+        # elif not used_conv_layers:
+        #     used_conv_layers = {'conv_3': range(self.conv_filters_n[3])}
 
         # debug!!!
-        print type(used_conv_layers)
-        print type(self.conv_filters_n)
-        print used_conv_layers
-        print self.conv_filters_n
+        # print type(used_conv_layers)
+        # print type(self.conv_filters_n)
+        # print used_conv_layers
+        # print self.conv_filters_n
 
         modelname = modelname + postfix
 
@@ -74,7 +74,7 @@ class kaggle_x_cat(kaggle_x_cat_x_maxout):
                                          in weight.keys()]
 
             try:
-                if ls.find('conv') >= 0:
+                if ls.find('conv') >= 0 and used_conv_layers:
                     weight = [np.array([np.transpose(weight[ls + '_W'],
                                                      (3, 1, 2, 0))[i]
                                         for i in used_conv_layers[ls]])
@@ -91,7 +91,7 @@ class kaggle_x_cat(kaggle_x_cat_x_maxout):
                                             used_conv_layers['conv_'
                                                              + str(conv_id - 1)]]),
                                   weight[1]]
-                elif ls.find('maxout_0') >= 0:
+                elif ls.find('maxout_0') >= 0 and used_conv_layers:
                     w_init_shape = np.shape(weight.values()[0])
                     weight_stripe = w_init_shape[1] / 128
                     weight_kernel = np.reshape(
@@ -107,7 +107,7 @@ class kaggle_x_cat(kaggle_x_cat_x_maxout):
                                           weight_stripe,
                                           w_init_shape[-1]))
                     weight = [weight_kernel, weight.values()[1]]
-                else:
+                elif used_conv_layers:
                     raise TypeError(
                         'Layer ' + ls + ' is here not awaited!')
 
