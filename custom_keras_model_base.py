@@ -197,8 +197,8 @@ class kaggle_base(object):
             #         weight = [np.transpose(weight[0], (1, 2, 0, 3)), np.zeros(
             #             np.shape(self.models[modelname].get_layer(
             #                 sub_modelname).get_layer(lt).get_weights()[1]))]
-            #     elif ls.find('dense_output') >= 0:
-            #         weight = weight[::-1]
+            if ls.find('dense_output') >= 0:
+                weight = weight[::-1]  # not clear, but it works
 
             try:
                 self.models[modelname].get_layer(

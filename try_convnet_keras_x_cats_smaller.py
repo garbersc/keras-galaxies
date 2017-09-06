@@ -5,6 +5,7 @@ import realtime_augmentation as ra
 import time
 import sys
 import os
+import signal
 import json
 import os.path
 from custom_for_keras import input_generator
@@ -104,26 +105,27 @@ y_train = np.load("data/solutions_train_10cat.npy")
 # y_train = np.concatenate((y_train, np.zeros((np.shape(y_train)[0], 30 - 3))),
 #                          axis=1)
 
+red_num = 50000
 ra.y_train = y_train
 
 # split training data into training + a small validation set
-ra.num_train = y_train.shape[0]
+ra.num_train = y_train.shape[0] - red_num
 
 # integer division, is defining validation size
 ra.num_valid = ra.num_train // 10
 ra.num_valid -= ra.num_valid % BATCH_SIZE
 ra.num_train -= ra.num_valid
 
-ra.y_valid = ra.y_train[ra.num_train:]
+ra.y_valid = ra.y_train[ra.num_train:ra.num_train + ra.num_valid]
 ra.y_train = ra.y_train[:ra.num_train]
 
-load_data.num_train = y_train.shape[0]
+load_data.num_train = y_train.shape[0] - red_num
 load_data.train_ids = np.load("data/train_ids.npy")
 
 ra.load_data.num_train = load_data.num_train
 ra.load_data.train_ids = load_data.train_ids
 
-ra.valid_ids = load_data.train_ids[ra.num_train:]
+ra.valid_ids = load_data.train_ids[ra.num_train:ra.num_train + ra.num_valid]
 ra.train_ids = load_data.train_ids[:ra.num_train]
 
 
@@ -339,8 +341,9 @@ def save_exit():
     winsol.save()
     print "Done!"
     print ' run for %s' % timedelta(seconds=(time.time() - start_time))
-    exit()
-    sys.exit(0)
+    pid = os.getpid()
+    os.kill(pid, signal.SIGTERM)
+    os._exit()
 
 
 try:
@@ -387,7 +390,6 @@ except ValueError, e:
         print '\t first image row: %s' % xs_valid[0][0, 0, 0]
     print ''
     print e
-
     save_exit()
 
 save_exit()
