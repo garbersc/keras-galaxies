@@ -11,10 +11,10 @@ from keras.layers import Merge
 from keras.engine.topology import InputLayer
 from keras import initializers
 
-from keras.layers.convolutional import Conv2D
+from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.pooling import MaxPooling2D
 
-from keras_extra_layers import MaxoutDense, Bias
+from keras_extra_layers import MaxoutDense, Bias, DeBias
 from custom_for_keras import kaggle_MultiRotMergeLayer_output,  kaggle_input,\
     dense_weight_init_values
 
@@ -93,6 +93,12 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
                          'categorical_crossentropy'
                          ] + extra_metrics)
 
+        except KeyError:
+            pass
+        try:
+            self.models['model_deconv' + postfix].compile(
+                loss=loss,
+                optimizer=optimizer)
         except KeyError:
             pass
         self._init_hist_dics(self.models)
@@ -284,16 +290,46 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
                                      output_shape=lambda x: x,
                                      )(model_seq)
 
+        # deconv_perm_layer = fPermute((0, 1, 2, 3), name='deconv_out_perm')
+
+        # deconv_perm_tensor = deconv_perm_layer(
+        #     model.get_layer('sconv_0').get_output_at(0))
+
+        # debias_layer = DeBias(nFilters=32, name='debias_layer')(
+        #     deconv_perm_tensor)
+
+        # deconv_layer = Conv2DTranspose(filters=3, kernel_size=6,
+        #                                strides=(1, 1),
+        #                                use_bias=False,
+        #                                name='deconv_layer',
+        #                                )(debias_layer)
+
+        def reshape_output(x, BATCH_SIZE=self.BATCH_SIZE):
+            input_shape = T.shape(x)
+            input_ = x
+            new_input_shape = (
+                BATCH_SIZE, input_shape[1], input_shape[2] * input_shape[0] / BATCH_SIZE, input_shape[3])
+            input_ = input_.reshape(new_input_shape)
+            return input_
+
+        # output_layer_deconv = Lambda(function=reshape_output, output_shape=lambda input_shape: (
+        # self.BATCH_SIZE, input_shape[1], input_shape[2] * input_shape[0] /
+        # self.BATCH_SIZE, input_shape[3]))(deconv_layer)
+
         model_norm = Model(
             inputs=[input_tensor, input_tensor_45], outputs=output_layer_norm, name='full_model_norm')
         model_norm_metrics = Model(
             inputs=[input_tensor, input_tensor_45], outputs=output_layer_norm, name='full_model_metrics')
         model_noNorm = Model(
             inputs=[input_tensor, input_tensor_45], outputs=output_layer_noNorm, name='full_model_noNorm')
+        # model_deconv = Model(inputs=model.get_input_at(0), outputs=output_layer_deconv,
+        #                      name='deconv_1')
 
         self.models = {'model_norm': model_norm,
                        'model_norm_metrics': model_norm_metrics,
-                       'model_noNorm': model_noNorm}
+                       'model_noNorm': model_noNorm,
+                       # 'model_deconv': model_deconv,
+                       }
 
         self._compile_models(
             loss=loss, extra_metrics=extra_metrics, optimizer=optimizer)
