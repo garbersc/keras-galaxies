@@ -40,7 +40,7 @@ NUM_INPUT_FEATURES = 3
 
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-EPOCHS = 1
+EPOCHS = 10
 VALIDATE_EVERY = 5  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 INCLUDE_FLIP = True
@@ -105,7 +105,7 @@ y_train = np.load("data/solutions_train_10cat.npy")
 # y_train = np.concatenate((y_train, np.zeros((np.shape(y_train)[0], 30 - 3))),
 #                          axis=1)
 
-red_num = 50000
+red_num = 0
 ra.y_train = y_train
 
 # split training data into training + a small validation set
