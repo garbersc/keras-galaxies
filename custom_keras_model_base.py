@@ -519,15 +519,21 @@ class kaggle_base(object):
     '''
 
     def save(self, option_string=None, postfix=''):
-        if not option_string:
+        if not option_string:  # debug
+            print 'saving weights'
             self.save_weights(postfix=postfix)
+            print 'saving loss metrics'
             self.save_loss(modelname='model_norm_metrics',  postfix=postfix)
+            print 'saving loss'
             self.save_loss(modelname='model_norm', postfix=postfix)
         elif option_string == 'interrupt':
+            print 'saving weights'
             self.save_weights(path=self.WEIGHTS_PATH +
                               '_interrupted.h5', postfix=postfix)
+            print 'saving loss metrics'
             self.save_loss(path=self.LOSS_PATH + '_interrupted.txt',
                            modelname='model_norm_metrics', postfix=postfix)
+            print 'saving loss'
             self.save_loss(path=self.LOSS_PATH + '_interrupted.txt',
                            modelname='model_norm', postfix=postfix)
         else:
@@ -632,6 +638,7 @@ class kaggle_base(object):
                             * epoch_togo / validate_every)))
 
             if save_at_every_validation:
+                print 'attempting to save'
                 self.save(postfix=postfix)
 
     def LSUV_init(self, train_batch, batch_size=None, modelname='model_norm',

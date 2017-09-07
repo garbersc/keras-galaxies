@@ -1,4 +1,4 @@
-import theano.sandbox.cuda.basic_ops as sbcuda
+# import pygpu.gpuarray.GpuContext as sbcuda
 import numpy as np
 import load_data
 import realtime_augmentation as ra
@@ -40,14 +40,14 @@ NUM_INPUT_FEATURES = 3
 
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0
-EPOCHS = 10
+EPOCHS = 3
 VALIDATE_EVERY = 5  # 20 # 12 # 6 # 6 # 6 # 5 #
 
 INCLUDE_FLIP = True
 
 TRAIN_LOSS_SF_PATH = "trainingNmbrs_10cat_smaller.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_10cat_smaller.h5"
+WEIGHTS_PATH = "analysis/final/try_10cat_smaller_next_next.h5"
 
 CONV_WEIGHT_PATH = ''  # 'analysis/final/try_3cat_geometry_corr_geopics_next.h5'
 
@@ -331,9 +331,9 @@ elif DO_LSUV_INIT:
     print "  took %.2f seconds" % (time.time() - start_time_lsuv)
 
 
-if debug:
-    print("Free GPU Mem before first step %s MiB " %
-          (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0] / 1024. / 1024.))
+# if debug:
+#     print("Free GPU Mem before first step %s MiB " %
+#           (sbcuda.free_gmem / 1024. / 1024.))
 
 
 def save_exit():
@@ -356,17 +356,15 @@ try:
     evalHist = winsol.evaluate([xs_valid[0], xs_valid[1]], y_valid=y_valid)
 
     if debug:
-        print("Free GPU Mem after validation check %s MiB " %
-              (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0]
-               / 1024. / 1024.))
+        # print("Free GPU Mem after validation check %s MiB " %
+        #       (sbcuda.free_gmem / 1024. / 1024.))
         print ''
 
     time1 = time.time()
 
-    if debug:
-        print("\nFree GPU Mem before train loop %s MiB " %
-              (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0]
-               / 1024. / 1024.))
+    # if debug:
+    #     print("\nFree GPU Mem before train loop %s MiB " %
+    #           (sbcuda.free_gmem / 1024. / 1024.))
 
     print 'starting main training'
 
@@ -375,6 +373,7 @@ try:
                     samples_per_epoch=N_TRAIN,
                     validate_every=VALIDATE_EVERY,
                     nb_epochs=EPOCHS,
+                    save_at_every_validation=saveAtEveryValidation,
                     class_weight=class_weights
                     )
 
