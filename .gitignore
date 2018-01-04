@@ -55,6 +55,7 @@ docs/_build/
 
 
 data/
+images_deconv/
 *.pyc
 *~
 tf_for_poets/

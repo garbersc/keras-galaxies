@@ -7,12 +7,11 @@ import load_data
 import functools
 import time
 import os
-import skimage as sk
 
 from PIL import Image
 from datetime import timedelta, date
-from termcolor import colored
 from custom_keras_model_x_cat import kaggle_x_cat
+from simple_deconv import simple_deconv
 from custom_for_keras import input_generator
 
 ##############################################
@@ -27,52 +26,39 @@ NUM_INPUT_FEATURES = 3
 EPOCHS = 1
 MAKE_PLOTS = True
 included_flipped = True
+
 TRAIN_LOSS_SF_PATH = 'trainingNmbrs_10cat_smaller.txt'
-# TRAIN_LOSS_SF_PATH = "trainingNmbrs_keras_modular_includeFlip_and_37relu.txt"
-# TARGET_PATH = "predictions/final/try_convnet.csv"
 WEIGHTS_PATH = 'analysis/final/try_10cat_new_run.h5'
 TXT_OUTPUT_PATH = '_'
+
 input_sizes = [(69, 69), (69, 69)]
 PART_SIZE = 45
 postfix = ''
 N_INPUT_VARIATION = 2
 GEN_BUFFER_SIZE = 2
-# set to True if the prediction and evaluation should be done when the
-# prediction file already exists
-REPREDICT_EVERYTIME = False
+
 date = date.today()
 IMAGE_OUTPUT_DIR = "images_deconv"
 IMAGE_OUTPUT_SUFFIX = str(date)
-TEST = False  # disable this to not generate predictions on the testset
-DONT_LOAD_WEIGHTS = True
-SET_UNITY_WEIGHTS = True
-test_image = True
-##############################################
-# main
-##############################################
 
-# output_names = ["smooth", "featureOrdisk", "NoGalaxy", "EdgeOnYes", "EdgeOnNo", "BarYes", "BarNo", "SpiralYes", "SpiralNo", "BulgeNo", "BulgeJust", "BulgeObvious", "BulgDominant", "OddYes", "OddNo", "RoundCompletly", "RoundBetween", "RoundCigar",
-#                 "Ring", "Lense", "Disturbed", "Irregular", "Other", "Merger", "DustLane", "BulgeRound", "BlulgeBoxy", "BulgeNo2", "SpiralTight", "SpiralMedium", "SpiralLoose", "Spiral1Arm", "Spiral2Arm", "Spiral3Arm", "Spiral4Arm", "SpiralMoreArms", "SpiralCantTell"]
+LOAD_WEIGHTS = False
+CUSTOM_WEIGHTS = False
+RANDOM_WEIGHTS = False
 
-# question_slices = [slice(0, 3), slice(3, 5), slice(5, 7), slice(7, 9),#
-#                    slice(9, 13), slice(13, 15), slice(15, 18), slice(18, 25),
-#                    slice(25, 28), slice(28, 31), slice(31, 37)]
+test_image = False
+WALL_OUTPUT = True
+
+USE_SIMPLE_MODEL = True
+PREDICT_MERGE = True
+
+##############################################
+# main, defining and loading stuff
+##############################################
 
 output_names = ['round', 'broad_ellipse', 'small_ellipse', 'edge_bulg',
                 'edge_no_bulge', 'disc', 'spiral_1_arm', 'spiral_2_arm',
                 'spiral_other', 'other']
 question_slices = [slice(0, 10)]
-
-# question_requierement = [None] * len(question_slices)
-# question_requierement[1] = question_slices[0].start + 1
-# question_requierement[2] = question_slices[1].start + 1
-# question_requierement[3] = question_slices[1].start + 1
-# question_requierement[4] = question_slices[1].start + 1
-# question_requierement[6] = question_slices[0].start
-# question_requierement[9] = question_slices[4].start
-# question_requierement[10] = question_slices[4].start
-
-# print 'Question requirements: %s' % question_requierement
 
 target_filename = os.path.basename(WEIGHTS_PATH).replace(".h5", ".npy.gz")
 if get_deconv_weights:
@@ -144,15 +130,25 @@ print("validation sample contains %s images. \n" %
       (ra.num_valid))
 
 print 'initiate deconvnet class'
-deconv = kaggle_x_cat(BATCH_SIZE=BATCH_SIZE,
-                      NUM_INPUT_FEATURES=NUM_INPUT_FEATURES,
-                      PART_SIZE=PART_SIZE,
-                      input_sizes=input_sizes,
-                      LOSS_PATH=TRAIN_LOSS_SF_PATH,
-                      WEIGHTS_PATH=WEIGHTS_PATH,
-                      include_flip=included_flipped)
+# if USE_SIMPLE_MODEL:
+deconv = simple_deconv(BATCH_SIZE=BATCH_SIZE,
+                       NUM_INPUT_FEATURES=NUM_INPUT_FEATURES,
+                       PART_SIZE=PART_SIZE,
+                       input_sizes=input_sizes,
+                       LOSS_PATH=TRAIN_LOSS_SF_PATH,
+                       WEIGHTS_PATH=TRAIN_LOSS_SF_PATH,
+                       include_flip=included_flipped)
 
-layer_formats = deconv.layer_formats
+# else:
+mergedeconv = kaggle_x_cat(BATCH_SIZE=BATCH_SIZE,
+                           NUM_INPUT_FEATURES=NUM_INPUT_FEATURES,
+                           PART_SIZE=PART_SIZE,
+                           input_sizes=input_sizes,
+                           LOSS_PATH=None,
+                           WEIGHTS_PATH=WEIGHTS_PATH,
+                           include_flip=included_flipped)
+
+layer_formats = mergedeconv.layer_formats
 layer_names = layer_formats.keys()
 
 print "Build model"
@@ -174,65 +170,97 @@ print 'building smaller model'
 conv_filters_n = tuple(len(used_conv_layers['conv_%s' % i]) for i in range(4))
 print conv_filters_n
 deconv.init_models(final_units=10, conv_filters_n=conv_filters_n)
+mergedeconv.init_models(final_units=10, conv_filters_n=conv_filters_n)
 
 if debug:
     deconv.print_summary(postfix=postfix)
 
+##############################################
+# defining weights
+##############################################
 
 print
-if not DONT_LOAD_WEIGHTS:
+if LOAD_WEIGHTS:
     print "Load model weights..."
     if not os.path.isfile(WEIGHTS_PATH):
         raise Exception('in ' + WEIGHTS_PATH + ' weights file not found')
     deconv.load_weights(path=WEIGHTS_PATH, postfix=postfix)
-    deconv.WEIGHTS_PATH = ((WEIGHTS_PATH.split('.', 1)[0] + '_next.h5'))
-    # c, y, x, filter
-    # y, x, c, filter
-elif SET_UNITY_WEIGHTS:
-    conv_weights = deconv.get_layer_weights(layer='conv_0')
-    print 'Shape of conv weights:' + str(np.shape(conv_weights[0]))
-    conv_bias = deconv.get_layer_weights(layer='conv_0_bias')
-    print 'Shape of conv bias weights:' + str(np.shape(conv_bias))
+    deconv.WEIGHTS_PATH = ((WEIGHTS_PATH))
 
-    unity_weights = np.zeros(conv_weights[0].shape)
-    unity_bias = np.zeros(conv_bias[0].shape)
-
-    unity_weights = unity_weights.transpose(3, 2, 0, 1)
-    print len(unity_weights[0])
-    for i in range(0, len(unity_weights)):
-        # for j in range(0, len(unity_weights[i])):
-        #     unity_weights[i][j][5][5] = 1
-        unity_weights[i][0][5][5] = 1
-
-    print unity_weights[0][0]
-    unity_weights = unity_weights.transpose(2, 3, 1, 0)
+    # Loading conv_0 weights into deconv_0
+    deconv_weight_0 = deconv.get_layer_weights(layer='conv_0')
+    conv_bias_0 = deconv.get_layer_weights(layer='conv_0_bias')
+    print 'Shape of conv weights:' + str(np.shape(deconv_weight_0[0]))
+    print 'Shape of conv bias weights:' + str(np.shape(conv_bias_0))
 
     deconv.models['model_deconv'].get_layer(
-        'deconv_layer').set_weights([unity_weights])
+        'deconv_layer_0').set_weights([deconv_weight_0][0])
+    deconv.models['model_deconv'].get_layer('debias_layer_0').set_weights(
+        conv_bias_0)
+
+    # Loading conv_1 weights into deconv_1
+    deconv_weight_1 = deconv.get_layer_weights(layer='conv_1')
+    conv_bias_1 = deconv.get_layer_weights(layer='conv_1_bias')
+
+    deconv.models['model_deconv'].get_layer(
+        'deconv_layer_1').set_weights([deconv_weight_1][0])
+    deconv.models['model_deconv'].get_layer('debias_layer_1').set_weights(
+        conv_bias_1)
+
+
+elif CUSTOM_WEIGHTS:
+    print "Initializing model with custom weights..."
+    conv_weights = deconv.get_layer_weights(layer='conv_0')
+    conv_bias = deconv.get_layer_weights(layer='conv_0_bias')
+    if debug:
+        print 'Shape of conv weights:' + str(np.shape(conv_weights[0]))
+        print 'Shape of conv bias weights:' + str(np.shape(conv_bias))
+
+    custom_weights = np.zeros(conv_weights[0].shape)
+    custom_bias = np.zeros(conv_bias[0].shape)
+
+    custom_weights = custom_weights.transpose(3, 2, 0, 1)
+    for i in range(0, len(custom_weights)):
+        # for j in range(0, len(unity_weights[i])):
+        #     unity_weights[i][j][5][5] = 1
+        custom_weights[i][0][3][3] = 0
+
+    print 'Filter matrix is:'
+    print custom_weights[0][0]
+    custom_weights = custom_weights.transpose(2, 3, 1, 0)
+
+    deconv.models['model_deconv'].get_layer(
+        'deconv_layer').set_weights([custom_weights])
     deconv.models['model_deconv'].get_layer('debias_layer').set_weights(
-        [unity_bias])
+        [custom_bias])
 
     deconv.models['model_norm'].get_layer('main_seq').get_layer(
-        'conv_0').set_weights([unity_weights])
+        'conv_0').set_weights([custom_weights])
     deconv.models['model_norm'].get_layer('main_seq').get_layer('conv_0_bias').set_weights(
-        [unity_bias])
+        [custom_bias])
 
-else:
+elif RANDOM_WEIGHTS:
     print 'Initializing model with random weights...'
 
     deconv_weight = deconv.get_layer_weights(layer='conv_0')
-    print 'Shape of conv weights:' + str(np.shape(deconv_weight[0]))
-
     conv_bias = deconv.get_layer_weights(layer='conv_0_bias')
-    print 'Shape of conv bias weights:' + str(np.shape(conv_bias))
+
+    if debug:
+        print 'Shape of conv weights:' + str(np.shape(deconv_weight[0]))
+        print 'Shape of conv bias weights:' + str(np.shape(conv_bias))
 
     deconv.models['model_deconv'].get_layer(
         'deconv_layer').set_weights([deconv_weight][0])
     deconv.models['model_deconv'].get_layer('debias_layer').set_weights(
         conv_bias)
-    print 'weights loaded'
-    print
 
+print 'Setting weights done.'
+print
+
+
+##############################################
+# generating data
+##############################################
 
 print "Set up data loading"
 
@@ -316,6 +344,32 @@ if debug:
           (sbcuda.cuda_ndarray.cuda_ndarray.mem_info()[0] / 1024. / 1024.))
 
 
+def load_image(infilename, rotate=False):
+    img = Image.open(infilename)
+    img.load()
+    if rotate:
+        img.rotate(45)
+    data = np.asarray(img, dtype='uint8')
+    return data
+
+
+if test_image:
+    print
+    print 'Loading test images'
+    ti = load_image('test_images/testpic_1.jpg')
+    ti = np.transpose((ti), (2, 0, 1))
+    ti_rot = load_image('test_images/testpic_1.jpg', rotate=True)
+    ti_rot = np.transpose((ti_rot), (2, 0, 1))
+    ti2 = load_image('test_images/testpic_2.jpg')
+    ti2 = np.transpose((ti2), (2, 0, 1))
+    ti2_rot = load_image('test_images/testpic_2.jpg', rotate=True)
+    ti2_rot = np.transpose((ti2_rot), (2, 0, 1))
+
+
+##############################################
+# auxiliary tools
+##############################################
+
 def save_exit():
     # deconv.save()
     print "Done!"
@@ -375,58 +429,6 @@ def _img_wall(img, norm=False):
     return wall
 
 
-def print_weights(norm=False, nameprefix=''):
-    if not os.path.isdir(IMAGE_OUTPUT_DIR):
-        os.mkdir(IMAGE_OUTPUT_DIR)
-
-    os.chdir(IMAGE_OUTPUT_DIR)
-    weights_out_dir = 'weights'
-    if norm:
-        weights_out_dir += '_normalized'
-    if not os.path.isdir(weights_out_dir):
-        os.mkdir(weights_out_dir)
-    os.chdir(weights_out_dir)
-
-    print 'Printing weights'
-
-    for name in layer_formats:
-        if layer_formats[name] == 1:
-            w, b = deconv.get_layer_weights(layer=name)
-            w = np.transpose(w, (3, 0, 1, 2))
-
-            w = _img_wall(w, norm)
-            b = _img_wall(b, norm)
-        elif layer_formats[name] == 0:
-            w, b = deconv.get_layer_weights(layer=name)
-            w = _img_wall(w, norm)
-            b = _img_wall(b, norm)
-        else:
-            continue
-
-    w, b = deconv.models['model_deconv'].get_layer(
-        'deconv_layer').get_weights()
-    w = np.transpose(w, (3, 0, 1, 2))
-
-    w = _img_wall(w, norm)
-    b = _img_wall(b, norm)
-
-    for i in range(len(w)):
-        imshow_g(w[i])
-        if not norm:
-            plt.colorbar()
-        plt.savefig(
-            nameprefix + 'weight_layer_%s_kernel_channel_%s.jpg' % (name, i))
-        plt.close()
-
-    imshow_g(b)
-    if not norm:
-        plt.colorbar()
-    plt.savefig(nameprefix + 'weight_layer_%s_bias.jpg' % (name))
-    plt.close()
-
-    os.chdir('../..')
-
-
 def reshape_output(x):
     _shape = x.shape
     if _shape[0] == 1:
@@ -437,27 +439,9 @@ def reshape_output(x):
     return x
 
 
-def load_image(infilename, rotate=False):
-    img = Image.open(infilename)
-    img.load()
-    if rotate:
-        img.rotate(45)
-    data = np.asarray(img, dtype='uint8')
-    return data
-
-
-if test_image:
-    print
-    print 'Loading test images'
-    ti = load_image('test_images/testpic_1.jpg')
-    ti = np.transpose((ti), (2, 0, 1))
-    ti_rot = load_image('test_images/testpic_1.jpg', rotate=True)
-    ti_rot = np.transpose((ti_rot), (2, 0, 1))
-    ti2 = load_image('test_images/testpic_2.jpg')
-    ti2 = np.transpose((ti2), (2, 0, 1))
-    ti2_rot = load_image('test_images/testpic_2.jpg', rotate=True)
-    ti2_rot = np.transpose((ti2_rot), (2, 0, 1))
-
+##############################################
+# running deconv
+##############################################
 
 def print_output(nr_images=1, plots=True, combined_rgb=True, wall_variations=True, wall_output=True, norm_single_img=True):
     if debug:
@@ -484,21 +468,15 @@ def print_output(nr_images=1, plots=True, combined_rgb=True, wall_variations=Tru
     print '  Output images will be saved at dir: ' + IMAGE_OUTPUT_DIR + '/' + IMAGE_OUTPUT_SUFFIX
     print 'Collecting output from Deconvnet... this may take a while...'
     if debug:
-        print 'Shape of validation data array: ' + str(np.shape(validation_data[0]))
+        print 'Shape of validation data array at [0]: ' + str(np.shape(validation_data[0]))
 
     if debug:
         print
         print 'Ids of input images are: ' + str(valid_ids[0:ra.num_valid])
-    deconv.layer_formats['input_merge'] = 4
+    mergedeconv.layer_formats['input_merge'] = 4
 
-    # valid_data_crop = []
-    # for img in validation_data[0]:
-    #     valid_data_crop.append(img[:, :, :45, :45])
-    # valid_data_crop = [np.asarray(valid_data_crop)]
-
-    if test_image:
+    if test_image and PREDICT_MERGE:
         repeat_size = ra.num_valid
-        print 'Using test image for deconv'
         input_img = [np.ones(shape=(np.asarray([validation_data[0][0][0]]).shape)),
                      np.ones(
             shape=(np.asarray([validation_data[0][0][1]]).shape))]
@@ -506,47 +484,154 @@ def print_output(nr_images=1, plots=True, combined_rgb=True, wall_variations=Tru
         input_img[0] = input_img[0].astype('uint8')
         input_img[1][0, :, :, :] = ti2
         input_img[1] = input_img[1].astype('uint8')
-        validation_data_ = ([np.asarray(np.repeat(input_img[0], repeat_size, axis=0)),
-                             np.asarray(np.repeat(input_img[1], repeat_size, axis=0))], validation_data[1])
-        output_deconv = deconv.predict(
-            x=validation_data_[0], modelname='model_deconv')
-    else:
-        output_deconv = deconv.predict(
-            x=validation_data[0], modelname='model_deconv')
-    if debug:
-        print
-        print 'Deconv output shape:' + str(np.shape(output_deconv))
-
-    output_deconv = np.reshape(output_deconv, (ra.num_valid, 3, 16, 45, 45))
-    output_deconv = np.transpose(output_deconv, (0, 2, 1, 4, 3))
-
-    for i, img_vars in enumerate(output_deconv[0:nr_images]):
-        image_nr = i
-        # get images in range for pyplot:
-        img_vars = img_vars / 255
-
-        if not norm_single_img:
-            img_vars -= np.min(img_vars)
-            img_vars = img_vars / np.max(img_vars)
-
-        if type(image_nr) == int and not test_image:
-            input_img = [np.asarray([validation_data[0][0][image_nr]]),
-                         np.asarray([validation_data[0][1][image_nr]])]
-
-#        if debug:
-        #     print 'Collecting output from merge layer...'
         merge_outputs = {}
-        merge_outputs['input_merge'] = np.asarray(deconv.get_layer_output(
+        merge_outputs['input_merge'] = np.asarray(mergedeconv.get_layer_output(
             'input_merge', input_=input_img))
         merge_outputs['input_merge'] = reshape_output(
             merge_outputs['input_merge'])
         merge_outputs['input_merge'] = merge_outputs['input_merge'] / 255
-        # if debug:
-        # print 'Shape of intermediate outputs: ' +
-        # str(np.shape(intermediate_outputs['input_merge']))
-        # print 'Shape of input image array: ' + str(np.shape(input_img[0][0]))
-        # print 'Shape of output image array: ' +
-        # str(np.shape(output_deconv[0]))
+        print 'Shape of merge outputs: ' + str(np.shape(merge_outputs['input_merge']))
+        validation_data_ = (np.asarray(
+            np.repeat(merge_outputs['input_merge'], repeat_size, axis=0)), validation_data[1])
+
+        output_deconv = deconv.predict(
+            x=validation_data_[0], modelname='model_deconv')
+
+    if test_image and not PREDICT_MERGE:
+        print 'Using test image for deconv'
+
+        ''' generating test image'''
+        if USE_SIMPLE_MODEL:
+            repeat_size = ra.num_valid / 2
+            input_img = np.ones(
+                shape=np.asarray([validation_data[0][0][0]]).shape)
+            input_img2 = np.ones(
+                shape=np.asarray([validation_data[0][0][0]]).shape)
+            input_img[0, :, :, :] = ti
+            input_img2[0, :, :, :] = ti2
+            input_img = np.append(input_img, input_img2, axis=0)
+            input_img = input_img.astype('uint8')
+            validation_data_ = (np.asarray(
+                np.repeat(input_img, repeat_size, axis=0)), validation_data[1])
+
+        else:
+            repeat_size = ra.num_valid
+            input_img = [np.ones(shape=(np.asarray([validation_data[0][0][0]]).shape)),
+                         np.ones(
+                shape=(np.asarray([validation_data[0][0][1]]).shape))]
+            input_img[0][0, :, :, :] = ti
+            input_img[0] = input_img[0].astype('uint8')
+            input_img[1][0, :, :, :] = ti2
+            input_img[1] = input_img[1].astype('uint8')
+            validation_data_ = ([np.asarray(np.repeat(input_img[0], repeat_size, axis=0)),
+                                 np.asarray(np.repeat(input_img[1], repeat_size, axis=0))], validation_data[1])
+
+        output_deconv = deconv.predict(
+            x=validation_data_[0], modelname='model_deconv')
+
+    if not test_image:
+        img_nr = 0
+
+        repeat_size = ra.num_valid / 2
+        merge_outputs = {}
+        merge_outputs['input_merge'] = np.asarray(mergedeconv.get_layer_output(
+            'input_merge', input_=validation_data[0]))
+        merge_outputs['input_merge'] = reshape_output(
+            merge_outputs['input_merge'])
+        merge_outputs['input_merge'] = merge_outputs['input_merge']
+        print 'Shape of merge outputs: ' + str(np.shape(merge_outputs['input_merge']))
+
+        validation_data_ = (np.asarray(
+            np.repeat(merge_outputs['input_merge'], repeat_size, axis=0)), validation_data[1])
+
+        print 'Shape of validation_data_: ' + str(np.shape(validation_data_[0]))
+
+        output_deconv = deconv.predict(
+            x=validation_data_[0][img_nr], modelname='model_deconv')
+    if debug:
+        print
+        print 'Deconv output shape:' + str(np.shape(output_deconv))
+        print 'Shape of merge outputs: ' + str(np.shape(merge_outputs['input_merge'][0]))
+
+
+##############################################
+# plotting
+##############################################
+
+    if USE_SIMPLE_MODEL:
+        if wall_output:
+            if norm_single_img:
+                for i, img_vars in enumerate(output_deconv[img_nr:img_nr + 16]):
+                    output_deconv[i] -= np.min(output_deconv[i])
+                    output_deconv[i] = output_deconv[i] / \
+                        np.max(output_deconv[i])
+
+            canvas, (im1, im2, im3) = plt.subplots(1, 3)
+
+            im1.imshow(np.transpose(validation_data[0][0][img_nr], (1, 2, 0)))
+            im1.set_title('Input image %s' % valid_ids[img_nr])
+
+            im2.imshow(_img_wall(merge_outputs['input_merge'][img_nr]))
+            im2.set_title('Variations')
+            im2.axis('off')
+
+            im3.imshow(_img_wall(output_deconv))
+            im3.axis('off')
+
+            plt.savefig('walled_output_%s' % valid_ids[img_nr], dpi=600)
+            plt.close
+
+        else:
+            for i, img_vars in enumerate(output_deconv[img_nr:img_nr + 16]):
+                image_nr = i
+                # get images in range for pyplot:
+                img_vars = img_vars / 255
+
+                fpicture = img_vars
+                fpicture = np.transpose(fpicture, (1, 2, 0))
+
+                if norm_single_img:
+                    fpicture -= np.min(fpicture)
+                    fpicture = fpicture / np.max(fpicture)
+                    canvas, (im1, im2) = plt.subplots(1, 2)
+                    if test_image:
+                        im1.imshow(np.transpose(
+                            (merge_outputs['input_merge'][i]), (1, 2, 0)))
+                        im1.set_title('Input Image variation %s' % i)
+                    else:
+                        im1.imshow(np.transpose(
+                            (merge_outputs['input_merge'][img_nr][i]), (1, 2, 0)))
+                        im1.set_title('Input Image variation %s' % i)
+
+                    im2.imshow(fpicture)
+                    im2.set_title('Deconv output')
+
+                plt.savefig('deconv_test_%s.jpg' % i)
+                plt.close
+
+    else:
+        # output_deconv = np.reshape(
+        #     output_deconv, (ra.num_valid, 3, 16, 45, 45))
+        # output_deconv = np.transpose(output_deconv, (0, 2, 1, 4, 3))
+
+        for i, img_vars in enumerate(output_deconv[0:nr_images]):
+            image_nr = i
+            # get images in range for pyplot:
+            img_vars = img_vars / 255
+
+            if not norm_single_img:
+                img_vars -= np.min(img_vars)
+                img_vars = img_vars / np.max(img_vars)
+
+                if type(image_nr) == int and not test_image:
+                    input_img = [np.asarray([validation_data[0][0][image_nr]]),
+                                 np.asarray([validation_data[0][1][image_nr]])]
+            merge_outputs = {}
+            merge_outputs['input_merge'] = np.asarray(deconv.get_layer_output(
+                'input_merge', input_=input_img))
+            merge_outputs['input_merge'] = reshape_output(
+                merge_outputs['input_merge'])
+            merge_outputs['input_merge'] = merge_outputs['input_merge'] / 255
 
         if plots:
             print 'Creating plots for Image %s' % (valid_ids[i])
@@ -586,13 +671,10 @@ def print_output(nr_images=1, plots=True, combined_rgb=True, wall_variations=Tru
                 im1.set_title('Input Image %s' % (valid_ids[i]))
 
                 im2.imshow(
-                    (_img_wall(merge_outputs['input_merge'][:16, :, :, :])), interpolation='none')
+                    (_img_wall(merge_outputs['input_merge'])), interpolation='none')
                 im2.set_title('Variations')
                 im2.axis('off')
 
-                # normalizing output
-
-                # im3.imshow(_img_wall(img_vars[i:i + 3]))
                 im3.imshow(_img_wall(img_vars))
                 im3.set_title('Deconv Variations')
                 im3.axis('off')
@@ -645,51 +727,16 @@ def print_output(nr_images=1, plots=True, combined_rgb=True, wall_variations=Tru
                                        cmap=plt.get_cmap('gray'))
                             im3.set_title('Deconv Variation %s' % j)
                             im3.axis('off')
-                    plt.savefig('image_%s_variation_%s.jpg' %
-                                (valid_ids[i], j), dpi=300)
-                    plt.close()
-
-        # for i, img in enumerate(output_deconv[0:5]):
-        #     for j, channel in enumerate(img):
-        #         imshow_g(channel)
-        #         plt.colorbar()
-        #         plt.savefig('%s_%s.jpg' % (i, j), dpi=300)
-        #         plt.close()
-
-        # if type(image_nr) == int:
-        #     imshow_c(np.transpose(input_img[0][0], (1, 2, 0)))
-        #     plt.savefig('input_fig_%s_rotation_0.jpg' % (image_nr))
-        #     plt.close()
-
-        #     imshow_c(np.transpose(input_img[1][0], (1, 2, 0)))
-        #     plt.savefig('input_fig_%s_rotation_45.jpg' % (image_nr))
-        #     plt.close()
-
-        #     for i in range(len(input_img[0][0])):
-        #         imshow_g(input_img[0][0][i])
-        #         plt.savefig('input_fig_%s_rotation_0_dim_%s.jpg' %
-        #                     (image_nr, i))
-        #         plt.close()
-
-        #     for i in range(len(input_img[1][0])):
-        #         imshow_g(input_img[1][0][i])
-        #         plt.savefig('input_fig_%s_rotation_45_dim_%s.jpg' %
-        #                     (image_nr, i))
-        #         plt.close()
-
-        #     imshow_g(_img_wall(intermediate_outputs['input_merge']))
-        #     plt.colorbar()
-        #     plt.savefig('output_fig_%s_%s.jpg' %
-        #                 (image_nr, 'input_merge'))
-        #     plt.close()
+                            plt.savefig('image_%s_variation_%s.jpg' %
+                                        (valid_ids[i], j), dpi=300)
+                            plt.close()
 
     os.chdir('..')
 
 
-if MAKE_PLOTS:
-    print_output(nr_images=5, plots=True, combined_rgb=True,
-                 wall_variations=True, wall_output=True, norm_single_img=True)
-    save_exit()
+print_output(nr_images=16, plots=MAKE_PLOTS, combined_rgb=True,
+             wall_variations=True, wall_output=WALL_OUTPUT, norm_single_img=True)
+save_exit()
 
 print 'Done'
 # sys.exit(0)

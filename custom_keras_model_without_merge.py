@@ -178,6 +178,7 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
             if self.use_keras_conv:
                 model.add(Conv2D(filters=conv_filters_n[0], kernel_size=6, name='conv_0',
                                  trainable=not freeze_conv[0], use_bias=False))
+
                 model.add(Bias(
                     conv_filters_n[0], name='conv_0_bias'))
                 self.layer_formats['conv_0_bias'] = 3
@@ -215,8 +216,7 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
 
         if not cut_out_conv[2]:
             if self.use_keras_conv:
-                model.add(Conv2D(filters=conv_filters_n[2], kernel_size=3,
-                                 name='conv_2',
+                model.add(Conv2D(filters=conv_filters_n[2], kernel_size=3, name='conv_2',
                                  trainable=not freeze_conv[2], use_bias=False))
                 model.add(Bias(conv_filters_n[2], name='conv_2_bias'))
                 self.layer_formats['conv_2_bias'] = 3
@@ -295,16 +295,33 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
         deconv_perm_layer = fPermute((0, 1, 2, 3), name='deconv_out_perm')
 
         deconv_perm_tensor = deconv_perm_layer(
-            model.get_layer('conv_0').get_output_at(0))
+            model.get_layer('conv_1').get_output_at(0))
 
-        debias_layer = DeBias(nFilters=32, name='debias_layer')(
+        debias_layer_1 = DeBias(nFilters=32, name='debias_layer_1')(
             deconv_perm_tensor)
 
-        deconv_layer = Conv2DTranspose(filters=3, kernel_size=6,
-                                       strides=(1, 1),
-                                       use_bias=False,
-                                       name='deconv_layer'
-                                       )(debias_layer)
+        deconv_layer_1 = Conv2DTranspose(filters=3, kernel_size=6,
+                                         strides=(1, 1),
+                                         use_bias=False,
+                                         name='deconv_layer_1'
+                                         )(debias_layer_1)
+
+        debias_layer_0 = DeBias(nFilters=32, name='debias_layer_0')(
+            deconv_layer_1)
+
+        deconv_layer_0 = Conv2DTranspose(filters=3, kernel_size=6,
+                                         strides=(1, 1),
+                                         use_bias=False,
+                                         name='deconv_layer_0'
+                                         )(debias_layer_0)
+
+        # def reshape_output(x, BATCH_SIZE=self.BATCH_SIZE):
+        #     input_shape = T.shape(x)
+        #     input_ = x
+        #     new_input_shape = (
+        #         BATCH_SIZE, input_shape[1], input_shape[2] * input_shape[0] / BATCH_SIZE, input_shape[3])
+        #     input_ = input_.reshape(new_input_shape)
+        #     return input_
 
         def reshape_output(x, BATCH_SIZE=self.BATCH_SIZE):
             input_shape = T.shape(x)
@@ -314,9 +331,12 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
             input_ = input_.reshape(new_input_shape)
             return input_
 
-        output_layer_deconv = Lambda(function=reshape_output, output_shape=lambda input_shape: (
-            self.BATCH_SIZE, input_shape[1], input_shape[2] * input_shape[0] /
-            self.BATCH_SIZE, input_shape[3]))(deconv_layer)
+        # output_layer_deconv = Lambda(function=reshape_output, output_shape=lambda input_shape: (
+        #     self.BATCH_SIZE, input_shape[1], input_shape[2] * input_shape[0] /
+        #     self.BATCH_SIZE, input_shape[3]))(deconv_layer)
+
+        output_layer_deconv = Lambda(
+            function=reshape_output, output_shape=lambda x: x,)(deconv_layer_0)
 
         model_norm = Model(
             inputs=[input_tensor, input_tensor_45], outputs=output_layer_norm, name='full_model_norm')

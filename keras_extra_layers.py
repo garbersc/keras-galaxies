@@ -191,6 +191,20 @@ class fPermute(Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+class Demerge(Layer):
+    def __init__(self, model):
+        pass
+
+    def call():
+        pass
+
+    def get_output_shape_for(self, input_shape):
+        pass
+
+    def compute_output_shape(self, input_shape):
+        pass
+
+
 class DePool(Layer):
     def __init__(self,  model,
                  pool_layer_origin=['pool_0'], stride=(2, 2),
@@ -204,15 +218,14 @@ class DePool(Layer):
     def _get_pool_flags(self, pool):
         # permutation needed if the layer is in the 'normal' not the pylearn
         # order, maybe make a switch for that and the channel order
-        input_ = K.permute_dimensions(pool.get_input_at(0), (3, 0, 1, 2))
-        pooled = K.permute_dimensions(pool.get_output_at(0), (3, 0, 1, 2))
+        input_ = K.permute_dimensions(pool.get_input_at(0), (0, 1, 2, 3))
+        pooled = K.permute_dimensions(pool.get_output_at(0), (0, 1, 2, 3))
 
         pooled = K.repeat_elements(pooled, self.stride[0], axis=-2)
         pooled = K.repeat_elements(pooled, self.stride[1], axis=-1)
 
         print 'shapes before k.equal %s \t %s' % (K.int_shape(input_),
-                                                  K.int_shape(
-            pooled))
+                                                  K.int_shape(pooled))
 
         return K.equal(input_, pooled)
 

@@ -47,7 +47,7 @@ INCLUDE_FLIP = True
 
 TRAIN_LOSS_SF_PATH = "trainingNmbrs_10cat_smaller.txt"
 # TARGET_PATH = "predictions/final/try_convnet.csv"
-WEIGHTS_PATH = "analysis/final/try_10cat_smaller_next_next.h5"
+WEIGHTS_PATH = "analysis/final/try_10cat_new_run.h5"
 
 CONV_WEIGHT_PATH = ''  # 'analysis/final/try_3cat_geometry_corr_geopics_next.h5'
 

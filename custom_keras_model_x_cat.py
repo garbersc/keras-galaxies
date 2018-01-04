@@ -1,4 +1,4 @@
-from custom_keras_model_x_cat_x_maxout import kaggle_x_cat_x_maxout
+from custom_keras_model_without_merge import kaggle_x_cat_x_maxout
 
 import h5py
 import numpy as np
@@ -109,7 +109,7 @@ class kaggle_x_cat(kaggle_x_cat_x_maxout):
                     weight = [weight_kernel, weight.values()[1]]
                 elif used_conv_layers:
                     raise TypeError(
-                        'Layer ' + ls + ' is here not awaited!')
+                        'Layer ' + ls + ' is not expected here!')
 
                 print ls
                 print np.shape(weight[0])
