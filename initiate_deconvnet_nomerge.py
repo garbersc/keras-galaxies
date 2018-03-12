@@ -21,7 +21,7 @@ starting_time = time.time()
 copy_to_ram_beforehand = False
 debug = True
 get_deconv_weights = False
-BATCH_SIZE = 1  # keep in mind
+BATCH_SIZE = 16  # keep in mind
 NUM_INPUT_FEATURES = 3
 EPOCHS = 1
 MAKE_PLOTS = True
@@ -41,7 +41,7 @@ date = date.today()
 IMAGE_OUTPUT_DIR = "images_deconv"
 IMAGE_OUTPUT_SUFFIX = str(date)
 
-LOAD_WEIGHTS = False
+LOAD_WEIGHTS = True
 CUSTOM_WEIGHTS = False
 RANDOM_WEIGHTS = False
 
@@ -74,7 +74,7 @@ if copy_to_ram_beforehand:
     import copy_data_to_shm
 
 y_train = np.load("data/solutions_train_10cat.npy")
-red_num = 61556
+red_num = 61080
 ra.y_train = y_train
 print 'Total amount of images avaible: ' + str(y_train.shape[0])
 
@@ -176,7 +176,7 @@ if debug:
     deconv.print_summary(postfix=postfix)
 
 ##############################################
-# defining weights
+# defining and injecting weights
 ##############################################
 
 print
@@ -187,25 +187,77 @@ if LOAD_WEIGHTS:
     deconv.load_weights(path=WEIGHTS_PATH, postfix=postfix)
     deconv.WEIGHTS_PATH = ((WEIGHTS_PATH))
 
-    # Loading conv_0 weights into deconv_0
+    # Loading weights on conv_0 level
+    ##############################################
     deconv_weight_0 = deconv.get_layer_weights(layer='conv_0')
     conv_bias_0 = deconv.get_layer_weights(layer='conv_0_bias')
-    print 'Shape of conv weights:' + str(np.shape(deconv_weight_0[0]))
-    print 'Shape of conv bias weights:' + str(np.shape(conv_bias_0))
+    print 'Shape of conv_0 weights:' + str(np.shape(deconv_weight_0[0]))
+    print 'Shape of conv_0_bias weights:' + str(np.shape(conv_bias_0))
 
-    deconv.models['model_deconv'].get_layer(
-        'deconv_layer_0').set_weights([deconv_weight_0][0])
-    deconv.models['model_deconv'].get_layer('debias_layer_0').set_weights(
+    deconv.models['model_deconv_0'].get_layer(
+        'd0_deconv_layer_0').set_weights([deconv_weight_0][0])
+    deconv.models['model_deconv_0'].get_layer('d0_debias_layer_0').set_weights(
         conv_bias_0)
 
-    # Loading conv_1 weights into deconv_1
+    deconv.models['model_deconv_1'].get_layer(
+        'd1_deconv_layer_0').set_weights([deconv_weight_0][0])
+    deconv.models['model_deconv_1'].get_layer('d1_debias_layer_0').set_weights(
+        conv_bias_0)
+
+    deconv.models['model_deconv_2'].get_layer(
+        'd2_deconv_layer_0').set_weights([deconv_weight_0][0])
+    deconv.models['model_deconv_2'].get_layer('d2_debias_layer_0').set_weights(
+        conv_bias_0)
+
+    deconv.models['model_deconv_3'].get_layer(
+        'd3_deconv_layer_0').set_weights([deconv_weight_0][0])
+    deconv.models['model_deconv_3'].get_layer('d3_debias_layer_0').set_weights(
+        conv_bias_0)
+
+    # Loading weights on conv_1 level
+    ##############################################
     deconv_weight_1 = deconv.get_layer_weights(layer='conv_1')
     conv_bias_1 = deconv.get_layer_weights(layer='conv_1_bias')
 
-    deconv.models['model_deconv'].get_layer(
-        'deconv_layer_1').set_weights([deconv_weight_1][0])
-    deconv.models['model_deconv'].get_layer('debias_layer_1').set_weights(
+    deconv.models['model_deconv_1'].get_layer(
+        'd1_deconv_layer_1').set_weights([deconv_weight_1][0])
+    deconv.models['model_deconv_1'].get_layer('d1_debias_layer_1').set_weights(
         conv_bias_1)
+
+    deconv.models['model_deconv_2'].get_layer(
+        'd2_deconv_layer_1').set_weights([deconv_weight_1][0])
+    deconv.models['model_deconv_2'].get_layer('d2_debias_layer_1').set_weights(
+        conv_bias_1)
+
+    deconv.models['model_deconv_3'].get_layer(
+        'd3_deconv_layer_1').set_weights([deconv_weight_1][0])
+    deconv.models['model_deconv_3'].get_layer('d3_debias_layer_1').set_weights(
+        conv_bias_1)
+
+    # Loading weights on conv_2 level
+    ##############################################
+    deconv_weight_2 = deconv.get_layer_weights(layer='conv_2')
+    conv_bias_2 = deconv.get_layer_weights(layer='conv_2_bias')
+
+    deconv.models['model_deconv_2'].get_layer(
+        'd2_deconv_layer_2').set_weights([deconv_weight_2][0])
+    deconv.models['model_deconv_2'].get_layer('d2_debias_layer_2').set_weights(
+        conv_bias_2)
+
+    deconv.models['model_deconv_3'].get_layer(
+        'd3_deconv_layer_2').set_weights([deconv_weight_2][0])
+    deconv.models['model_deconv_3'].get_layer('d3_debias_layer_2').set_weights(
+        conv_bias_2)
+
+    # Loading weights on conv_3 level
+    ##############################################
+    deconv_weight_3 = deconv.get_layer_weights(layer='conv_3')
+    conv_bias_3 = deconv.get_layer_weights(layer='conv_3_bias')
+
+    deconv.models['model_deconv_3'].get_layer(
+        'd3_deconv_layer_3').set_weights([deconv_weight_3][0])
+    deconv.models['model_deconv_3'].get_layer('d3_debias_layer_3').set_weights(
+        conv_bias_3)
 
 
 elif CUSTOM_WEIGHTS:
@@ -494,8 +546,14 @@ def print_output(nr_images=1, plots=True, combined_rgb=True, wall_variations=Tru
         validation_data_ = (np.asarray(
             np.repeat(merge_outputs['input_merge'], repeat_size, axis=0)), validation_data[1])
 
-        output_deconv = deconv.predict(
-            x=validation_data_[0], modelname='model_deconv')
+        output_deconv_0 = deconv.predict(
+            x=validation_data_[0], modelname='model_deconv_0')
+        output_deconv_1 = deconv.predict(
+            x=validation_data_[0], modelname='model_deconv_1')
+        output_deconv_2 = deconv.predict(
+            x=validation_data_[0], modelname='model_deconv_2')
+        output_deconv_3 = deconv.predict(
+            x=validation_data_[0], modelname='model_deconv_3')
 
     if test_image and not PREDICT_MERGE:
         print 'Using test image for deconv'
@@ -525,9 +583,14 @@ def print_output(nr_images=1, plots=True, combined_rgb=True, wall_variations=Tru
             input_img[1] = input_img[1].astype('uint8')
             validation_data_ = ([np.asarray(np.repeat(input_img[0], repeat_size, axis=0)),
                                  np.asarray(np.repeat(input_img[1], repeat_size, axis=0))], validation_data[1])
-
-        output_deconv = deconv.predict(
-            x=validation_data_[0], modelname='model_deconv')
+        output_deconv_0 = deconv.predict(
+            x=validation_data_[0], modelname='model_deconv_0')
+        output_deconv_1 = deconv.predict(
+            x=validation_data_[0], modelname='model_deconv_1')
+        output_deconv_2 = deconv.predict(
+            x=validation_data_[0], modelname='model_deconv_2')
+        output_deconv_3 = deconv.predict(
+            x=validation_data_[0], modelname='model_deconv_3')
 
     if not test_image:
         img_nr = 0
@@ -546,11 +609,18 @@ def print_output(nr_images=1, plots=True, combined_rgb=True, wall_variations=Tru
 
         print 'Shape of validation_data_: ' + str(np.shape(validation_data_[0]))
 
-        output_deconv = deconv.predict(
-            x=validation_data_[0][img_nr], modelname='model_deconv')
+        output_deconv_0 = deconv.predict(
+            x=validation_data_[0][img_nr], modelname='model_deconv_0')
+        output_deconv_1 = deconv.predict(
+            x=validation_data_[0][img_nr], modelname='model_deconv_1')
+        output_deconv_2 = deconv.predict(
+            x=validation_data_[0][img_nr], modelname='model_deconv_2')
+        output_deconv_3 = deconv.predict(
+            x=validation_data_[0][img_nr], modelname='model_deconv_3')
+
     if debug:
         print
-        print 'Deconv output shape:' + str(np.shape(output_deconv))
+        print 'Deconv output shape:' + str(np.shape(output_deconv_0))
         print 'Shape of merge outputs: ' + str(np.shape(merge_outputs['input_merge'][0]))
 
 
@@ -560,13 +630,24 @@ def print_output(nr_images=1, plots=True, combined_rgb=True, wall_variations=Tru
 
     if USE_SIMPLE_MODEL:
         if wall_output:
+            if test_image:
+                img_nr = 0
             if norm_single_img:
-                for i, img_vars in enumerate(output_deconv[img_nr:img_nr + 16]):
-                    output_deconv[i] -= np.min(output_deconv[i])
-                    output_deconv[i] = output_deconv[i] / \
-                        np.max(output_deconv[i])
+                for i, img_vars in enumerate(output_deconv_0[img_nr:img_nr + 16]):
+                    output_deconv_0[i] -= np.min(output_deconv_0[i])
+                    output_deconv_0[i] = output_deconv_0[i] / \
+                        np.max(output_deconv_0[i])
+                    output_deconv_1[i] -= np.min(output_deconv_1[i])
+                    output_deconv_1[i] = output_deconv_1[i] / \
+                        np.max(output_deconv_1[i])
+                    output_deconv_2[i] -= np.min(output_deconv_2[i])
+                    output_deconv_2[i] = output_deconv_2[i] / \
+                        np.max(output_deconv_2[i])
+                    output_deconv_3[i] -= np.min(output_deconv_3[i])
+                    output_deconv_3[i] = output_deconv_3[i] / \
+                        np.max(output_deconv_3[i])
 
-            canvas, (im1, im2, im3) = plt.subplots(1, 3)
+            canvas, ((im1, im2, im3), (im4, im5, im6)) = plt.subplots(2, 3)
 
             im1.imshow(np.transpose(validation_data[0][0][img_nr], (1, 2, 0)))
             im1.set_title('Input image %s' % valid_ids[img_nr])
@@ -575,8 +656,21 @@ def print_output(nr_images=1, plots=True, combined_rgb=True, wall_variations=Tru
             im2.set_title('Variations')
             im2.axis('off')
 
-            im3.imshow(_img_wall(output_deconv))
+            im3.imshow(_img_wall(output_deconv_0))
+            im3.set_title('deconv_0')
             im3.axis('off')
+
+            im4.imshow(_img_wall(output_deconv_1))
+            im4.set_title('deconv_1')
+            im4.axis('off')
+
+            im5.imshow(_img_wall(output_deconv_2))
+            im5.set_title('deconv_2')
+            im5.axis('off')
+
+            im6.imshow(_img_wall(output_deconv_3))
+            im6.set_title('deconv_3')
+            im6.axis('off')
 
             plt.savefig('walled_output_%s' % valid_ids[img_nr], dpi=600)
             plt.close
@@ -734,7 +828,7 @@ def print_output(nr_images=1, plots=True, combined_rgb=True, wall_variations=Tru
     os.chdir('..')
 
 
-print_output(nr_images=16, plots=MAKE_PLOTS, combined_rgb=True,
+print_output(nr_images=5, plots=MAKE_PLOTS, combined_rgb=True,
              wall_variations=True, wall_output=WALL_OUTPUT, norm_single_img=True)
 save_exit()
 

@@ -110,6 +110,17 @@ class simple_deconv(kaggle_winsol):
                                            ),
                               dtype='float32', name='input_tensor')
 
+        def reshape_output(x, BATCH_SIZE=self.BATCH_SIZE):
+            input_shape = T.shape(x)
+            input_ = x
+            # new_input_shape = (
+            # BATCH_SIZE, input_shape[1], input_shape[2] * input_shape[0] /
+            # BATCH_SIZE, input_shape[3])
+            new_input_shape = (
+                input_shape[0], input_shape[1], input_shape[2], input_shape[3])
+            input_ = input_.reshape(new_input_shape)
+            return input_
+
         '''
         emulation of the main NN without the merge layer
         parameters and weights are set the same
@@ -129,34 +140,173 @@ class simple_deconv(kaggle_winsol):
                          trainable=not freeze_conv[1], use_bias=False))
         model.add(Bias(conv_filters_n[1], name='conv_1_bias'))
 
-        '''
-        deconvolution model
-        '''
+        model.add(MaxPooling2D(name='pool_1'))
+
+        model.add(Conv2D(filters=conv_filters_n[2], kernel_size=3, name='conv_2',
+                         trainable=not freeze_conv[2], use_bias=False))
+        model.add(Bias(conv_filters_n[2], name='conv_2_bias'))
+
+        model.add(Conv2D(filters=conv_filters_n[3], kernel_size=3,
+                         name='conv_3',
+                         trainable=not freeze_conv[3], use_bias=False))
+        model.add(Bias(conv_filters_n[3], name='conv_3_bias'))
+
+        model.add(MaxPooling2D(name='pool_2'))
+
         deconv_perm_layer = fPermute((0, 1, 2, 3), name='deconv_out_perm')
 
-        deconv_perm_tensor = deconv_perm_layer(
+        '''
+        deconvolution model for conv 0
+        '''
+
+        d0_deconv_perm_tensor = deconv_perm_layer(
+            model.get_layer('conv_0_bias').get_output_at(0))
+
+        d0_debias_layer_0 = DeBias(nFilters=32, name='d0_debias_layer_0')(
+            d0_deconv_perm_tensor)
+
+        d0_deconv_layer_0 = Conv2DTranspose(filters=3, kernel_size=6,
+                                            strides=(1, 1),
+                                            use_bias=False,
+                                            name='d0_deconv_layer_0'
+                                            )(d0_debias_layer_0)
+
+        d0_output_layer = Lambda(function=reshape_output, output_shape=lambda input_shape: (
+            self.BATCH_SIZE, input_shape[1], input_shape[2] * input_shape[0] /
+            self.BATCH_SIZE, input_shape[3]))(d0_deconv_layer_0)
+
+        '''
+        deconvolution model for conv 1
+        '''
+
+        d1_deconv_perm_tensor = deconv_perm_layer(
             model.get_layer('conv_1_bias').get_output_at(0))
 
-        debias_layer_1 = DeBias(nFilters=conv_filters_n[0], name='debias_layer_1')(
-            deconv_perm_tensor)
+        d1_debias_layer_1 = DeBias(nFilters=conv_filters_n[0], name='d1_debias_layer_1')(
+            d1_deconv_perm_tensor)
 
-        deconv_layer_1 = Conv2DTranspose(filters=conv_filters_n[0], kernel_size=5,
-                                         strides=(1, 1),
-                                         use_bias=False,
-                                         name='deconv_layer_1'
-                                         )(debias_layer_1)
+        d1_deconv_layer_1 = Conv2DTranspose(filters=conv_filters_n[0], kernel_size=5,
+                                            strides=(1, 1),
+                                            use_bias=False,
+                                            name='d1_deconv_layer_1'
+                                            )(d1_debias_layer_1)
 
-        depool_0 = DePool(model=model, pool_layer_origin=['pool_0'], name='depool_layer_0')(
-            deconv_layer_1)
+        d1_depool_0 = DePool(model=model, pool_layer_origin=['pool_0'], name='d1_depool_layer_0')(
+            d1_deconv_layer_1)
 
-        debias_layer_0 = DeBias(nFilters=32, name='debias_layer_0')(
-            depool_0)
+        d1_debias_layer_0 = DeBias(nFilters=32, name='d1_debias_layer_0')(
+            d1_depool_0)
 
-        deconv_layer_0 = Conv2DTranspose(filters=3, kernel_size=6,
-                                         strides=(1, 1),
-                                         use_bias=False,
-                                         name='deconv_layer_0'
-                                         )(debias_layer_0)
+        d1_deconv_layer_0 = Conv2DTranspose(filters=3, kernel_size=6,
+                                            strides=(1, 1),
+                                            use_bias=False,
+                                            name='d1_deconv_layer_0'
+                                            )(d1_debias_layer_0)
+
+        d1_output_layer = Lambda(function=reshape_output, output_shape=lambda input_shape: (
+            self.BATCH_SIZE, input_shape[1], input_shape[2] * input_shape[0] /
+            self.BATCH_SIZE, input_shape[3]))(d1_deconv_layer_0)
+
+        '''
+        deconvolution model for conv 2
+        '''
+
+        d2_deconv_perm_tensor = deconv_perm_layer(
+            model.get_layer('conv_2_bias').get_output_at(0))
+
+        d2_debias_layer_2 = DeBias(nFilters=conv_filters_n[1], name='d2_debias_layer_2')(
+            d2_deconv_perm_tensor)
+
+        d2_deconv_layer_2 = Conv2DTranspose(filters=conv_filters_n[1], kernel_size=3,
+                                            strides=(1, 1),
+                                            use_bias=False,
+                                            name='d2_deconv_layer_2'
+                                            )(d2_debias_layer_2)
+
+        d2_depool_1 = DePool(model=model, pool_layer_origin=['pool_1'], name='d2_depool_layer_1')(
+            d2_deconv_layer_2)
+
+        d2_debias_layer_1 = DeBias(nFilters=conv_filters_n[0], name='d2_debias_layer_1')(
+            d2_depool_1)
+
+        d2_deconv_layer_1 = Conv2DTranspose(filters=conv_filters_n[0], kernel_size=5,
+                                            strides=(1, 1),
+                                            use_bias=False,
+                                            name='d2_deconv_layer_1'
+                                            )(d2_debias_layer_1)
+
+        d2_depool_0 = DePool(model=model, pool_layer_origin=['pool_0'], name='d2_depool_layer_0')(
+            d2_deconv_layer_1)
+
+        d2_debias_layer_0 = DeBias(nFilters=32, name='d2_debias_layer_0')(
+            d2_depool_0)
+
+        d2_deconv_layer_0 = Conv2DTranspose(filters=3, kernel_size=6,
+                                            strides=(1, 1),
+                                            use_bias=False,
+                                            name='d2_deconv_layer_0'
+                                            )(d2_debias_layer_0)
+
+        d2_output_layer = Lambda(function=reshape_output, output_shape=lambda input_shape: (
+            self.BATCH_SIZE, input_shape[1], input_shape[2] * input_shape[0] /
+            self.BATCH_SIZE, input_shape[3]))(d2_deconv_layer_0)
+
+        '''
+        deconvolution model for conv 3
+        '''
+
+        d3_deconv_perm_tensor = deconv_perm_layer(
+            model.get_layer('conv_3_bias').get_output_at(0))
+
+        d3_debias_layer_3 = DeBias(nFilters=conv_filters_n[2], name='d3_debias_layer_3')(
+            d3_deconv_perm_tensor)
+
+        d3_deconv_layer_3 = Conv2DTranspose(filters=conv_filters_n[2], kernel_size=3,
+                                            strides=(1, 1),
+                                            use_bias=False,
+                                            name='d3_deconv_layer_3'
+                                            )(d3_debias_layer_3)
+
+        d3_debias_layer_2 = DeBias(nFilters=conv_filters_n[1], name='d3_debias_layer_2')(
+            d3_deconv_layer_3)
+
+        d3_deconv_layer_2 = Conv2DTranspose(filters=conv_filters_n[1], kernel_size=3,
+                                            strides=(1, 1),
+                                            use_bias=False,
+                                            name='d3_deconv_layer_2'
+                                            )(d3_debias_layer_2)
+
+        d3_depool_1 = DePool(model=model, pool_layer_origin=['pool_1'], name='d3_depool_layer_1')(
+            d3_deconv_layer_2)
+
+        d3_debias_layer_1 = DeBias(nFilters=conv_filters_n[0], name='d3_debias_layer_1')(
+            d3_depool_1)
+
+        d3_deconv_layer_1 = Conv2DTranspose(filters=conv_filters_n[0], kernel_size=5,
+                                            strides=(1, 1),
+                                            use_bias=False,
+                                            name='d3_deconv_layer_1'
+                                            )(d3_debias_layer_1)
+
+        d3_depool_0 = DePool(model=model, pool_layer_origin=['pool_0'], name='d3_depool_layer_0')(
+            d3_deconv_layer_1)
+
+        d3_debias_layer_0 = DeBias(nFilters=32, name='d3_debias_layer_0')(
+            d3_depool_0)
+
+        d3_deconv_layer_0 = Conv2DTranspose(filters=3, kernel_size=6,
+                                            strides=(1, 1),
+                                            use_bias=False,
+                                            name='d3_deconv_layer_0'
+                                            )(d3_debias_layer_0)
+
+        d3_output_layer = Lambda(function=reshape_output, output_shape=lambda input_shape: (
+            self.BATCH_SIZE, input_shape[1], input_shape[2] * input_shape[0] /
+            self.BATCH_SIZE, input_shape[3]))(d3_deconv_layer_0)
+
+        '''
+        enabling models
+        '''
 
         smodel_seq = model(sinput_tensor)
 
@@ -164,29 +314,26 @@ class simple_deconv(kaggle_winsol):
                                      output_shape=lambda x: x,
                                      )(smodel_seq)
 
-        def reshape_output(x, BATCH_SIZE=self.BATCH_SIZE):
-            input_shape = T.shape(x)
-            input_ = x
-            # new_input_shape = (
-            # BATCH_SIZE, input_shape[1], input_shape[2] * input_shape[0] /
-            # BATCH_SIZE, input_shape[3])
-            new_input_shape = (
-                input_shape[0], input_shape[1], input_shape[2], input_shape[3])
-            input_ = input_.reshape(new_input_shape)
-            return input_
-
-        output_layer_deconv = Lambda(function=reshape_output, output_shape=lambda input_shape: (
-            self.BATCH_SIZE, input_shape[1], input_shape[2] * input_shape[0] /
-            self.BATCH_SIZE, input_shape[3]))(deconv_layer_0)
-
         model_simple = Model(sinput_tensor,
                              outputs=output_layer_smodel, name='model_simple')
 
-        model_deconv = Model(inputs=model.get_input_at(0), outputs=output_layer_deconv,
-                             name='model_deconv')
+        model_deconv_0 = Model(inputs=model.get_input_at(0), outputs=d0_output_layer,
+                               name='model_deconv_0')
+
+        model_deconv_1 = Model(inputs=model.get_input_at(0), outputs=d1_output_layer,
+                               name='model_deconv_1')
+
+        model_deconv_2 = Model(inputs=model.get_input_at(0), outputs=d2_output_layer,
+                               name='model_deconv_2')
+
+        model_deconv_3 = Model(inputs=model.get_input_at(0), outputs=d3_output_layer,
+                               name='model_deconv_3')
 
         self.models = {'model_norm': model_simple,
-                       'model_deconv': model_deconv,
+                       'model_deconv_0': model_deconv_0,
+                       'model_deconv_1': model_deconv_1,
+                       'model_deconv_2': model_deconv_2,
+                       'model_deconv_3': model_deconv_3,
                        }
 
         self._compile_models(loss='categorical_crossentropy')

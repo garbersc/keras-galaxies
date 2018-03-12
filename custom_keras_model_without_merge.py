@@ -345,7 +345,7 @@ class kaggle_x_cat_x_maxout(kaggle_winsol):
         model_noNorm = Model(
             inputs=[input_tensor, input_tensor_45], outputs=output_layer_noNorm, name='full_model_noNorm')
         model_deconv = Model(inputs=model.get_input_at(0), outputs=output_layer_deconv,
-                             name='deconv_1')
+                             name='model_deconv')
 
         self.models = {'model_norm': model_norm,
                        'model_norm_metrics': model_norm_metrics,
